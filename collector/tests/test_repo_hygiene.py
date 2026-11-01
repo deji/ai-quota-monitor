@@ -49,13 +49,10 @@ class TestRepoFreeOfSecretsAndPersonalIdentifiers(unittest.TestCase):
         """Ensure no forbidden secret, keystore, or database files are present in the repo."""
         forbidden_found = []
         for root, dirs, files in os.walk(self.repo_root):
-            # Skip .git and local virtual environments
-            if ".git" in dirs:
-                dirs.remove(".git")
-            if ".venv" in dirs:
-                dirs.remove(".venv")
-            if "__pycache__" in dirs:
-                dirs.remove("__pycache__")
+            # Skip .git, local virtual environments, and build output directories
+            for skip in (".git", ".venv", "__pycache__", "build", ".gradle", ".kotlin"):
+                if skip in dirs:
+                    dirs.remove(skip)
 
             for f in files:
                 rel_path = os.path.relpath(os.path.join(root, f), self.repo_root)
@@ -73,7 +70,7 @@ class TestRepoFreeOfSecretsAndPersonalIdentifiers(unittest.TestCase):
     def test_no_secrets_or_personal_identifiers_in_code_or_docs(self):
         """Scan all text files for leaked tokens, keys, and personal home paths."""
         violations = []
-        skip_dirs = {".git", ".venv", "__pycache__", ".agents"}
+        skip_dirs = {".git", ".venv", "__pycache__", ".agents", "build", ".gradle", ".kotlin"}
         skip_files = {
             "test_repo_hygiene.py",  # Contains regex definitions
             "pre-commit",            # Contains pre-commit hook regex definitions

@@ -1,6 +1,7 @@
 """AES-256-GCM authenticated snapshot encryption and GitHub Gist publisher."""
 import base64
 import datetime
+import hmac
 import json
 import os
 import shutil
@@ -182,7 +183,7 @@ def _pure_python_aes_gcm_decrypt(
 
     s = _ghash(H, pad_aad + pad_c + len_block)
     expected_tag = bytes(a ^ b for a, b in zip(s, _cipher_block(J0, w)))
-    if expected_tag != tag:
+    if not hmac.compare_digest(expected_tag, tag):
         raise ValueError("Authentication tag mismatch")
 
     plaintext = bytearray()
@@ -214,27 +215,28 @@ def encrypt_snapshot(
     plaintext_bytes: bytes,
     key_hex: Any,
     captured_at: Optional[str] = None,
+    nonce: Optional[bytes] = None,
 ) -> Dict[str, Any]:
     """Encrypt plaintext_bytes using AES-256-GCM authenticated encryption.
     
     Produces a standard v1 envelope dict.
     """
     key_bytes = _decode_key(key_hex)
-    nonce = os.urandom(12)
+    iv_bytes = nonce if nonce is not None else os.urandom(12)
     timestamp = captured_at or datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     if _HAS_CRYPTOGRAPHY:
         aesgcm = _CryptoAESGCM(key_bytes)
-        ct_and_tag = aesgcm.encrypt(nonce, plaintext_bytes, None)
+        ct_and_tag = aesgcm.encrypt(iv_bytes, plaintext_bytes, None)
         ciphertext = ct_and_tag[:-16]
         tag = ct_and_tag[-16:]
     else:
-        ciphertext, tag = _pure_python_aes_gcm_encrypt(key_bytes, nonce, plaintext_bytes)
+        ciphertext, tag = _pure_python_aes_gcm_encrypt(key_bytes, iv_bytes, plaintext_bytes)
 
     return {
         "v": 1,
         "alg": "AES-256-GCM",
-        "nonce": base64.b64encode(nonce).decode("ascii"),
+        "nonce": base64.b64encode(iv_bytes).decode("ascii"),
         "ciphertext": base64.b64encode(ciphertext).decode("ascii"),
         "tag": base64.b64encode(tag).decode("ascii"),
         "capturedAt": timestamp,
@@ -255,7 +257,10 @@ def decrypt_snapshot(envelope: Dict[str, Any], key_hex: Any) -> bytes:
     key_bytes = _decode_key(key_hex)
 
     try:
-        nonce = base64.b64decode(envelope["nonce"])
+        raw_nonce = envelope.get("nonce") or envelope.get("iv")
+        if not raw_nonce:
+            raise ValueError("Missing nonce or iv in envelope")
+        nonce = base64.b64decode(raw_nonce)
         ciphertext = base64.b64decode(envelope["ciphertext"])
         tag = base64.b64decode(envelope["tag"])
     except (KeyError, Exception) as e:
@@ -269,18 +274,35 @@ def decrypt_snapshot(envelope: Dict[str, Any], key_hex: Any) -> bytes:
     if _HAS_CRYPTOGRAPHY:
         aesgcm = _CryptoAESGCM(key_bytes)
         try:
-            return aesgcm.decrypt(nonce, ciphertext + tag, None)
+            decrypted = aesgcm.decrypt(nonce, ciphertext + tag, None)
         except Exception:
             raise ValueError("Authentication tag mismatch")
     else:
-        return _pure_python_aes_gcm_decrypt(key_bytes, nonce, ciphertext, tag)
+        decrypted = _pure_python_aes_gcm_decrypt(key_bytes, nonce, ciphertext, tag)
+
+    # If outer envelope has non-blank capturedAt and decrypted JSON has capturedAt, verify they match
+    envelope_captured = envelope.get("capturedAt")
+    if envelope_captured and isinstance(envelope_captured, str) and envelope_captured.strip():
+        try:
+            inner_obj = json.loads(decrypted.decode("utf-8"))
+            if isinstance(inner_obj, dict):
+                inner_captured = inner_obj.get("capturedAt")
+                if inner_captured and isinstance(inner_captured, str) and inner_captured.strip():
+                    if envelope_captured.strip() != inner_captured.strip():
+                        raise ValueError(
+                            f"Envelope capturedAt ({envelope_captured}) does not match inner capturedAt ({inner_captured})"
+                        )
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            pass
+
+    return decrypted
 
 
 def publish_to_gist(
     envelope_dict: Dict[str, Any],
     gist_id: Optional[str] = None,
     gh_token: Optional[str] = None,
-    filename: str = "quota_snapshot.json",
+    filename: str = "quota_snapshot.enc.json",
 ) -> Dict[str, Any]:
     """Publish an encrypted snapshot envelope to a secret GitHub Gist.
     

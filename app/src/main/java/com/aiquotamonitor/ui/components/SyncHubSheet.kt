@@ -66,6 +66,7 @@ fun SyncHubSheet(
     val settings by viewModel.settings.collectAsState()
     val syncError by viewModel.syncError.collectAsState()
     val isSyncError by viewModel.isSyncError.collectAsState()
+    val isStale by viewModel.isStale.collectAsState()
     val isPriming by viewModel.isPriming.collectAsState()
     val userMessage by viewModel.userMessage.collectAsState()
 
@@ -120,6 +121,7 @@ fun SyncHubSheet(
             // Connection Status Card
             val statusColor = when {
                 isSyncError -> QuotaCoral
+                isStale -> QuotaAmber
                 connectionState == ConnectionState.TAILSCALE_LIVE -> QuotaEmerald
                 connectionState == ConnectionState.CLOUD_RELAY_SYNCED -> QuotaCyan
                 connectionState == ConnectionState.DEMO_SEED -> QuotaAmber
@@ -149,15 +151,19 @@ fun SyncHubSheet(
 
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = connectionState.label,
+                            text = if (isStale) "${connectionState.label} (Stale)" else connectionState.label,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = if (isSyncError) "Fallback active due to transport error" else "Operating nominally",
+                            text = when {
+                                isSyncError -> "Fallback active due to transport error"
+                                isStale -> "Snapshot captured over 2 hours ago (>7200s)"
+                                else -> "Operating nominally"
+                            },
                             style = MaterialTheme.typography.bodySmall,
-                            color = if (isSyncError) QuotaCoral else MaterialTheme.colorScheme.onSurfaceVariant
+                            color = if (isSyncError) QuotaCoral else if (isStale) QuotaAmber else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -256,6 +262,23 @@ fun SyncHubSheet(
                             style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.SemiBold,
                             color = if (settings.gistId.isNotBlank()) QuotaEmerald else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "   GitHub Token:",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = if (settings.githubToken.isNotBlank()) "Configured" else "None (Raw URL / Public)",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (settings.githubToken.isNotBlank()) QuotaEmerald else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }

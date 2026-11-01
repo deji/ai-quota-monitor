@@ -42,8 +42,8 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Run Android Unit Tests & Assemble Debug APK
-        run: ./gradlew testDebugUnitTest assembleDebug --stacktrace
+      - name: Run Android Lint, Unit Tests & Assemble Debug APK
+        run: ./gradlew lintDebug testDebugUnitTest assembleDebug --stacktrace
 
       - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4

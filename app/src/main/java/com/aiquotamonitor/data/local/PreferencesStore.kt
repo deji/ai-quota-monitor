@@ -24,26 +24,30 @@ class PreferencesStore(
     private fun readSettings(): SyncSettings {
         val encryptedToken = prefs.getString(KEY_TAILSCALE_TOKEN, "") ?: ""
         val encryptedGistKey = prefs.getString(KEY_GIST_KEY, "") ?: ""
+        val encryptedGithubToken = prefs.getString(KEY_GITHUB_TOKEN, "") ?: ""
 
         return SyncSettings(
             tailscaleUrl = prefs.getString(KEY_TAILSCALE_URL, "") ?: "",
             tailscaleToken = secretStore.decrypt(encryptedToken),
             gistId = prefs.getString(KEY_GIST_ID, "") ?: "",
             gistAesKey = secretStore.decrypt(encryptedGistKey),
+            githubToken = secretStore.decrypt(encryptedGithubToken),
             activeHoursStart = prefs.getString(KEY_HOURS_START, "08:00") ?: "08:00",
             activeHoursEnd = prefs.getString(KEY_HOURS_END, "22:00") ?: "22:00"
         )
     }
 
     fun saveSettings(settings: SyncSettings) {
-        val encryptedToken = secretStore.encrypt(settings.tailscaleToken)
-        val encryptedGistKey = secretStore.encrypt(settings.gistAesKey)
+        val encryptedToken = try { secretStore.encrypt(settings.tailscaleToken) } catch (_: Exception) { "" }
+        val encryptedGistKey = try { secretStore.encrypt(settings.gistAesKey) } catch (_: Exception) { "" }
+        val encryptedGithubToken = try { secretStore.encrypt(settings.githubToken) } catch (_: Exception) { "" }
 
         prefs.edit()
             .putString(KEY_TAILSCALE_URL, settings.tailscaleUrl)
             .putString(KEY_TAILSCALE_TOKEN, encryptedToken)
             .putString(KEY_GIST_ID, settings.gistId)
             .putString(KEY_GIST_KEY, encryptedGistKey)
+            .putString(KEY_GITHUB_TOKEN, encryptedGithubToken)
             .putString(KEY_HOURS_START, settings.activeHoursStart)
             .putString(KEY_HOURS_END, settings.activeHoursEnd)
             .apply()
@@ -76,6 +80,7 @@ class PreferencesStore(
         private const val KEY_TAILSCALE_TOKEN = "tailscale_token"
         private const val KEY_GIST_ID = "gist_id"
         private const val KEY_GIST_KEY = "gist_key"
+        private const val KEY_GITHUB_TOKEN = "github_token"
         private const val KEY_HOURS_START = "hours_start"
         private const val KEY_HOURS_END = "hours_end"
         private const val KEY_CACHED_SNAPSHOT = "cached_snapshot"

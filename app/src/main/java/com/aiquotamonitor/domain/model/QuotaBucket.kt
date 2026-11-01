@@ -11,7 +11,7 @@ data class QuotaBucket(
     val windowDurationHours: Int,
     val remainingPercent: Double,
     val usedPercent: Double,
-    val resetsAt: String,
+    val resetsAt: String? = null,
     val elapsedPercent: Double = 0.0,
     val paceDeltaPercent: Double = 0.0,
     val burnRatePerHour: Double = 0.0,
@@ -31,7 +31,8 @@ data class QuotaBucket(
      */
     val hoursUntilReset: Double?
         get() = try {
-            val instant = java.time.Instant.parse(resetsAt)
+            val at = resetsAt ?: return null
+            val instant = java.time.Instant.parse(at)
             val now = java.time.Instant.now()
             val duration = java.time.Duration.between(now, instant)
             if (duration.isNegative) 0.0 else duration.toMinutes() / 60.0

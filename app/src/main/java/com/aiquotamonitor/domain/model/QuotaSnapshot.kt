@@ -6,12 +6,22 @@ import kotlinx.serialization.Serializable
 data class QuotaSnapshot(
     val schemaVersion: Int = 1,
     val capturedAt: String,
-    val host: String = "mac-host",
+    val host: String = "collector",
     val smartPrime: SmartPrimeStatus = SmartPrimeStatus(),
     val orcaRoles: List<OrcaRoleReadiness> = emptyList(),
     val providers: List<ProviderQuota> = emptyList(),
     val history: List<HistoryPoint> = emptyList()
 ) {
+    /**
+     * Snapshots older than 2 hours (7200 seconds) are considered stale.
+     */
+    val isStale: Boolean
+        get() = try {
+            val captured = java.time.Instant.parse(capturedAt)
+            java.time.Duration.between(captured, java.time.Instant.now()).seconds > 7200
+        } catch (_: Exception) {
+            false
+        }
     /**
      * Find bucket by id across all providers
      */

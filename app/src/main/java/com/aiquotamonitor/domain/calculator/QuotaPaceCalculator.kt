@@ -9,7 +9,8 @@ object QuotaPaceCalculator {
     /**
      * Parses an ISO-8601 string (e.g. 2026-11-01T19:39:25Z) to epoch milliseconds.
      */
-    fun parseIsoToEpochMs(isoString: String): Long {
+    fun parseIsoToEpochMs(isoString: String?): Long {
+        if (isoString.isNullOrBlank()) return 0L
         return try {
             Instant.parse(isoString).toEpochMilli()
         } catch (_: Exception) {

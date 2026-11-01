@@ -150,7 +150,7 @@ fun TimeTravelScrubberDock(
                     .height(32.dp)
             )
 
-            // Preset Quick Buttons: NOW, +1H, +3H, and RESET (to nearest bucket's hoursUntilReset)
+            // Preset Quick Buttons: NOW, +1H, +4H, and RESET (to nearest bucket's hoursUntilReset)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -160,7 +160,7 @@ fun TimeTravelScrubberDock(
                 val presets = listOf(
                     0.0 to "NOW",
                     1.0 to "+1H",
-                    3.0 to "+3H",
+                    4.0 to "+4H",
                     roundedNearest to "RESET (${roundedNearest}h)"
                 )
 

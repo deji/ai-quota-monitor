@@ -42,6 +42,14 @@ class QuotaViewModel(
             initialValue = !repository.syncErrorFlow.value.isNullOrBlank()
         )
 
+    val isStale: StateFlow<Boolean> = repository.snapshotFlow
+        .map { it.isStale }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = repository.snapshotFlow.value.isStale
+        )
+
     private val _polarity = MutableStateFlow(preferencesStore?.getPolarity() ?: QuotaPolarity.REMAINING)
     val polarity: StateFlow<QuotaPolarity> = _polarity.asStateFlow()
 
@@ -135,6 +143,13 @@ class QuotaViewModel(
     fun saveSettings(newSettings: SyncSettings) {
         repository.updateSettings(newSettings)
         refresh(forceTailscale = false, isManual = true)
+    }
+
+    fun updateActiveHours(start: String, end: String) {
+        viewModelScope.launch {
+            repository.updateActiveHours(start, end)
+            triggerWidgetUpdate()
+        }
     }
 
     fun clearUserMessage() {

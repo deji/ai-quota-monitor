@@ -98,7 +98,8 @@ class QuotaRepositoryImpl(
             try {
                 val relaySnapshot = gistClient.fetchAndDecryptSnapshot(
                     gistId = settings.gistId,
-                    aesKey = settings.gistAesKey
+                    aesKey = settings.gistAesKey,
+                    githubToken = settings.githubToken.ifBlank { null }
                 )
                 _syncErrorFlow.value = null
                 applyNewSnapshot(relaySnapshot, ConnectionState.CLOUD_RELAY_SYNCED)
@@ -145,7 +146,9 @@ class QuotaRepositoryImpl(
             val current = _snapshotFlow.value
             val simulatedPrime = current.smartPrime.copy(
                 grokTokenRemainingSeconds = 5400L, // 90 minutes
-                lastPrimedAt = java.time.Instant.now().toString()
+                lastPrimedAt = java.time.Instant.now().toString(),
+                primed = true,
+                reason = "offline_demo_primed"
             )
             val updatedSnapshot = current.copy(smartPrime = simulatedPrime)
             applyNewSnapshot(updatedSnapshot, _connectionStateFlow.value)
@@ -154,19 +157,42 @@ class QuotaRepositoryImpl(
         }
 
         try {
-            val primeStatus = tailscaleClient.primeGrok(
+            val freshSnapshot = tailscaleClient.primeGrok(
                 baseUrl = settings.tailscaleUrl,
                 token = settings.tailscaleToken.ifBlank { null }
             )
-            // Follow-up quota refresh after prime - must verify outcome!
-            val refreshResult = refresh(forceTailscale = true, isManual = true)
-            if (refreshResult.isFailure) {
-                val cause = refreshResult.exceptionOrNull() ?: IOException("Follow-up quota refresh failed after Grok prime")
-                return@withContext Result.failure(cause)
+            _syncErrorFlow.value = null
+            applyNewSnapshot(freshSnapshot, ConnectionState.TAILSCALE_LIVE)
+            if (!freshSnapshot.smartPrime.primed) {
+                _syncErrorFlow.value = "Grok token not primed: ${freshSnapshot.smartPrime.reason}"
             }
-            Result.success(primeStatus)
+            Result.success(freshSnapshot.smartPrime)
         } catch (e: Exception) {
             Result.failure(e)
+        }
+    }
+
+    override suspend fun updateActiveHours(start: String, end: String): Result<QuotaSnapshot> = withContext(Dispatchers.IO) {
+        val current = settingsFlow.value
+        val updated = current.copy(activeHoursStart = start, activeHoursEnd = end)
+        preferencesStore.saveSettings(updated)
+
+        if (updated.tailscaleUrl.isNotBlank()) {
+            try {
+                val snapshot = tailscaleClient.updateActiveHours(
+                    baseUrl = updated.tailscaleUrl,
+                    token = updated.tailscaleToken.ifBlank { null },
+                    start = start,
+                    end = end
+                )
+                _syncErrorFlow.value = null
+                applyNewSnapshot(snapshot, ConnectionState.TAILSCALE_LIVE)
+                Result.success(snapshot)
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        } else {
+            Result.success(_snapshotFlow.value)
         }
     }
 

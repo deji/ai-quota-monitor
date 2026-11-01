@@ -44,13 +44,16 @@ class QuotaCompactWidget : GlanceAppWidget() {
         val prefs = PreferencesStore(context)
         val polarity = prefs.getPolarity()
         val cachedJson = prefs.getCachedSnapshotJson()
+        var isDemo = false
         val snapshot = if (!cachedJson.isNullOrBlank()) {
             try {
                 widgetJson.decodeFromString<QuotaSnapshot>(cachedJson)
             } catch (_: Exception) {
+                isDemo = true
                 SeedData.createSeedSnapshot()
             }
         } else {
+            isDemo = true
             SeedData.createSeedSnapshot()
         }
 
@@ -59,6 +62,8 @@ class QuotaCompactWidget : GlanceAppWidget() {
         val label = bottleneck?.label ?: "Gemini 4 Argon"
         val pace = bottleneck?.paceDeltaPercent ?: -33.1
         val polarityTag = if (polarity == QuotaPolarity.REMAINING) "REM" else "USED"
+        val headerText = if (isDemo) "AI QUOTA • $polarityTag • DEMO" else "AI QUOTA • $polarityTag"
+        val dotColor = if (isDemo) Color(0xFFFFB951) else Color(0xFF5CE196)
 
         provideContent {
             GlanceTheme {
@@ -82,7 +87,7 @@ class QuotaCompactWidget : GlanceAppWidget() {
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "AI QUOTA • $polarityTag",
+                                text = headerText,
                                 style = TextStyle(
                                     color = ColorProvider(Color(0xFF80D4DC)),
                                     fontSize = 10.sp,
@@ -94,7 +99,7 @@ class QuotaCompactWidget : GlanceAppWidget() {
                                 modifier = GlanceModifier
                                     .size(8.dp)
                                     .cornerRadius(4.dp)
-                                    .background(ColorProvider(Color(0xFF5CE196)))
+                                    .background(ColorProvider(dotColor))
                             ) {}
                         }
 

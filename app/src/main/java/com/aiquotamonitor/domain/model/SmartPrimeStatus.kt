@@ -9,5 +9,7 @@ data class SmartPrimeStatus(
     val activeHoursEnd: String = "22:00",
     val grokTokenExpiresAt: String? = null,
     val grokTokenRemainingSeconds: Long? = null,
-    val lastPrimedAt: String? = null
+    val lastPrimedAt: String? = null,
+    val primed: Boolean = false,
+    val reason: String? = null
 )

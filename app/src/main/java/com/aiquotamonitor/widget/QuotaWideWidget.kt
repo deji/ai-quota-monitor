@@ -45,16 +45,20 @@ class QuotaWideWidget : GlanceAppWidget() {
         val prefs = PreferencesStore(context)
         val polarity = prefs.getPolarity()
         val cachedJson = prefs.getCachedSnapshotJson()
+        var isDemo = false
         val snapshot = if (!cachedJson.isNullOrBlank()) {
             try {
                 widgetJson.decodeFromString<QuotaSnapshot>(cachedJson)
             } catch (_: Exception) {
+                isDemo = true
                 SeedData.createSeedSnapshot()
             }
         } else {
+            isDemo = true
             SeedData.createSeedSnapshot()
         }
         val polarityTag = if (polarity == QuotaPolarity.REMAINING) "REM" else "USED"
+        val headerText = if (isDemo) "ORCA STAGE DECK • $polarityTag • DEMO" else "ORCA STAGE DECK • $polarityTag"
 
         provideContent {
             GlanceTheme {
@@ -76,7 +80,7 @@ class QuotaWideWidget : GlanceAppWidget() {
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "ORCA STAGE DECK • $polarityTag",
+                                text = headerText,
                                 style = TextStyle(
                                     color = ColorProvider(Color(0xFF80D4DC)),
                                     fontSize = 11.sp,

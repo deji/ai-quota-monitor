@@ -3,7 +3,6 @@ import datetime
 import json
 import os
 import shutil
-import socket
 import sqlite3
 import subprocess
 import urllib.error
@@ -129,6 +128,7 @@ class AgyProvider:
                 except (ValueError, TypeError):
                     continue
 
+                rem_fraction = max(0.0, min(1.0, rem_fraction))
                 rem_percent = round(rem_fraction * 100.0, 1)
                 used_percent = round(100.0 - rem_percent, 1)
                 resets_at = b.get("reset_time")
@@ -233,7 +233,23 @@ class OpencodeGoProvider:
             if not isinstance(w_obj, dict):
                 continue
 
-            used_pct = _safe_float(w_obj.get("percent"), 0.0)
+            # Fail closed: skip window if status != 'ok' or percent missing/None/non-numeric
+            if w_obj.get("status") != "ok":
+                continue
+
+            raw_percent = w_obj.get("percent")
+            if raw_percent is None:
+                continue
+
+            try:
+                if isinstance(raw_percent, dict) and "val" in raw_percent:
+                    used_pct = float(raw_percent["val"])
+                else:
+                    used_pct = float(raw_percent)
+            except (ValueError, TypeError):
+                continue
+
+            used_pct = max(0.0, min(100.0, round(used_pct, 1)))
             rem_pct = round(100.0 - used_pct, 1)
             resets_at = w_obj.get("resetsAt")
 
@@ -276,17 +292,24 @@ class GrokProvider:
             "https://cli-chat-proxy.grok.com/v1/billing",
         ]
 
+        had_200_no_usage = False
         for url in urls:
             req = urllib.request.Request(url, headers=headers)
             try:
                 with urllib.request.urlopen(req, timeout=timeout) as resp:
-                    data = json.loads(resp.read().decode("utf-8"))
-                    return data, None
-            except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, socket.timeout):
+                    status = getattr(resp, "status", getattr(resp, "code", 200))
+                    if status == 200:
+                        data = json.loads(resp.read().decode("utf-8"))
+                        buckets = GrokProvider.parse(data)
+                        if not buckets:
+                            had_200_no_usage = True
+                            continue
+                        return data, None
+            except Exception:
                 continue
-            except Exception as e:
-                return None, f"Grok request error: {type(e).__name__}"
 
+        if had_200_no_usage:
+            return None, "parse_error"
         return None, "Failed all Grok billing endpoints"
 
     @staticmethod
@@ -294,6 +317,7 @@ class GrokProvider:
         """Defensively parse Grok billing configuration.
         
         Handles billing.config, config, onDemandCap.val, and productUsage arrays.
+        Fails closed with empty list if neither creditUsagePercent nor productUsage[].usagePercent is numeric.
         """
         if not raw_data or not isinstance(raw_data, dict):
             return []
@@ -305,20 +329,50 @@ class GrokProvider:
         if not isinstance(config, dict):
             return []
 
-        # Find creditUsagePercent or fallback to productUsage
-        used_pct: Optional[float] = None
-        if "creditUsagePercent" in config:
-            used_pct = _safe_float(config["creditUsagePercent"])
-        elif "productUsage" in config and isinstance(config["productUsage"], list):
+        # Find creditUsagePercent and productUsage[].usagePercent
+        credit_pct: Optional[float] = None
+        if "creditUsagePercent" in config and config["creditUsagePercent"] is not None:
+            raw_c = config["creditUsagePercent"]
+            try:
+                if isinstance(raw_c, dict) and "val" in raw_c:
+                    credit_pct = float(raw_c["val"])
+                else:
+                    credit_pct = float(raw_c)
+            except (ValueError, TypeError):
+                credit_pct = None
+
+        prod_pct: Optional[float] = None
+        if "productUsage" in config and isinstance(config["productUsage"], list):
             for prod in config["productUsage"]:
-                if isinstance(prod, dict) and "usagePercent" in prod:
-                    used_pct = _safe_float(prod["usagePercent"])
-                    break
+                if not isinstance(prod, dict):
+                    continue
+                # Only read usagePercent from items where item.get('product') in ('GrokBuild', None, '')
+                if prod.get("product") not in ("GrokBuild", None, ""):
+                    continue
+                if "usagePercent" in prod and prod["usagePercent"] is not None:
+                    raw_p = prod["usagePercent"]
+                    try:
+                        if isinstance(raw_p, dict) and "val" in raw_p:
+                            p_val = float(raw_p["val"])
+                        else:
+                            p_val = float(raw_p)
+                        if prod_pct is None or p_val > prod_pct:
+                            prod_pct = p_val
+                    except (ValueError, TypeError):
+                        pass
 
-        if used_pct is None:
-            used_pct = 0.0
+        if credit_pct is None and prod_pct is None:
+            # Mark parse_error with empty buckets if neither is numeric
+            return []
 
-        used_pct = round(used_pct, 1)
+        if credit_pct is not None and prod_pct is not None:
+            used_pct = max(credit_pct, prod_pct)
+        elif credit_pct is not None:
+            used_pct = credit_pct
+        else:
+            used_pct = prod_pct
+
+        used_pct = max(0.0, min(100.0, round(used_pct, 1)))
         rem_pct = round(100.0 - used_pct, 1)
 
         # Resets at end of period
@@ -415,7 +469,7 @@ def assemble_snapshot(
 ) -> Dict[str, Any]:
     """Assemble normalized v1 Quota Snapshot from provider buckets."""
     timestamp = captured_at or datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    host = host_name or "mac-host"
+    host = "collector"
     errs = errors or {}
 
     # Normalize buckets per provider
@@ -432,10 +486,25 @@ def assemble_snapshot(
     planner_rem = planner_bucket["remainingPercent"] if planner_bucket else 0.0
     planner_status = planner_bucket["status"] if planner_bucket else "unknown"
 
-    # BUILDER: Gemini 5h / OpenCode
-    builder_bucket = all_buckets_map.get("gemini-5h")
+    # BUILDER: min(gemini-5h, opencode-rolling)
+    gemini_5h = all_buckets_map.get("gemini-5h")
+    oc_rolling = all_buckets_map.get("opencode-rolling")
+
+    if gemini_5h and oc_rolling:
+        if gemini_5h["remainingPercent"] <= oc_rolling["remainingPercent"]:
+            builder_bucket = gemini_5h
+        else:
+            builder_bucket = oc_rolling
+    elif gemini_5h:
+        builder_bucket = gemini_5h
+    elif oc_rolling:
+        builder_bucket = oc_rolling
+    else:
+        builder_bucket = None
+
     builder_rem = builder_bucket["remainingPercent"] if builder_bucket else 0.0
     builder_status = builder_bucket["status"] if builder_bucket else "unknown"
+    builder_primary_id = builder_bucket["id"] if builder_bucket else "gemini-5h"
 
     # REVIEWER: Grok 4.7
     reviewer_bucket = all_buckets_map.get("grok-weekly-credits")
@@ -444,6 +513,8 @@ def assemble_snapshot(
     rem_sec = smart_prime_info.get("grokTokenRemainingSeconds") if smart_prime_info else None
     if reviewer_bucket and reviewer_bucket["status"] in ("warning", "critical"):
         reviewer_status = reviewer_bucket["status"]
+    elif errs.get("grok") == "parse_error":
+        reviewer_status = "parse_error"
     elif rem_sec is not None and 0 < rem_sec < 900:
         reviewer_status = "near_expiry"
 
@@ -458,7 +529,7 @@ def assemble_snapshot(
         {
             "role": "BUILDER",
             "label": "Flash 3.8 / OpenCode",
-            "primaryBucketId": "gemini-5h",
+            "primaryBucketId": builder_primary_id,
             "remainingPercent": builder_rem,
             "status": builder_status,
         },
@@ -558,6 +629,11 @@ def collect_all_quotas(
     oc_b = OpencodeGoProvider.parse(oc_raw)
     grok_b = GrokProvider.parse(grok_raw)
 
+    if not oc_err and oc_raw is not None and len(oc_b) == 0:
+        errors["opencode_go"] = "parse_error"
+    if grok_err == "parse_error" or (not grok_err and grok_raw is not None and len(grok_b) == 0):
+        errors["grok"] = "parse_error"
+
     now_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     # Record readings in storage if available
@@ -571,7 +647,7 @@ def collect_all_quotas(
         grok_buckets=grok_b,
         storage=storage,
         smart_prime_info=prime_info,
-        host_name=socket.gethostname() or "mac-host",
+        host_name="collector",
         captured_at=now_str,
         errors=errors,
     )

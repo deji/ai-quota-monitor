@@ -6,12 +6,18 @@ import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 
 @Serializable
 data class EncryptedGistEnvelope(
-    val iv: String,
+    val v: Int? = null,
+    val alg: String? = null,
+    val nonce: String? = null,
+    val iv: String? = null,
     val ciphertext: String,
-    val tag: String? = null
+    val tag: String? = null,
+    val capturedAt: String? = null
 )
 
 object GistEnvelopeDecryptor {
@@ -54,14 +60,24 @@ object GistEnvelopeDecryptor {
     }
 
     /**
-     * Decrypts a JSON envelope string containing {iv, ciphertext, [tag]}.
+     * Decrypts a JSON envelope string containing {nonce|iv, ciphertext, [tag], [capturedAt]}.
      * [keyHexOrBase64] can be either a 64-character hex string or base64 encoded 32-byte key.
      */
     fun decryptEnvelope(keyHexOrBase64: String, jsonEnvelope: String): String {
-        val keyBytes = decodeKey(keyHexOrBase64.trim())
         val envelope = json.decodeFromString<EncryptedGistEnvelope>(jsonEnvelope)
 
-        val ivBytes = decodeBytes(envelope.iv, expectedByteCount = 12)
+        if (envelope.v != 1) {
+            throw IllegalArgumentException("Unsupported or missing envelope version: ${envelope.v}")
+        }
+        if (envelope.alg != "AES-256-GCM") {
+            throw IllegalArgumentException("Unsupported or missing algorithm: ${envelope.alg}")
+        }
+
+        val rawNonce = envelope.nonce ?: envelope.iv
+            ?: throw IllegalArgumentException("Missing nonce or iv in envelope")
+
+        val keyBytes = decodeKey(keyHexOrBase64.trim())
+        val ivBytes = decodeBytes(rawNonce, expectedByteCount = 12)
         val cipherBytes = decodeBytes(envelope.ciphertext)
 
         val fullCiphertext = if (envelope.tag != null && envelope.tag.isNotEmpty()) {
@@ -71,7 +87,28 @@ object GistEnvelopeDecryptor {
             cipherBytes
         }
 
-        return decrypt(keyBytes, ivBytes, fullCiphertext)
+        val plaintext = decrypt(keyBytes, ivBytes, fullCiphertext)
+
+        if (!envelope.capturedAt.isNullOrBlank()) {
+            try {
+                val element = json.parseToJsonElement(plaintext)
+                if (element is JsonObject && element.containsKey("capturedAt")) {
+                    val innerPrimitive = element["capturedAt"] as? JsonPrimitive
+                    val innerCapturedAt = innerPrimitive?.content
+                    if (!innerCapturedAt.isNullOrBlank() && innerCapturedAt != envelope.capturedAt) {
+                        throw IllegalArgumentException(
+                            "Envelope capturedAt (${envelope.capturedAt}) does not match decrypted payload capturedAt ($innerCapturedAt)"
+                        )
+                    }
+                }
+            } catch (e: IllegalArgumentException) {
+                throw e
+            } catch (_: Exception) {
+                // Ignore if not a json object
+            }
+        }
+
+        return plaintext
     }
 
     fun decodeKey(keyStr: String): ByteArray {

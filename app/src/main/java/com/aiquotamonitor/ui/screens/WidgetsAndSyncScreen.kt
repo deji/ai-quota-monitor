@@ -64,6 +64,7 @@ fun WidgetsAndSyncScreen(
     var tailscaleToken by remember(savedSettings) { mutableStateOf(savedSettings.tailscaleToken) }
     var gistId by remember(savedSettings) { mutableStateOf(savedSettings.gistId) }
     var gistAesKey by remember(savedSettings) { mutableStateOf(savedSettings.gistAesKey) }
+    var githubToken by remember(savedSettings) { mutableStateOf(savedSettings.githubToken) }
 
     val startHour = try {
         savedSettings.activeHoursStart.split(":").first().toInt()
@@ -111,6 +112,7 @@ fun WidgetsAndSyncScreen(
             onHoursChanged = { s, e ->
                 currentStartHour = s
                 currentEndHour = e
+                viewModel.updateActiveHours("%02d:00".format(s), "%02d:00".format(e))
             }
         )
 
@@ -185,8 +187,8 @@ fun WidgetsAndSyncScreen(
                 OutlinedTextField(
                     value = gistId,
                     onValueChange = { gistId = it },
-                    label = { Text("GitHub Secret Gist ID") },
-                    placeholder = { Text("Gist ID or raw JSON URL") },
+                    label = { Text("GitHub Secret Gist ID or Raw URL") },
+                    placeholder = { Text("Gist ID or raw URL (gist.githubusercontent.com/...)") },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
@@ -210,6 +212,28 @@ fun WidgetsAndSyncScreen(
                     )
                 )
 
+                OutlinedTextField(
+                    value = githubToken,
+                    onValueChange = { githubToken = it },
+                    label = { Text("GitHub Read Token (Optional)") },
+                    placeholder = { Text("Fine-grained read token (Bearer)") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = QuotaCyan,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                    )
+                )
+
+                Text(
+                    text = "Tip: For private/secret Gists via api.github.com, provide an optional GitHub Read Token. Alternatively, paste a direct Raw Gist URL (gist.githubusercontent.com/...) without a token.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 11.sp
+                )
+
                 Spacer(modifier = Modifier.height(8.dp))
 
                 // Save & Sync Button
@@ -220,6 +244,7 @@ fun WidgetsAndSyncScreen(
                             tailscaleToken = tailscaleToken.trim(),
                             gistId = gistId.trim(),
                             gistAesKey = gistAesKey.trim(),
+                            githubToken = githubToken.trim(),
                             activeHoursStart = "%02d:00".format(currentStartHour),
                             activeHoursEnd = "%02d:00".format(currentEndHour)
                         )

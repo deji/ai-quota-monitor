@@ -76,8 +76,8 @@ def evaluate_smart_prime(
     
     Rules:
     - force=True: prime regardless of expiry or active hours.
-    - manual_refresh=True: prime when 0 < remaining_seconds < 900 regardless of active hours.
-    - background poll (default): prime when 0 < remaining_seconds < 900 AND within active hours.
+    - manual_refresh=True: prime when remaining_seconds < 900 (expired <= 0 or near-expiry < 900) regardless of active hours.
+    - background poll (default): prime when remaining_seconds < 900 (expired <= 0 or near-expiry < 900) AND within active hours.
     """
     now_utc = now or datetime.datetime.now(datetime.timezone.utc)
     if now_utc.tzinfo is None:
@@ -97,16 +97,17 @@ def evaluate_smart_prime(
     if expires_at_dt:
         remaining_seconds = (expires_at_dt - now_utc).total_seconds()
 
-    # Low 6: Only mark near_expiry when remaining_seconds is known and > 0 and < 900
-    is_near_expiry = remaining_seconds is not None and 0 < remaining_seconds < 900
+    # Expired (remaining_seconds <= 0) and near_expiry (0 < remaining_seconds < 900)
+    # are treated identically for priming eligibility
+    is_eligible = remaining_seconds is not None and remaining_seconds < 900
     is_in_active_hours = _is_within_active_hours(now_local, active_hours_start, active_hours_end)
 
     if force:
         should_prime = True
-    elif manual_refresh:
-        should_prime = is_near_expiry
+    elif is_eligible:
+        should_prime = is_in_active_hours or manual_refresh
     else:
-        should_prime = is_near_expiry and is_in_active_hours
+        should_prime = False
 
     primed = False
     reason = "ok"
@@ -148,10 +149,10 @@ def evaluate_smart_prime(
     else:
         if remaining_seconds is None:
             reason = "no_expires_at"
+        elif is_eligible and not is_in_active_hours:
+            reason = "near_expiry_outside_active_hours" if remaining_seconds > 0 else "token_expired_outside_active_hours"
         elif remaining_seconds <= 0:
             reason = "token_expired"
-        elif is_near_expiry and not is_in_active_hours:
-            reason = "near_expiry_outside_active_hours"
         else:
             reason = "token_healthy"
 

@@ -33,6 +33,8 @@ class GistEnvelopeDecryptorTest {
 
         val envelopeJson = """
             {
+              "v": 1,
+              "alg": "AES-256-GCM",
               "iv": "$ivBase64",
               "ciphertext": "$cipherBase64"
             }
@@ -80,6 +82,8 @@ class GistEnvelopeDecryptorTest {
 
         val envelopeJson = """
             {
+              "v": 1,
+              "alg": "AES-256-GCM",
               "iv": "$ivBase64",
               "ciphertext": "${Base64.getEncoder().encodeToString(cipherBytes)}"
             }
@@ -102,6 +106,8 @@ class GistEnvelopeDecryptorTest {
 
         val envelopeJson = """
             {
+              "v": 1,
+              "alg": "AES-256-GCM",
               "iv": "$ivWithPrefix",
               "ciphertext": "${Base64.getEncoder().encodeToString(cipherBytes)}"
             }
@@ -109,5 +115,102 @@ class GistEnvelopeDecryptorTest {
 
         val decrypted = GistEnvelopeDecryptor.decryptEnvelope(keyWithPrefix, envelopeJson)
         assertEquals(plaintext, decrypted)
+    }
+
+    @Test
+    fun testDeterministicCrossLanguageGoldenVector() {
+        val keyHex = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
+        val expectedPlaintext = "{\"schemaVersion\":1,\"capturedAt\":\"2026-11-01T16:27:47Z\",\"host\":\"collector\",\"status\":\"healthy\"}"
+        val goldenEnvelopeJson = """
+            {
+              "v": 1,
+              "alg": "AES-256-GCM",
+              "nonce": "oKGio6Slpqeoqaqr",
+              "ciphertext": "nToPTi2ub940APWgbhWu/EqddTLx1jIY6XxD4j7fVzvwRHfNmQ9iDHKsNZw4TLnLcCFyfzjyNlwpMXgqhkqn09vQ6QpT0YuS1s7da/uvuM++KZGGraT4FpodR7jM",
+              "tag": "Dj/3Kj4fHyzmMwdjW4rKGQ==",
+              "capturedAt": "2026-11-01T16:27:47Z"
+            }
+        """.trimIndent()
+
+        val decrypted = GistEnvelopeDecryptor.decryptEnvelope(keyHex, goldenEnvelopeJson)
+        assertEquals(expectedPlaintext, decrypted)
+    }
+
+    @Test
+    fun testCapturedAtMismatchThrows() {
+        val keyHex = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
+        // Tampered outer timestamp
+        val tamperedEnvelope = """
+            {
+              "v": 1,
+              "alg": "AES-256-GCM",
+              "nonce": "oKGio6Slpqeoqaqr",
+              "ciphertext": "nToPTi2ub940APWgbhWu/EqddTLx1jIY6XxD4j7fVzvwRHfNmQ9iDHKsNZw4TLnLcCFyfzjyNlwpMXgqhkqn09vQ6QpT0YuS1s7da/uvuM++KZGGraT4FpodR7jM",
+              "tag": "Dj/3Kj4fHyzmMwdjW4rKGQ==",
+              "capturedAt": "2026-11-01T19:00:00Z"
+            }
+        """.trimIndent()
+
+        assertThrows(IllegalArgumentException::class.java) {
+            GistEnvelopeDecryptor.decryptEnvelope(keyHex, tamperedEnvelope)
+        }
+    }
+
+    @Test
+    fun testUnsupportedVersionOrAlgThrows() {
+        val keyHex = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
+        val badVersionEnvelope = """
+            {
+              "v": 2,
+              "alg": "AES-256-GCM",
+              "nonce": "oKGio6Slpqeoqaqr",
+              "ciphertext": "nToPTi2ub940APWgbhWu/EqddTLx1jIY6XxD4j7fVzvwRHfNmQ9iDHKsNZw4TLnLcCFyfzjyNlwpMXgqhkqn09vQ6QpT0YuS1s7da/uvuM++KZGGraT4FpodR7jM",
+              "tag": "Dj/3Kj4fHyzmMwdjW4rKGQ=="
+            }
+        """.trimIndent()
+
+        assertThrows(IllegalArgumentException::class.java) {
+            GistEnvelopeDecryptor.decryptEnvelope(keyHex, badVersionEnvelope)
+        }
+
+        val badAlgEnvelope = """
+            {
+              "v": 1,
+              "alg": "AES-128-CBC",
+              "nonce": "oKGio6Slpqeoqaqr",
+              "ciphertext": "nToPTi2ub940APWgbhWu/EqddTLx1jIY6XxD4j7fVzvwRHfNmQ9iDHKsNZw4TLnLcCFyfzjyNlwpMXgqhkqn09vQ6QpT0YuS1s7da/uvuM++KZGGraT4FpodR7jM",
+              "tag": "Dj/3Kj4fHyzmMwdjW4rKGQ=="
+            }
+        """.trimIndent()
+
+        assertThrows(IllegalArgumentException::class.java) {
+            GistEnvelopeDecryptor.decryptEnvelope(keyHex, badAlgEnvelope)
+        }
+
+        val missingVersionEnvelope = """
+            {
+              "alg": "AES-256-GCM",
+              "nonce": "oKGio6Slpqeoqaqr",
+              "ciphertext": "nToPTi2ub940APWgbhWu/EqddTLx1jIY6XxD4j7fVzvwRHfNmQ9iDHKsNZw4TLnLcCFyfzjyNlwpMXgqhkqn09vQ6QpT0YuS1s7da/uvuM++KZGGraT4FpodR7jM",
+              "tag": "Dj/3Kj4fHyzmMwdjW4rKGQ=="
+            }
+        """.trimIndent()
+
+        assertThrows(IllegalArgumentException::class.java) {
+            GistEnvelopeDecryptor.decryptEnvelope(keyHex, missingVersionEnvelope)
+        }
+
+        val missingAlgEnvelope = """
+            {
+              "v": 1,
+              "nonce": "oKGio6Slpqeoqaqr",
+              "ciphertext": "nToPTi2ub940APWgbhWu/EqddTLx1jIY6XxD4j7fVzvwRHfNmQ9iDHKsNZw4TLnLcCFyfzjyNlwpMXgqhkqn09vQ6QpT0YuS1s7da/uvuM++KZGGraT4FpodR7jM",
+              "tag": "Dj/3Kj4fHyzmMwdjW4rKGQ=="
+            }
+        """.trimIndent()
+
+        assertThrows(IllegalArgumentException::class.java) {
+            GistEnvelopeDecryptor.decryptEnvelope(keyHex, missingAlgEnvelope)
+        }
     }
 }

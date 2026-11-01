@@ -224,6 +224,60 @@ class TestCollectorProviderParsers(unittest.TestCase):
         self.assertEqual(grok["usedPercent"], 7.5)
         self.assertEqual(grok["remainingPercent"], 92.5)
 
+    def test_grok_parser_ignores_non_grokbuild_products(self):
+        """GrokBuild product filter: only read usagePercent from items where product in ('GrokBuild', None, '')."""
+        fixture = {
+            "config": {
+                "currentPeriod": {"end": "2026-11-05T16:45:10Z"},
+                "productUsage": [
+                    {"product": "UnrelatedProduct", "usagePercent": 99.0},
+                    {"product": "GrokBuild", "usagePercent": 12.0},
+                ],
+            }
+        }
+        buckets = GrokProvider.parse(fixture)
+        self.assertEqual(len(buckets), 1)
+        self.assertEqual(buckets[0]["usedPercent"], 12.0)
+
+    def test_grok_parser_no_numeric_usage_returns_empty(self):
+        """If HTTP 200 body has no numeric usage, return empty buckets list."""
+        fixture = {
+            "config": {
+                "currentPeriod": {"end": "2026-11-05T16:45:10Z"},
+                "creditUsagePercent": None,
+                "productUsage": [{"product": "UnrelatedProduct", "usagePercent": 50.0}],
+            }
+        }
+        buckets = GrokProvider.parse(fixture)
+        self.assertEqual(buckets, [])
+
+    @patch("urllib.request.urlopen")
+    def test_grok_collect_parse_error_on_200_without_numeric_usage(self, mock_urlopen):
+        """GrokProvider.collect returns (None, 'parse_error') if HTTP 200 response body has no numeric usage."""
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_response.code = 200
+        mock_response.read.return_value = json.dumps({"config": {"creditUsagePercent": None}}).encode("utf-8")
+        mock_urlopen.return_value.__enter__.return_value = mock_response
+
+        prov = GrokProvider()
+        with patch("collector.providers.load_grok_auth", return_value={"key": "test-key"}):
+            data, err = prov.collect()
+            self.assertIsNone(data)
+            self.assertEqual(err, "parse_error")
+
+    @patch("collector.providers.AgyProvider.collect", return_value=({}, None))
+    @patch("collector.providers.OpencodeGoProvider.collect", return_value=({}, None))
+    @patch("collector.providers.GrokProvider.collect", return_value=(None, "parse_error"))
+    def test_collect_all_quotas_sets_parse_error_status(self, mock_grok, mock_oc, mock_agy):
+        """collect_all_quotas sets status = 'parse_error' when grok_err == 'parse_error'."""
+        from collector.providers import collect_all_quotas
+        snapshot = collect_all_quotas()
+        grok_p = next(p for p in snapshot["providers"] if p["id"] == "grok")
+        self.assertEqual(grok_p["status"], "parse_error")
+        reviewer_role = next(r for r in snapshot["orcaRoles"] if r["role"] == "REVIEWER")
+        self.assertEqual(reviewer_role["status"], "parse_error")
+
 
 class TestPaceMath(unittest.TestCase):
     """Test pace math against verified numbers in docs/providers.md."""
@@ -334,21 +388,33 @@ class TestSmartPrimeLogic(unittest.TestCase):
         self.assertFalse(_is_within_active_hours(now_dt, "25:00", "22:00"))
 
     def test_prime_expired_or_healthy_not_near_expiry(self):
-        """Low 6: Only mark near_expiry when remaining_seconds is known and > 0 and < 900."""
+        """Unified Smart Prime: Expired (remaining <= 0) tokens inside active hours prime; healthy tokens do not."""
         tz_utc = datetime.timezone.utc
         now_dt = datetime.datetime(2026, 11, 1, 14, 0, 0, tzinfo=tz_utc)
-        # Expired token (remaining <= 0)
+        # Expired token (remaining <= 0) inside active hours: must be primed!
         auth_expired = {"expires_at": "2026-11-01T13:50:00Z", "key": "dummy"}
-        res_expired = evaluate_smart_prime(
+        res_expired_inside = evaluate_smart_prime(
             auth_data=auth_expired,
             now=now_dt,
             tz=tz_utc,
             grok_bin="/bin/echo",
         )
-        self.assertFalse(res_expired["primed"])
-        self.assertEqual(res_expired["reason"], "token_expired")
+        self.assertTrue(res_expired_inside["primed"])
+        self.assertEqual(res_expired_inside["reason"], "primed_successfully")
 
-        # Healthy token (remaining >= 900)
+        # Expired token outside active hours (03:00): not primed
+        night_dt = datetime.datetime(2026, 11, 1, 3, 0, 0, tzinfo=tz_utc)
+        auth_expired_night = {"expires_at": "2026-11-01T02:50:00Z", "key": "dummy"}
+        res_expired_outside = evaluate_smart_prime(
+            auth_data=auth_expired_night,
+            now=night_dt,
+            tz=tz_utc,
+            grok_bin="/bin/echo",
+        )
+        self.assertFalse(res_expired_outside["primed"])
+        self.assertEqual(res_expired_outside["reason"], "token_expired_outside_active_hours")
+
+        # Healthy token (remaining >= 900): not primed
         auth_healthy = {"expires_at": "2026-11-01T15:00:00Z", "key": "dummy"}
         res_healthy = evaluate_smart_prime(
             auth_data=auth_healthy,
@@ -391,6 +457,42 @@ class TestCryptoRelay(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             decrypt_snapshot(envelope, self.key_hex)
+
+    def test_deterministic_cross_language_golden_vector(self):
+        """Cross-language golden test vector verified byte-for-byte in Python and Kotlin."""
+        key_hex = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
+        nonce = bytes.fromhex("a0a1a2a3a4a5a6a7a8a9aaab")
+        payload = b'{"schemaVersion":1,"capturedAt":"2026-11-01T16:27:47Z","host":"collector","status":"healthy"}'
+        envelope = encrypt_snapshot(payload, key_hex, captured_at="2026-11-01T16:27:47Z", nonce=nonce)
+
+        self.assertEqual(envelope["v"], 1)
+        self.assertEqual(envelope["alg"], "AES-256-GCM")
+        self.assertEqual(envelope["nonce"], "oKGio6Slpqeoqaqr")
+        self.assertEqual(
+            envelope["ciphertext"],
+            "nToPTi2ub940APWgbhWu/EqddTLx1jIY6XxD4j7fVzvwRHfNmQ9iDHKsNZw4TLnLcCFyfzjyNlwpMXgqhkqn09vQ6QpT0YuS1s7da/uvuM++KZGGraT4FpodR7jM",
+        )
+        self.assertEqual(envelope["tag"], "Dj/3Kj4fHyzmMwdjW4rKGQ==")
+        self.assertEqual(envelope["capturedAt"], "2026-11-01T16:27:47Z")
+
+        # Decrypt envelope with Python
+        decrypted = decrypt_snapshot(envelope, key_hex)
+        self.assertEqual(decrypted, payload)
+
+        # Legacy alias test: 'iv' instead of 'nonce'
+        envelope_iv = dict(envelope)
+        envelope_iv["iv"] = envelope_iv.pop("nonce")
+        decrypted_iv = decrypt_snapshot(envelope_iv, key_hex)
+        self.assertEqual(decrypted_iv, payload)
+
+    def test_captured_at_mismatch_fails(self):
+        key_hex = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
+        nonce = bytes.fromhex("a0a1a2a3a4a5a6a7a8a9aaab")
+        payload = b'{"schemaVersion":1,"capturedAt":"2026-11-01T16:27:47Z","host":"collector","status":"healthy"}'
+        envelope = encrypt_snapshot(payload, key_hex, captured_at="2026-11-01T16:27:47Z", nonce=nonce)
+        envelope["capturedAt"] = "2026-11-01T19:00:00Z"
+        with self.assertRaises(ValueError):
+            decrypt_snapshot(envelope, key_hex)
 
 
 class TestStorage(unittest.TestCase):
@@ -598,6 +700,46 @@ class TestHTTPServer(unittest.TestCase):
             self.assertIn("smartPrime", data)
             self.assertEqual(data["smartPrime"]["policy"], "active_hours_or_manual")
 
+    def test_active_hours_endpoint(self):
+        """High 4: POST /v1/config/active-hours updates hours and returns canonical QuotaSnapshot."""
+        url = f"http://127.0.0.1:{self.port}/v1/config/active-hours"
+        payload = json.dumps({"activeHoursStart": "07:30", "activeHoursEnd": "21:45"}).encode("utf-8")
+        req = urllib.request.Request(
+            url,
+            data=payload,
+            headers={
+                "Authorization": f"Bearer {self.bearer_token}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            self.assertEqual(resp.status, 200)
+            data = json.loads(resp.read().decode("utf-8"))
+            self.assertEqual(data["schemaVersion"], 1)
+            self.assertEqual(data["smartPrime"]["activeHoursStart"], "07:30")
+            self.assertEqual(data["smartPrime"]["activeHoursEnd"], "21:45")
+
+        # Invalid format fails with 400
+        bad_req = urllib.request.Request(
+            url,
+            data=b'{"activeHoursStart":"invalid"}',
+            headers={
+                "Authorization": f"Bearer {self.bearer_token}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            urllib.request.urlopen(bad_req, timeout=5)
+        self.assertEqual(ctx.exception.code, 400)
+
+        # Unauthorized request fails with 401
+        unauth_req = urllib.request.Request(url, data=payload, method="POST")
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            urllib.request.urlopen(unauth_req, timeout=5)
+        self.assertEqual(ctx.exception.code, 401)
+
     def test_history_authorized(self):
         """Medium 3: GET /v1/history returns {'history': storage.get_history(...)}."""
         url = f"http://127.0.0.1:{self.port}/v1/history"
@@ -690,6 +832,50 @@ class TestCLIAndConfig(unittest.TestCase):
             non_existent = os.path.join(tmpdir, "missing.json")
             cfg = load_config(non_existent)
             self.assertEqual(cfg["host"], "127.0.0.1")
+
+    @patch("collector.cli.QuotaHTTPServer")
+    def test_cmd_serve_with_preconfigured_bearer_token(self, mock_server_cls):
+        """Item 1: serve does not raise NameError when bearerToken is already set."""
+        from collector import cli
+        mock_server = MagicMock()
+        mock_server.serve_forever.side_effect = KeyboardInterrupt
+        mock_server_cls.return_value = mock_server
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cfg_path = os.path.join(tmpdir, "config.json")
+            with open(cfg_path, "w", encoding="utf-8") as f:
+                json.dump({"bearerToken": "already-configured-secret", "host": "127.0.0.1", "port": 8741}, f)
+
+            with patch("sys.argv", ["ai-quota-collector", "serve", "--config", cfg_path]):
+                cli.main()
+
+            mock_server_cls.assert_called_once()
+            _, kwargs = mock_server_cls.call_args
+            self.assertEqual(kwargs.get("bearer_token"), "already-configured-secret")
+            self.assertEqual(kwargs.get("config_path"), cfg_path)
+
+    def test_install_launchd_includes_repo_root_and_python_path(self):
+        """Item 4: launchd plist includes WorkingDirectory and PYTHONPATH pointing to repo root."""
+        from collector import cli
+        with tempfile.TemporaryDirectory() as tmpdir:
+            target_plist = os.path.join(tmpdir, "launchd.plist")
+            with patch("sys.argv", [
+                "ai-quota-collector",
+                "install-launchd",
+                "--plist-path", target_plist,
+                "--python-path", "/usr/local/bin/python3"
+            ]):
+                cli.main()
+
+            self.assertTrue(os.path.exists(target_plist))
+            with open(target_plist, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            self.assertNotIn("__REPO_ROOT__", content)
+            self.assertIn("<key>WorkingDirectory</key>", content)
+            self.assertIn("<key>EnvironmentVariables</key>", content)
+            self.assertIn("<key>PYTHONPATH</key>", content)
+            self.assertIn("<string>/usr/local/bin/python3</string>", content)
 
 
 if __name__ == "__main__":

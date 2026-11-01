@@ -82,12 +82,12 @@ Running `quota.py` and `python3 -m collector collect --json` on the live host co
 - **Credential Source**: `~/.grok/auth.json`, entry matching key prefix `https://auth.x.ai` (`key`, `user_id`, `expires_at`).
 - **Unified Smart Prime State Machine**:
   - Let `remaining_seconds = expires_at - now`.
-  - **Expired or Near Expiry (`remaining_seconds <= 900`)**:
-    - **Background Poll**: Primes (`grok -p "reply with ok"`) if and only if current local time is within `[activeHoursStart, activeHoursEnd]` (`08:00–22:00` default). Otherwise `primed = false`, `reason = "outside_active_hours"`.
-    - **Manual Pull-to-Refresh (`POST /v1/quota/refresh`, `manual_refresh=True`)**: Primes immediately regardless of active hours (`reason = "primed_success"`).
-  - **Healthy (`remaining_seconds > 900`)**:
+  - **Expired or Near Expiry (`remaining_seconds < 900`)**:
+    - **Background Poll**: Primes (`grok -p "reply with ok"`) if and only if current local time is within `[activeHoursStart, activeHoursEnd]` (`08:00–22:00` default), setting `primed = true`, `reason = "primed_successfully"`. Outside active hours, `primed = false` with `reason = "near_expiry_outside_active_hours"` (if `0 < remaining_seconds < 900`) or `reason = "token_expired_outside_active_hours"` (if `remaining_seconds <= 0`).
+    - **Manual Pull-to-Refresh (`POST /v1/quota/refresh`, `manual_refresh=True`)**: Primes immediately regardless of active hours (`primed = true`, `reason = "primed_successfully"`).
+  - **Healthy (`remaining_seconds >= 900`)**:
     - **Background Poll or Pull-to-Refresh**: Does not prime (`primed = false`, `reason = "token_healthy"`).
-    - **Explicit Prime Pulse (`POST /v1/grok/prime`, `force=True`)**: Primes immediately (`reason = "primed_success"`), reloads `~/.grok/auth.json`, re-collects all providers, and returns the full canonical `QuotaSnapshot`.
+    - **Explicit Prime Pulse (`POST /v1/grok/prime`, `force=True`)**: Primes immediately (`primed = true`, `reason = "primed_successfully"`), reloads `~/.grok/auth.json`, re-collects all providers, and returns the full canonical `QuotaSnapshot`.
   - **Active-Hours Configuration Sync (`POST /v1/config/active-hours`)**:
     - Accepts `{"activeHoursStart": "HH:MM", "activeHoursEnd": "HH:MM"}`, validates both timestamps, atomically updates `config.json` (`0600`), and returns the updated `QuotaSnapshot`.
 
@@ -191,3 +191,17 @@ Rules enforced by both producer and consumer:
    - **Key (32 bytes hex)**: `000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f`
    - **Nonce (12 bytes hex)**: `a0a1a2a3a4a5a6a7a8a9aaab` (`oKGio6Slpqeoqaqr` in Base64)
    - Both `collector/tests/test_collector.py` and `app/src/test/java/com/aiquotamonitor/domain/GistEnvelopeDecryptorTest.kt` must verify encryption/decryption of the exact same golden envelope!
+
+---
+
+## 5. Security & Network Isolation
+
+- **OS-level `network_security_config.xml`**: Android's network security configuration permits cleartext HTTP in its `<base-config>` to enable communication with the local/Tailscale companion daemon, while strictly prohibiting cleartext (`cleartextTrafficPermitted="false"`) for GitHub domains (`github.com`, `api.github.com`, `githubusercontent.com`, `gist.githubusercontent.com`).
+- **Client-level CIDR Enforcement**: Because Android's XML network security configuration operates on domain names and does not evaluate IP CIDR blocks, `TailscaleApiClient` enforces strict client-level IP validation. Cleartext `http://` requests are permitted only for private, Tailscale CGNAT, and loopback ranges:
+  - `100.64.0.0/10` (Tailscale CGNAT)
+  - `127.0.0.1` / `localhost` (Loopback)
+  - `10.0.0.0/8` (RFC 1918 Private)
+  - `172.16.0.0/12` (RFC 1918 Private)
+  - `192.168.0.0/16` (RFC 1918 Private)
+  - `*.ts.net` (Tailscale MagicDNS)
+  Any attempt to send cleartext `http://` traffic to a public IP or unapproved host is rejected with `IllegalArgumentException` on the client before socket transmission, safeguarding bearer tokens.

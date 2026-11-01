@@ -229,14 +229,16 @@ fun BucketDetailSheet(
             }
 
             // Section 2: Reset Window & Exhaustion Projection
-            val resetTimeFormatted = try {
-                val resetInstant = Instant.parse(bucket.resetsAt)
-                val duration = Duration.between(Instant.now(), resetInstant)
-                if (duration.isNegative) "Resetting now"
-                else "${duration.toHours()}h ${duration.toMinutes() % 60}m"
-            } catch (_: Exception) {
-                "${bucket.hoursUntilReset?.let { String.format(Locale.US, "%.1fh", it) } ?: "N/A"}"
-            }
+            val resetTimeFormatted = bucket.resetsAt?.let { at ->
+                try {
+                    val resetInstant = Instant.parse(at)
+                    val duration = Duration.between(Instant.now(), resetInstant)
+                    if (duration.isNegative) "Resetting now"
+                    else "${duration.toHours()}h ${duration.toMinutes() % 60}m"
+                } catch (_: Exception) {
+                    null
+                }
+            } ?: bucket.hoursUntilReset?.let { String.format(Locale.US, "%.1fh", it) } ?: "N/A"
 
             val exhaustionText = if (bucket.burnRatePerHour > 0.0) {
                 val hoursToZero = bucket.remainingPercent / bucket.burnRatePerHour

@@ -69,6 +69,7 @@ fun DashboardScreen(
     val isScrubbing by viewModel.isScrubbing.collectAsState()
     val isPriming by viewModel.isPriming.collectAsState()
     val isSyncError by viewModel.isSyncError.collectAsState()
+    val isStale by viewModel.isStale.collectAsState()
 
     var selectedBucket by remember { mutableStateOf<QuotaBucket?>(null) }
     var showSyncHub by remember { mutableStateOf(false) }
@@ -112,6 +113,7 @@ fun DashboardScreen(
                 // Connection Status Pill: clickable to open SyncHubSheet
                 val dotColor = when {
                     isSyncError -> QuotaCoral
+                    isStale -> QuotaAmber
                     connectionState == ConnectionState.TAILSCALE_LIVE -> QuotaEmerald
                     connectionState == ConnectionState.CLOUD_RELAY_SYNCED -> QuotaCyan
                     connectionState == ConnectionState.DEMO_SEED -> QuotaAmber
@@ -119,7 +121,11 @@ fun DashboardScreen(
                     else -> Color(0xFF94A3B8)
                 }
 
-                val pillBorderColor = if (isSyncError) QuotaCoral.copy(alpha = 0.6f) else Color.Transparent
+                val pillBorderColor = when {
+                    isSyncError -> QuotaCoral.copy(alpha = 0.6f)
+                    isStale -> QuotaAmber.copy(alpha = 0.6f)
+                    else -> Color.Transparent
+                }
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -154,9 +160,13 @@ fun DashboardScreen(
                     }
 
                     Text(
-                        text = if (isSyncError) "Fallback Mode" else connectionState.label,
+                        text = when {
+                            isSyncError -> "Fallback Mode"
+                            isStale -> "${connectionState.label} (Stale)"
+                            else -> connectionState.label
+                        },
                         style = MaterialTheme.typography.labelSmall,
-                        color = if (isSyncError) QuotaCoral else MaterialTheme.colorScheme.onSurface,
+                        color = if (isSyncError) QuotaCoral else if (isStale) QuotaAmber else MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 11.sp
                     )

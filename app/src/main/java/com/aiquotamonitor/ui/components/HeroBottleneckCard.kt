@@ -43,19 +43,21 @@ fun HeroBottleneckCard(
     val subtitle = if (polarity == QuotaPolarity.REMAINING) "Remaining" else "Consumed"
 
     // Format remaining time to reset
-    val resetCountdown = try {
-        val resetInstant = Instant.parse(bucket.resetsAt)
-        val now = Instant.now()
-        val duration = Duration.between(now, resetInstant)
-        if (duration.isNegative) "Resetting now"
-        else {
-            val hours = duration.toHours()
-            val minutes = duration.toMinutes() % 60
-            "${hours}h ${minutes}m"
+    val resetCountdown = bucket.resetsAt?.let { at ->
+        try {
+            val resetInstant = Instant.parse(at)
+            val now = Instant.now()
+            val duration = Duration.between(now, resetInstant)
+            if (duration.isNegative) "Resetting now"
+            else {
+                val hours = duration.toHours()
+                val minutes = duration.toMinutes() % 60
+                "${hours}h ${minutes}m"
+            }
+        } catch (_: Exception) {
+            null
         }
-    } catch (_: Exception) {
-        "3h 22m"
-    }
+    } ?: "3h 22m"
 
     val paceColor = if (bucket.paceDeltaPercent <= 0) QuotaEmerald else QuotaAmber
     val paceText = if (bucket.paceDeltaPercent <= 0) {

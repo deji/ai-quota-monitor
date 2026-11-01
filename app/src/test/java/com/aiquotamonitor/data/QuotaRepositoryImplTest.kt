@@ -32,11 +32,15 @@ class QuotaRepositoryImplTest {
         var mockPrimeStatus: SmartPrimeStatus = SeedData.createSeedSnapshot().smartPrime,
         var shouldFailFetch: Boolean = false,
         var shouldFailRefresh: Boolean = false,
-        var shouldFailPrime: Boolean = false
+        var shouldFailPrime: Boolean = false,
+        var shouldFailActiveHours: Boolean = false
     ) : TailscaleApiClient() {
         var fetchQuotaCalled = false
         var triggerRefreshCalled = false
         var primeGrokCalled = false
+        var updateActiveHoursCalled = false
+        var lastUpdatedStart: String? = null
+        var lastUpdatedEnd: String? = null
 
         override fun fetchQuota(baseUrl: String, token: String?): QuotaSnapshot {
             fetchQuotaCalled = true
@@ -50,10 +54,20 @@ class QuotaRepositoryImplTest {
             return mockSnapshot
         }
 
-        override fun primeGrok(baseUrl: String, token: String?): SmartPrimeStatus {
+        override fun primeGrok(baseUrl: String, token: String?): QuotaSnapshot {
             primeGrokCalled = true
             if (shouldFailPrime) throw IOException("Tailscale grok prime error")
-            return mockPrimeStatus
+            return mockSnapshot.copy(smartPrime = mockPrimeStatus)
+        }
+
+        override fun updateActiveHours(baseUrl: String, token: String?, start: String, end: String): QuotaSnapshot {
+            updateActiveHoursCalled = true
+            lastUpdatedStart = start
+            lastUpdatedEnd = end
+            if (shouldFailActiveHours) throw IOException("Tailscale active hours error")
+            return mockSnapshot.copy(
+                smartPrime = mockPrimeStatus.copy(activeHoursStart = start, activeHoursEnd = end)
+            )
         }
     }
 
@@ -62,9 +76,11 @@ class QuotaRepositoryImplTest {
         var shouldFail: Boolean = false
     ) : GistRelayClient() {
         var fetchCalled = false
+        var lastGithubToken: String? = null
 
-        override fun fetchAndDecryptSnapshot(gistId: String, aesKey: String): QuotaSnapshot {
+        override fun fetchAndDecryptSnapshot(gistId: String, aesKey: String, githubToken: String?): QuotaSnapshot {
             fetchCalled = true
+            lastGithubToken = githubToken
             if (shouldFail) throw IOException("Gist relay 404 or decryption failed")
             return mockSnapshot
         }
@@ -184,17 +200,20 @@ class QuotaRepositoryImplTest {
     }
 
     @Test
-    fun testPrimeGrokVerifiesFollowUpRefreshOutcome() = runTest {
+    fun testPrimeGrokParsesFullSnapshotWithoutSecondRefresh() = runTest {
+        val primedPrime = SmartPrimeStatus(
+            policy = "active_hours",
+            activeHoursStart = "08:00",
+            activeHoursEnd = "22:00",
+            grokTokenExpiresAt = "2026-11-01T20:00:00Z",
+            grokTokenRemainingSeconds = 5400L,
+            lastPrimedAt = "2026-11-01T17:00:00Z",
+            primed = true,
+            reason = "manual_refresh"
+        )
         val fakeTailscale = FakeTailscaleClient(
-            mockPrimeStatus = SmartPrimeStatus(
-                policy = "active_hours",
-                activeHoursStart = "08:00",
-                activeHoursEnd = "22:00",
-                grokTokenExpiresAt = "2026-11-01T20:00:00Z",
-                grokTokenRemainingSeconds = 5400L,
-                lastPrimedAt = "2026-11-01T17:00:00Z"
-            ),
-            // Prime succeeds, but follow-up refresh fails!
+            mockPrimeStatus = primedPrime,
+            // Prime succeeds, but follow-up refresh should NOT be called!
             shouldFailPrime = false,
             shouldFailRefresh = true
         )
@@ -213,8 +232,62 @@ class QuotaRepositoryImplTest {
 
         val primeResult = repository.primeGrok()
 
-        assertTrue("primeGrok must fail if follow-up refresh fails", primeResult.isFailure)
-        assertTrue(primeResult.exceptionOrNull()?.message?.contains("Tailscale refresh daemon error") == true)
+        assertTrue("primeGrok must succeed without calling second refresh", primeResult.isSuccess)
+        assertTrue("primeGrok on client should be called", fakeTailscale.primeGrokCalled)
+        assertEquals("triggerRefresh must NOT be called on primeGrok", false, fakeTailscale.triggerRefreshCalled)
+        assertEquals(5400L, repository.snapshotFlow.value.smartPrime.grokTokenRemainingSeconds)
+        assertTrue(repository.snapshotFlow.value.smartPrime.primed)
+        assertEquals(ConnectionState.TAILSCALE_LIVE, repository.connectionStateFlow.value)
+    }
+
+    @Test
+    fun testUpdateActiveHoursCallsTailscaleAndUpdatesState() = runTest {
+        val fakeTailscale = FakeTailscaleClient()
+        val repository = QuotaRepositoryImpl(
+            preferencesStore = preferencesStore,
+            tailscaleClient = fakeTailscale,
+            gistClient = FakeGistClient()
+        )
+
+        repository.updateSettings(
+            SyncSettings(
+                tailscaleUrl = "http://100.115.92.2:8080"
+            )
+        )
+
+        val result = repository.updateActiveHours("09:00", "21:00")
+
+        assertTrue(result.isSuccess)
+        assertTrue(fakeTailscale.updateActiveHoursCalled)
+        assertEquals("09:00", fakeTailscale.lastUpdatedStart)
+        assertEquals("21:00", fakeTailscale.lastUpdatedEnd)
+        assertEquals("09:00", repository.snapshotFlow.value.smartPrime.activeHoursStart)
+        assertEquals("21:00", repository.snapshotFlow.value.smartPrime.activeHoursEnd)
+    }
+
+    @Test
+    fun testGistRelayReceivesGithubToken() = runTest {
+        val fakeGist = FakeGistClient()
+        val repository = QuotaRepositoryImpl(
+            preferencesStore = preferencesStore,
+            tailscaleClient = FakeTailscaleClient(shouldFailFetch = true, shouldFailRefresh = true),
+            gistClient = fakeGist
+        )
+
+        repository.updateSettings(
+            SyncSettings(
+                tailscaleUrl = "",
+                gistId = "gist_test_123",
+                gistAesKey = "key_test",
+                githubToken = "ghp_secrettoken"
+            )
+        )
+
+        val result = repository.refresh(forceTailscale = false, isManual = true)
+
+        assertTrue(result.isSuccess)
+        assertTrue(fakeGist.fetchCalled)
+        assertEquals("ghp_secrettoken", fakeGist.lastGithubToken)
     }
 
     @Test

@@ -27,31 +27,37 @@ class KeystoreSecretStore(
     @Volatile
     private var fallbackKey: SecretKey? = null
 
+    private fun isAndroidKeyStoreAvailable(): Boolean {
+        return java.security.Security.getProvider(androidKeystoreProvider) != null
+    }
+
     private fun getSecretKey(): SecretKey {
-        return try {
-            val keyStore = KeyStore.getInstance(androidKeystoreProvider)
-            keyStore.load(null)
-            if (!keyStore.containsAlias(keyAlias)) {
-                val keyGenerator = KeyGenerator.getInstance(
-                    KeyProperties.KEY_ALGORITHM_AES,
-                    androidKeystoreProvider
-                )
-                val spec = KeyGenParameterSpec.Builder(
-                    keyAlias,
-                    KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
-                )
-                    .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-                    .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
-                    .setKeySize(256)
-                    .build()
-                keyGenerator.init(spec)
-                keyGenerator.generateKey()
-            }
-            (keyStore.getEntry(keyAlias, null) as KeyStore.SecretKeyEntry).secretKey
-        } catch (_: Throwable) {
-            // AndroidKeyStore unavailable in JVM unit tests or test environments
-            getFallbackKey()
+        if (!isAndroidKeyStoreAvailable()) {
+            // AndroidKeyStore provider absent: use JVM test fallback key
+            return getFallbackKey()
         }
+
+        val keyStore = KeyStore.getInstance(androidKeystoreProvider)
+        keyStore.load(null)
+        if (!keyStore.containsAlias(keyAlias)) {
+            val keyGenerator = KeyGenerator.getInstance(
+                KeyProperties.KEY_ALGORITHM_AES,
+                androidKeystoreProvider
+            )
+            val spec = KeyGenParameterSpec.Builder(
+                keyAlias,
+                KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
+            )
+                .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                .setKeySize(256)
+                .build()
+            keyGenerator.init(spec)
+            keyGenerator.generateKey()
+        }
+        val entry = keyStore.getEntry(keyAlias, null) as? KeyStore.SecretKeyEntry
+            ?: throw IllegalStateException("Failed to retrieve secret key entry from AndroidKeyStore")
+        return entry.secretKey
     }
 
     private fun getFallbackKey(): SecretKey {
@@ -71,6 +77,7 @@ class KeystoreSecretStore(
     /**
      * Encrypts plaintext string using AES-256-GCM.
      * Returns an "enc:" prefixed string containing Base64(12-byte IV + ciphertextWithTag).
+     * Fails closed on error and NEVER returns plaintext.
      */
     fun encrypt(plaintext: String): String {
         if (plaintext.isBlank()) return ""
@@ -84,8 +91,9 @@ class KeystoreSecretStore(
             System.arraycopy(iv, 0, combined, 0, iv.size)
             System.arraycopy(ciphertext, 0, combined, iv.size, ciphertext.size)
             ENC_PREFIX + Base64.getEncoder().encodeToString(combined)
-        } catch (_: Exception) {
-            plaintext
+        } catch (e: Exception) {
+            // Fail closed: never return plaintext
+            throw IllegalStateException("Failed to encrypt secret: ${e.message}", e)
         }
     }
 

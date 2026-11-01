@@ -4,10 +4,12 @@ import json
 import logging
 import os
 import sys
+import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Dict, Optional
 
+from collector.config import save_config
 from collector.crypto_relay import encrypt_snapshot, publish_to_gist
 from collector.providers import collect_all_quotas
 from collector.smart_prime import evaluate_smart_prime
@@ -29,6 +31,20 @@ def _sanitize_log_text(text: str) -> str:
     return scrubbed
 
 
+def _validate_hh_mm(val: Any) -> bool:
+    """Validate that val is a string in HH:MM 24-hour format."""
+    if not isinstance(val, str):
+        return False
+    parts = val.strip().split(":")
+    if len(parts) != 2:
+        return False
+    try:
+        h, m = int(parts[0]), int(parts[1])
+        return 0 <= h <= 23 and 0 <= m <= 59
+    except (ValueError, TypeError):
+        return False
+
+
 class ScrubbedHTTPHandler(BaseHTTPRequestHandler):
     """HTTP request handler with bearer auth enforcement and scrubbed logging."""
 
@@ -36,6 +52,8 @@ class ScrubbedHTTPHandler(BaseHTTPRequestHandler):
     bearer_token: str = ""
     storage: Optional[QuotaStorage] = None
     config: Dict[str, Any] = {}
+    config_path: Optional[str] = None
+    lock: Optional[threading.Lock] = None
     cached_snapshot: Optional[Dict[str, Any]] = None
 
     def log_message(self, format: str, *args: Any) -> None:
@@ -111,14 +129,55 @@ class ScrubbedHTTPHandler(BaseHTTPRequestHandler):
 
         if path == "/v1/quota/refresh":
             snapshot = self._refresh_quota(publish_relay=True, manual_refresh=True, force_prime=False)
-            self.cached_snapshot = snapshot
             self._send_json_response(200, snapshot)
             return
 
         if path == "/v1/grok/prime":
             # Explicit POST /v1/grok/prime triggers prime and re-collects/returns FULL canonical v1 snapshot
             snapshot = self._refresh_quota(publish_relay=True, manual_refresh=False, force_prime=True)
-            self.cached_snapshot = snapshot
+            self._send_json_response(200, snapshot)
+            return
+
+        if path == "/v1/config/active-hours":
+            content_length = int(self.headers.get("Content-Length", 0))
+            if content_length <= 0:
+                self._send_json_response(400, {"error": "Missing JSON request body"})
+                return
+            body_bytes = self.rfile.read(content_length)
+            try:
+                payload = json.loads(body_bytes.decode("utf-8"))
+            except Exception:
+                self._send_json_response(400, {"error": "Malformed JSON"})
+                return
+
+            if not isinstance(payload, dict):
+                self._send_json_response(400, {"error": "JSON body must be an object"})
+                return
+
+            start_hhmm = payload.get("activeHoursStart")
+            end_hhmm = payload.get("activeHoursEnd")
+            if not _validate_hh_mm(start_hhmm) or not _validate_hh_mm(end_hhmm):
+                self._send_json_response(400, {"error": "Invalid active hours format; expected HH:MM (00:00 to 23:59)"})
+                return
+
+            lock = getattr(self, "lock", None)
+            if lock is not None:
+                with lock:
+                    self.config["activeHoursStart"] = start_hhmm
+                    self.config["activeHoursEnd"] = end_hhmm
+                    try:
+                        save_config(self.config, self.config_path)
+                    except Exception as e:
+                        logger.warning("Failed to persist updated active hours to config: %s", type(e).__name__)
+            else:
+                self.config["activeHoursStart"] = start_hhmm
+                self.config["activeHoursEnd"] = end_hhmm
+                try:
+                    save_config(self.config, self.config_path)
+                except Exception as e:
+                    logger.warning("Failed to persist updated active hours to config: %s", type(e).__name__)
+
+            snapshot = self._refresh_quota(publish_relay=True, manual_refresh=False, force_prime=False)
             self._send_json_response(200, snapshot)
             return
 
@@ -131,6 +190,18 @@ class ScrubbedHTTPHandler(BaseHTTPRequestHandler):
         force_prime: bool = False,
     ) -> Dict[str, Any]:
         """Collect fresh quota and optionally publish encrypted snapshot to Gist."""
+        lock = getattr(self, "lock", None)
+        if lock is not None:
+            with lock:
+                return self._refresh_quota_locked(publish_relay, manual_refresh, force_prime)
+        return self._refresh_quota_locked(publish_relay, manual_refresh, force_prime)
+
+    def _refresh_quota_locked(
+        self,
+        publish_relay: bool = True,
+        manual_refresh: bool = False,
+        force_prime: bool = False,
+    ) -> Dict[str, Any]:
         snapshot = collect_all_quotas(
             storage=self.storage,
             force_prime=force_prime,
@@ -149,6 +220,7 @@ class ScrubbedHTTPHandler(BaseHTTPRequestHandler):
             except Exception as e:
                 logger.warning("Failed to publish relay snapshot: %s", type(e).__name__)
 
+        self.__class__.cached_snapshot = snapshot
         return snapshot
 
 
@@ -162,12 +234,17 @@ class QuotaHTTPServer:
         bearer_token: str = "",
         storage: Optional[QuotaStorage] = None,
         config: Optional[Dict[str, Any]] = None,
+        config_path: Optional[str] = None,
     ):
         self.host = host
         self.port = port
         self.bearer_token = bearer_token
         self.storage = storage or QuotaStorage()
         self.config = config or {}
+        self.config_path = config_path
+        self.lock = threading.Lock()
+        self._stop_event = threading.Event()
+        self._bg_thread: Optional[threading.Thread] = None
 
         # Isolate handler class attributes per server instance
         class InstanceHTTPHandler(ScrubbedHTTPHandler):
@@ -176,16 +253,53 @@ class QuotaHTTPServer:
         InstanceHTTPHandler.bearer_token = self.bearer_token
         InstanceHTTPHandler.storage = self.storage
         InstanceHTTPHandler.config = self.config
+        InstanceHTTPHandler.config_path = self.config_path
+        InstanceHTTPHandler.lock = self.lock
         InstanceHTTPHandler.server_start_time = time.time()
         InstanceHTTPHandler.cached_snapshot = None
 
+        self.handler_cls = InstanceHTTPHandler
         self.server = ThreadingHTTPServer((self.host, self.port), InstanceHTTPHandler)
 
+    def _background_poll_worker(self) -> None:
+        """Periodic background poll that refreshes quotas and publishes to Gist."""
+        poll_interval = self.config.get("pollIntervalSeconds", 300)
+        while not self._stop_event.is_set():
+            if self._stop_event.wait(timeout=poll_interval):
+                break
+            try:
+                with self.lock:
+                    snapshot = collect_all_quotas(
+                        storage=self.storage,
+                        force_prime=False,
+                        manual_refresh=False,
+                        active_hours_start=self.config.get("activeHoursStart", "08:00"),
+                        active_hours_end=self.config.get("activeHoursEnd", "22:00"),
+                    )
+                    relay_key_hex = self.config.get("relayKeyHex")
+                    gist_id = self.config.get("gistId")
+                    if relay_key_hex and gist_id:
+                        try:
+                            plaintext = json.dumps(snapshot).encode("utf-8")
+                            envelope = encrypt_snapshot(plaintext, relay_key_hex, snapshot.get("capturedAt"))
+                            publish_to_gist(envelope, gist_id=gist_id)
+                        except Exception as e:
+                            logger.warning("Failed to publish relay snapshot in background loop: %s", type(e).__name__)
+                    self.handler_cls.cached_snapshot = snapshot
+            except Exception as e:
+                logger.warning("Background poll error: %s", type(e).__name__)
+
     def serve_forever(self) -> None:
-        """Start listening for incoming requests."""
+        """Start listening for incoming requests and run background polling daemon."""
+        if self._bg_thread is None:
+            self._bg_thread = threading.Thread(target=self._background_poll_worker, daemon=True)
+            self._bg_thread.start()
         self.server.serve_forever()
 
     def shutdown(self) -> None:
-        """Stop server and release port."""
+        """Stop server, signal background thread, and release port."""
+        self._stop_event.set()
         self.server.shutdown()
         self.server.server_close()
+        if self._bg_thread and self._bg_thread.is_alive():
+            self._bg_thread.join(timeout=1.0)

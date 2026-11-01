@@ -40,6 +40,7 @@ def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
         "bearerToken": "",
         "relayKeyHex": "",
         "gistId": "",
+        "pollIntervalSeconds": 300,
     }
 
     if os.path.exists(path):
@@ -71,12 +72,31 @@ def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
         cfg["activeHoursStart"] = os.environ["AQM_ACTIVE_HOURS_START"]
     if os.environ.get("AQM_ACTIVE_HOURS_END"):
         cfg["activeHoursEnd"] = os.environ["AQM_ACTIVE_HOURS_END"]
+    if os.environ.get("AQM_POLL_INTERVAL_SECONDS"):
+        try:
+            cfg["pollIntervalSeconds"] = int(os.environ["AQM_POLL_INTERVAL_SECONDS"])
+        except ValueError:
+            pass
 
     if cfg.get("host") == "tailscale":
         ts_ip = get_tailscale_ip()
         cfg["host"] = ts_ip if ts_ip else "127.0.0.1"
 
     return cfg
+
+
+def save_config(cfg: Dict[str, Any], config_path: Optional[str] = None) -> None:
+    """Atomically save configuration to JSON file with 0600 permissions."""
+    path = config_path or os.environ.get("AQM_CONFIG_PATH") or DEFAULT_CONFIG_FILE
+    parent_dir = os.path.dirname(path)
+    if parent_dir and not os.path.exists(parent_dir):
+        os.makedirs(parent_dir, mode=0o700, exist_ok=True)
+
+    temp_path = f"{path}.tmp.{secrets.token_hex(4)}"
+    with open(temp_path, "w", encoding="utf-8") as f:
+        json.dump(cfg, f, indent=2)
+    os.chmod(temp_path, 0o600)
+    os.replace(temp_path, path)
 
 
 def init_config(config_path: Optional[str] = None, force: bool = False) -> Dict[str, Any]:
@@ -100,11 +120,7 @@ def init_config(config_path: Optional[str] = None, force: bool = False) -> Dict[
             existing["relayKeyHex"] = secrets.token_hex(32)
             changed = True
         if changed:
-            temp_path = f"{path}.tmp.{secrets.token_hex(4)}"
-            with open(temp_path, "w", encoding="utf-8") as f:
-                json.dump(existing, f, indent=2)
-            os.chmod(temp_path, 0o600)
-            os.replace(temp_path, path)
+            save_config(existing, path)
         return existing
 
     new_cfg = {
@@ -116,13 +132,8 @@ def init_config(config_path: Optional[str] = None, force: bool = False) -> Dict[
         "bearerToken": secrets.token_hex(32),
         "relayKeyHex": secrets.token_hex(32),
         "gistId": "",
+        "pollIntervalSeconds": 300,
     }
 
-    # Atomic write with 0600 permissions
-    temp_path = f"{path}.tmp.{secrets.token_hex(4)}"
-    with open(temp_path, "w", encoding="utf-8") as f:
-        json.dump(new_cfg, f, indent=2)
-    os.chmod(temp_path, 0o600)
-    os.replace(temp_path, path)
-
+    save_config(new_cfg, path)
     return new_cfg
