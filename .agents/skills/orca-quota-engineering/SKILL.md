@@ -55,6 +55,10 @@ All non-trivial work in this repository uses three distinct agent roles and **th
 5. **Android Keystore & Network Security**:
    - `KeystoreSecretStore` encrypts `tailscale_token`, `gist_key`, and `github_token` using `AndroidKeyStore` (`AES/GCM/NoPadding`) and fails closed on Android (never writing plaintext secrets to `SharedPreferences`).
    - `TailscaleApiClient` permits `http://` **only** for private/Tailscale/loopback addresses (`100.64.0.0/10`, `127.0.0.1`, `localhost`, RFC1918, `*.ts.net`) and rejects public `http://` hosts.
+6. **Compose Settings State, Non-Destructive Probing & Honest Source Labels (`APP-UX1`)**:
+   - Key `ConnectionSettingsForm` draft state on individual credential strings (never on the whole `SyncSettings` object, which also carries `activeHoursStart`/`End`), and serialize all settings mutations in `QuotaRepositoryImpl` under `settingsMutex`.
+   - Use `SyncSettings.hasUsableTransport` (`tailscaleUrl.isNotBlank() || (gistId.isNotBlank() && gistAesKey.isNotBlank())`) everywhere transport readiness is checked.
+   - Never persist `SeedData` to `cached_snapshot`; ensure `testConnection` probes non-destructively (preserving stored secrets and restoring prior `ConnectionState` on failure); and keep collector port `8741` consistent across code, placeholders, and docs.
 
 ---
 

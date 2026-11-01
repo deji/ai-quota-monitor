@@ -69,6 +69,17 @@ This document captures the hard-won architectural, security, wire-protocol, UI/U
 4. **Google Stitch MCP Lessons**:
    - `create_design_system` only accepts specific font and color variant enums (`MANROPE`/`INTER` + `FIDELITY`; `PLUS_JAKARTA_SANS` + `EXPRESSIVE`; `SPACE_GROTESK`/`GEIST` + `VIBRANT`).
    - Direct HTTP `GET` against Stitch CDN URLs (`lh3.googleusercontent.com/aida/...`) returns `401 Unauthorized`; always use Stitch MCP's `download_file` tool RPC to fetch base64-encoded PNG and HTML assets.
+5. **Compose Form Draft State vs Composite Settings Updates (`APP-UX1`)**:
+   - Never key form draft `remember(...)` state on an entire composite `SyncSettings` object (`remember(settings)`) when another control on the same screen (such as `ActiveHoursSlider`) writes partial updates to `SyncSettings`—doing so resets unsaved text fields while the user is typing.
+   - Always key draft state only on the specific credential strings (`remember(settings.tailscaleUrl, settings.tailscaleToken, settings.gistId, settings.gistAesKey, settings.githubToken)`), and serialize all repository settings writes (`saveSettings`, `updateActiveHours`, `updateSettings`, and `testConnection` commits) under a single `Mutex` (`settingsMutex`) that merges onto the latest persisted settings.
+6. **Non-Destructive Connection Probing & Honest Cache vs Demo Labeling (`APP-UX1`)**:
+   - A "Test Connection" action (`testConnection(draftSettings)`) must probe using the draft credentials without overwriting stored Keystore secrets if the probe fails, must restore the prior `ConnectionState` on failure, and must combine both Tailscale and Gist error causes when both fail.
+   - Never persist `SeedData` into `cached_snapshot` preferences—only persist real snapshots from `TAILSCALE_LIVE` or `CLOUD_RELAY_SYNCED` so `ConnectionState.OFFLINE` ("Offline Cache") is never shown for demo seed numbers.
+   - Use a single shared predicate (`SyncSettings.hasUsableTransport`: `tailscaleUrl.isNotBlank() || (gistId.isNotBlank() && gistAesKey.isNotBlank())`) across the Dashboard onboarding card, `SyncHubSheet`, and `WidgetsAndSyncScreen` so a Gist ID without an AES key is marked `"Incomplete (needs ID & AES key)"` rather than `"Configured"`.
+7. **First-Run Discoverability, Port Consistency & Wireless ADB UX**:
+   - Never bury first-run endpoint configuration at the bottom of a secondary tab or make status sheets read-only. Surface a first-run onboarding card (`ConnectCollectorCard`) on the Dashboard and make `SyncHubSheet` directly editable.
+   - Keep default ports (`8741`) identical across `collector/config.py`, `collector/cli.py`, UI placeholders, unit tests, and `README.md`.
+   - Document Android 14–16 Wireless Debugging's two-port flow explicitly (`adb pair <ip>:<pairing-port> <code>` uses the temporary popup port, whereas `adb connect <ip>:<connect-port>` uses the main Wireless Debugging screen port).
 
 ---
 
