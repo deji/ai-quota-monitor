@@ -1,0 +1,114 @@
+#!/bin/sh
+set -e
+
+REPO_ROOT=$(git rev-parse --show-toplevel)
+cd "$REPO_ROOT"
+
+MAX_FILE_BYTES=5242880 # 5 MB
+ZERO_OID="0000000000000000000000000000000000000000"
+
+check_range() {
+  range="$1"
+  commit_oid="$2"
+
+  # 1. Inspect every file in the target commit tree for forbidden filenames/extensions and > 5 MB blobs
+  git ls-tree -r -l "$commit_oid" | while IFS= read -r line; do
+    if [ -z "$line" ]; then
+      continue
+    fi
+    # Format: <mode> <type> <object> <size>\t<file>
+    meta=$(printf '%s' "$line" | cut -f1)
+    filepath=$(printf '%s' "$line" | cut -f2-)
+    size=$(printf '%s' "$meta" | awk '{print $4}')
+    base=$(basename "$filepath")
+    lower_base=$(printf '%s' "$base" | tr '[:upper:]' '[:lower:]')
+
+    case "$lower_base" in
+      *.har|*.token|*.jks|*.keystore|*.p12|*.pfx|*.pem|*.key|*.crt|*.cer|*.der|*.ovpn|*.db|*.sqlite|*.sqlite3|*.apk|*.aab|*.ap_|*.dex|*.hprof|*.log|id_rsa|id_rsa.*|id_ed25519|id_ed25519.*|auth.json|google-services.json|local.properties|keystore.properties|signing.properties|config.yaml|config.yml|config.json|*.local.yaml|*.local.yml|*.local.json|.ds_store|thumbs.db|.env|.env.*)
+        if [ "$lower_base" != ".env.example" ]; then
+          echo "pre-push: refusing to push forbidden file in commit $commit_oid: $filepath" >&2
+          exit 1
+        fi
+        ;;
+    esac
+
+    if [ "$size" != "-" ] && [ "$size" -gt "$MAX_FILE_BYTES" ]; then
+      echo "pre-push: refusing to push blob larger than 5 MB ($size bytes) in commit $commit_oid: $filepath" >&2
+      exit 1
+    fi
+  done
+
+  # 2. Scan commit diffs in range for conflict markers, secrets, private keys, tokens, personal paths, and real emails
+  diff_lines=$(git log "$range" -p -U0 -- . ':!.githooks/*' ':!collector/tests/test_repo_hygiene.py' ':!.agents/*' | grep -v '^+++' | grep '^+' || true)
+  if [ -n "$diff_lines" ]; then
+    if printf '%s\n' "$diff_lines" | grep -Eq '^\+(<{7} |={7}$|>{7} )'; then
+      echo "pre-push: detected unresolved Git merge conflict markers in commits ($range)." >&2
+      exit 1
+    fi
+    if printf '%s\n' "$diff_lines" | grep -Eq '(-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----|eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}|xai-[A-Za-z0-9_-]{16,}|AIza[0-9A-Za-z_-]{35}|sk-[A-Za-z0-9_-]{20,}|sk-ant-[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9_]{30,}|github_pat_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|ya29\.[A-Za-z0-9_-]{20,}|/Users/[a-zA-Z0-9][a-zA-Z0-9._-]*|/home/[a-zA-Z0-9][a-zA-Z0-9._-]*)'; then
+      echo "pre-push: detected potential secret, private key, token, or private local home path in commits ($range)." >&2
+      exit 1
+    fi
+    emails=$(printf '%s\n' "$diff_lines" | sed 's/^+//' | grep -Eo '[A-Za-z0-9][A-Za-z0-9._%+-]*@[A-Za-z][A-Za-z0-9.-]*\.[A-Za-z]{2,}' || true)
+    if [ -n "$emails" ]; then
+      for em in $emails; do
+        case "$em" in
+          this@*|return@*|continue@*|break@*|super@*)
+            continue
+            ;;
+        esac
+        lower_em=$(printf '%s' "$em" | tr '[:upper:]' '[:lower:]')
+        case "$lower_em" in
+          *@example.com|*@example.org|*@example.net|noreply@github.com|*@users.noreply.github.com)
+            ;;
+          *)
+            echo "pre-push: detected non-synthetic email address in commits ($range): $em" >&2
+            exit 1
+            ;;
+        esac
+      done
+    fi
+  fi
+
+  # 3. Scan commit messages in range
+  commit_msgs=$(git log "$range" --format=%B || true)
+  if [ -n "$commit_msgs" ]; then
+    tmp_msg=$(mktemp)
+    printf '%s\n' "$commit_msgs" > "$tmp_msg"
+    if ! AQM_SKIP_ISSUE_REF=1 sh "$REPO_ROOT/.githooks/commit-msg" "$tmp_msg"; then
+      rm -f "$tmp_msg"
+      exit 1
+    fi
+    rm -f "$tmp_msg"
+  fi
+}
+
+echo "==> [pre-push] Inspecting pushed refs and running repository hygiene suite..."
+found_stdin=0
+if [ ! -t 0 ]; then
+  while read -r local_ref local_oid remote_ref remote_oid; do
+    if [ -z "$local_ref" ]; then
+      continue
+    fi
+    found_stdin=1
+    if [ "$local_oid" = "$ZERO_OID" ]; then
+      continue
+    fi
+    if [ "$remote_oid" = "$ZERO_OID" ]; then
+      range="$local_oid"
+    else
+      range="${remote_oid}..${local_oid}"
+    fi
+    check_range "$range" "$local_oid"
+  done
+fi
+
+if [ "$found_stdin" = "0" ]; then
+  head_oid=$(git rev-parse HEAD)
+  check_range "$head_oid" "$head_oid"
+fi
+
+sh "$REPO_ROOT/.githooks/pre-commit"
+if [ -d "$REPO_ROOT/collector/tests" ]; then
+  PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s collector/tests -p "test_repo_hygiene.py"
+fi

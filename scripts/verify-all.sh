@@ -34,13 +34,19 @@ REQUIRED_DOCS=(
   "docs/status.md"
   "docs/workers.md"
   ".agents/skills/orca-quota-engineering/SKILL.md"
+  "scripts/gh-issue-workflow.sh"
+  "scripts/review-plan-and-code.sh"
 )
 for doc in "${REQUIRED_DOCS[@]}"; do
   if [[ ! -s "$doc" ]]; then
-    echo "ERROR: Required documentation/skill file missing or empty: $doc" >&2
+    echo "ERROR: Required documentation/skill/workflow file missing or empty: $doc" >&2
     exit 1
   fi
 done
+if [[ ! -x "scripts/gh-issue-workflow.sh" ]]; then
+  echo "ERROR: scripts/gh-issue-workflow.sh must be executable" >&2
+  exit 1
+fi
 
 # Ensure every defect ID recorded in docs/bugs/index.md is also documented in docs/lessons.md
 python3 - <<'PY'

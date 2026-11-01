@@ -1,8 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MODE="${1:-cross-system}"
-TARGET_DIR="${2:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+TARGET_DIR="$REPO_ROOT"
+ISSUE_NUM=""
+
+shift || true
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --issue)
+      ISSUE_NUM="${2:-}"
+      shift 2
+      ;;
+    *)
+      TARGET_DIR="$1"
+      shift
+      ;;
+  esac
+done
 
 case "$MODE" in
   plan)
@@ -15,9 +31,16 @@ case "$MODE" in
     PROMPT="Perform a read-only cross-system review of docs/plan.md, docs/providers.md, docs/lessons.md, README.md, .agents/skills/orca-quota-engineering/SKILL.md, collector/, and app/ together. Verify: 1) Relay envelope interoperability and shared golden test vector, 2) Secret Gist raw URL & optional GitHub token support, 3) Tailscale daemon single-flight lock, launchd plist, and private-IP cleartext guard, 4) Unified Smart Prime state machine and active-hours sync, 5) Fail-closed provider parsers and nullable resetsAt, and 6) Plan-to-code, README, and docs/lessons.md + skills alignment. Do NOT modify any files. Output a structured Markdown review with Verdict (APPROVED or CHANGES_REQUESTED)."
     ;;
   *)
-    echo "Usage: $0 [plan|worktree|cross-system] [target-dir]" >&2
+    echo "Usage: $0 [plan|worktree|cross-system] [target-dir] [--issue <issue-number>]" >&2
     exit 1
     ;;
 esac
 
-exec grok -m grok-4.7 --effort medium --always-approve --cwd "$TARGET_DIR" -p "$PROMPT"
+if [[ -n "$ISSUE_NUM" ]]; then
+  OUT_FILE="$(mktemp)"
+  trap 'rm -f "$OUT_FILE"' EXIT
+  grok -m grok-4.7 --effort medium --always-approve --cwd "$TARGET_DIR" -p "$PROMPT" | tee "$OUT_FILE"
+  "$REPO_ROOT/scripts/gh-issue-workflow.sh" comment "$ISSUE_NUM" review "@$OUT_FILE"
+else
+  exec grok -m grok-4.7 --effort medium --always-approve --cwd "$TARGET_DIR" -p "$PROMPT"
+fi

@@ -9,13 +9,29 @@ local.properties
 .cxx/
 captures/
 
-# Keystores & Signing (NEVER commit)
+# Keystores, Certificates & Signing (NEVER commit)
 *.jks
 *.keystore
 *.KeyStore
+*.p12
+*.pfx
+*.crt
+*.cer
+*.der
 keystore.properties
 signing.properties
 google-services.json
+id_rsa*
+id_ed25519*
+
+# Build Artifacts, Binaries & Logs (NEVER commit)
+*.apk
+*.aab
+*.ap_
+*.dex
+*.hprof
+*.log
+*.ovpn
 
 # Secrets, Tokens, Credentials & Local Config (NEVER commit)
 .env

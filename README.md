@@ -18,7 +18,7 @@ A high-craft, **100% native Android application** (Kotlin + Jetpack Compose, Mat
   - **Offline-Mac Fallback (AES-256-GCM Gist Relay)**: Every collection cycle encrypts the normalized v1 snapshot with a 256-bit key (`AES-256-GCM`, 12-byte random nonce, 16-byte authentication tag) and publishes `quota_snapshot.enc.json` to GitHub Gist, readable via a **Direct Raw Gist URL** (`gist.githubusercontent.com/...`) or authenticated GitHub API (`api.github.com/gists/{id}`).
 - **Hardened Security & Public-Repo Hygiene**:
   - Android secrets (`tailscale_token`, `gist_key`, `github_token`) are encrypted at rest via `AndroidKeyStore` (`KeystoreSecretStore`, fail-closed) with `android:allowBackup="false"`.
-  - Pre-commit secret guard (`.githooks/pre-commit`) and automated repo hygiene tests (`collector/tests/test_repo_hygiene.py`) block tokens, keys, personal emails, and `/Users/<username>` paths from ever entering Git history.
+  - Multi-stage Git hooks ([`.githooks/pre-commit`](.githooks/pre-commit), [`.githooks/commit-msg`](.githooks/commit-msg), and [`.githooks/pre-push`](.githooks/pre-push)) and automated repo hygiene tests ([`collector/tests/test_repo_hygiene.py`](collector/tests/test_repo_hygiene.py)) block tokens, PEM private keys, nested config/secret files, APK/keystore binaries, oversized files (`> 5 MB`), unresolved merge conflict markers, non-synthetic emails, and `/Users/<username>` or `/home/<username>` paths from ever entering commits, commit messages, or pushes.
 
 ---
 
@@ -142,17 +142,26 @@ adb shell am start -n com.aiquotamonitor/.ui.MainActivity
 
 ---
 
-### 5. Run the 3-Gate `grok-4.7` Architectural & Code Reviews (`scripts/review-plan-and-code.sh`)
+### 5. GitHub Issue-First Workflow & 3-Gate `grok-4.7` Reviews (`scripts/gh-issue-workflow.sh` & `scripts/review-plan-and-code.sh`)
+
+All bugs and features follow a mandatory **GitHub Issue-First Workflow** where the issue is created first and all four stages (`[PLAN]`, `[IMPLEMENTATION]`, `[TESTING]`, `[REVIEW]`) are recorded as comments on the issue:
 
 ```bash
-# Gate 1: Review architectural plan & provider wire specs
-./scripts/review-plan-and-code.sh plan
+# 1. Create a GitHub Issue first (scrubbed for secret/PII hygiene)
+./scripts/gh-issue-workflow.sh create "<title>" "<description>" "enhancement"
 
-# Gate 2: Review a specific implementation worktree
-./scripts/review-plan-and-code.sh worktree /path/to/worktree
+# 2. Post Plan, Implementation, and Testing comments on the Issue
+./scripts/gh-issue-workflow.sh comment <issue-number> plan "<plan-details>"
+./scripts/gh-issue-workflow.sh comment <issue-number> implementation "<commit-and-diff-summary>"
+./scripts/gh-issue-workflow.sh comment <issue-number> testing "<verify-all-results>"
 
-# Gate 3: Full cross-system review across docs/, collector/, and app/
-./scripts/review-plan-and-code.sh cross-system
+# 3. Run the 3-Gate Grok 4.7 review and automatically post ## [REVIEW] to the Issue
+./scripts/review-plan-and-code.sh plan --issue <issue-number>
+./scripts/review-plan-and-code.sh worktree /path/to/worktree --issue <issue-number>
+./scripts/review-plan-and-code.sh cross-system --issue <issue-number>
+
+# 4. Verify all 4 lifecycle comments exist and close the Issue
+./scripts/gh-issue-workflow.sh close <issue-number>
 ```
 
 ---

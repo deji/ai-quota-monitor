@@ -1,0 +1,47 @@
+#!/bin/sh
+set -e
+
+msg_file="$1"
+if [ -z "$msg_file" ] || [ ! -f "$msg_file" ]; then
+  exit 0
+fi
+
+raw_content=$(cat "$msg_file")
+if [ -z "$raw_content" ]; then
+  exit 0
+fi
+
+# 1. Scan ALL lines (including Markdown # / ## headings) for secrets, private keys, tokens, or local home paths (/Users/... or /home/...)
+if printf '%s\n' "$raw_content" | grep -Eq '(-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----|eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}|xai-[A-Za-z0-9_-]{16,}|AIza[0-9A-Za-z_-]{35}|sk-[A-Za-z0-9_-]{20,}|sk-ant-[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9_]{30,}|github_pat_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|ya29\.[A-Za-z0-9_-]{20,}|/Users/[a-zA-Z0-9][a-zA-Z0-9._-]*|/home/[a-zA-Z0-9][a-zA-Z0-9._-]*)'; then
+  echo "commit-msg: detected potential secret, token, or private local home path (/Users/... or /home/...) in message." >&2
+  exit 1
+fi
+
+# 2. Scan ALL lines for non-synthetic email addresses (only exact @example.com/.org/.net, noreply@github.com, and *@users.noreply.github.com are permitted)
+emails=$(printf '%s\n' "$raw_content" | grep -Eo '[A-Za-z0-9][A-Za-z0-9._%+-]*@[A-Za-z][A-Za-z0-9.-]*\.[A-Za-z]{2,}' || true)
+if [ -n "$emails" ]; then
+  for em in $emails; do
+    lower_em=$(printf '%s' "$em" | tr '[:upper:]' '[:lower:]')
+    case "$lower_em" in
+      *@example.com|*@example.org|*@example.net|noreply@github.com|*@users.noreply.github.com)
+        ;;
+      *)
+        echo "commit-msg: detected non-synthetic email address in message: $em" >&2
+        exit 1
+        ;;
+    esac
+  done
+fi
+
+# 3. Enforce GitHub Issue reference (#<number>) when GitHub remote origin is configured or AQM_REQUIRE_ISSUE_REF=1
+if [ "${AQM_SKIP_ISSUE_REF:-0}" != "1" ]; then
+  msg_content=$(grep -v '^#' "$msg_file" || true)
+  has_origin=$(git remote get-url origin 2>/dev/null || true)
+  if [ -n "$has_origin" ] || [ "${AQM_REQUIRE_ISSUE_REF:-0}" = "1" ]; then
+    if ! printf '%s\n' "$msg_content" | grep -Eq '(^Merge |#[0-9]+)'; then
+      echo "commit-msg: missing GitHub Issue reference (#<number>)." >&2
+      echo "All bugs and features must be documented as a GitHub Issue first (./scripts/gh-issue-workflow.sh create ...)." >&2
+      exit 1
+    fi
+  fi
+fi

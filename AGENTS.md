@@ -42,6 +42,14 @@ skills-lock.json         Locked skill versions installed via npx skills
   - Never include real tokens (`Bearer ...`, `eyJ...`, `xai-...`), user IDs, device serial numbers, or local user paths (`/Users/<username>`) in source code, tests, or docs. Use `$HOME` or `~` in documentation and synthetic fixtures (`00000000-0000-0000-0000-000000000000`, `user@example.com`) in tests.
 - **Scrubbed logs and errors**: Neither the collector nor the Android app may ever log `Authorization` headers, session tokens, or cookies in Logcat, crash reports, or HTTP error messages.
 - **Do not invent provider endpoints or wire shapes**: [`docs/providers.md`](docs/providers.md) records the verified quota commands and HTTP wire shapes. Two upstream endpoints (`opencode go` and `grok`) are undocumented and can change shape—always parse defensively and back parsers with fixture tests.
+- **GitHub Issue-First Workflow (Mandatory)**:
+  - Every bug or feature MUST be created as a GitHub Issue **before** any implementation starts (`./scripts/gh-issue-workflow.sh create "<title>" "<body>"`).
+  - Every stage of work MUST be appended as a structured comment on that GitHub Issue using `./scripts/gh-issue-workflow.sh comment <issue-number> <plan|implementation|testing|review> "<body-or-@file>"`:
+    1. `## [PLAN]` — Architectural plan & files in scope.
+    2. `## [IMPLEMENTATION]` — Summary of code changes & commits (`Refs #<issue>`).
+    3. `## [TESTING]` — Unit test, Gradle lint/build, and emulator/device verification output.
+    4. `## [REVIEW]` — `grok-4.7` (`--effort medium`) review verdict (`./scripts/review-plan-and-code.sh worktree <path> --issue <issue-number>`).
+  - `.githooks/commit-msg` enforces that commits reference `#<issue-number>` when `origin` is configured, and `./scripts/gh-issue-workflow.sh close <issue-number>` refuses to close an issue unless all four `[PLAN]`, `[IMPLEMENTATION]`, `[TESTING]`, and `[REVIEW]` comments exist.
 - **Update docs & codify learnings in the same change (unprompted)**: Before finishing any task, bug fix, or review cycle—and **without waiting for the user to ask**—you MUST update [`docs/lessons.md`](docs/lessons.md), [`docs/bugs/index.md`](docs/bugs/index.md), [`docs/status.md`](docs/status.md), [`README.md`](README.md) (for any run/test/deploy workflow change), and [`.agents/skills/orca-quota-engineering/SKILL.md`](.agents/skills/orca-quota-engineering/SKILL.md) with all new lessons, edge cases, and reviewer findings. Run `./scripts/verify-all.sh` to enforce the automated documentation & lessons sync check.
 - **Keep `AGENTS.md` a signpost, never a running log**: Record progress in [`docs/status.md`](docs/status.md), design details in [`docs/design/`](docs/design/README.md), and defects in [`docs/bugs/`](docs/bugs/README.md).
 

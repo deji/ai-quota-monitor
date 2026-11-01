@@ -1,6 +1,23 @@
-# Bug Tracker Protocol
+# Bug & Feature Tracker Protocol (GitHub Issue-First Workflow)
 
-Every non-trivial defect discovered during implementation, review (`grok-4.7`), or device testing on the Pixel 8 Pro is tracked in `docs/bugs/`.
+Every bug or feature in `ai-quota-monitor` **must** be filed as a GitHub Issue first via [`scripts/gh-issue-workflow.sh`](../../scripts/gh-issue-workflow.sh) and also logged in [`docs/bugs/index.md`](index.md) + [`docs/lessons.md`](../lessons.md).
+
+## Mandatory GitHub Issue Lifecycle (`scripts/gh-issue-workflow.sh`)
+
+1. **Create Issue First**:
+   ```bash
+   ./scripts/gh-issue-workflow.sh create "<title>" "<symptom-or-feature-scope>" "bug"
+   ```
+2. **Document All 4 Stages as Issue Comments**:
+   - **Plan (`## [PLAN]`)**: `./scripts/gh-issue-workflow.sh comment <issue-number> plan "<plan>"`
+   - **Implementation (`## [IMPLEMENTATION]`)**: `./scripts/gh-issue-workflow.sh comment <issue-number> implementation "<diff-summary-and-commits>"`
+   - **Testing (`## [TESTING]`)**: `./scripts/gh-issue-workflow.sh comment <issue-number> testing "<verify-all-and-device-test-results>"`
+   - **Review (`## [REVIEW]`)**: `./scripts/review-plan-and-code.sh worktree "<worktree-path>" --issue <issue-number>`
+3. **Verify & Close**:
+   ```bash
+   ./scripts/gh-issue-workflow.sh close <issue-number>
+   ```
+   (`close` runs `verify` first and fails closed if any of `## [PLAN]`, `## [IMPLEMENTATION]`, `## [TESTING]`, or `## [REVIEW]` is missing from the issue comments.)
 
 ## Lifecycle States
 

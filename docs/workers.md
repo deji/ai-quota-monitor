@@ -29,20 +29,24 @@ python3 -m collector collect --json
 
 ---
 
-## 3. Canonical Supervised Coordinator Loop
+## 3. Canonical GitHub Issue-First + Supervised Coordinator Loop
 
-Confirm the Orca runtime, create/reuse a Run, and dispatch workers with self-contained Task specs:
+Every bug or feature follows the **GitHub Issue-First Workflow** enforced by [`scripts/gh-issue-workflow.sh`](../scripts/gh-issue-workflow.sh) and `.githooks/commit-msg`:
 
 ```bash
-# 1. Confirm runtime
-orca status --json
+# 0. Create the GitHub Issue FIRST (scrubbed for secret/PII hygiene automatically)
+./scripts/gh-issue-workflow.sh create "<title>" "<problem-and-scope>" "enhancement"
 
-# 2. Create or bind the orchestration run (once per objective)
-orca orchestration run-create --objective "AI Quota Monitor - <phase>" --json
+# 1. Post the Plan comment (## [PLAN]) on the GitHub Issue
+./scripts/gh-issue-workflow.sh comment <issue-number> plan "<plan-markdown-or-@file>"
+
+# 2. Confirm runtime & create/bind the orchestration run
+orca status --json
+orca orchestration run-create --objective "AI Quota Monitor - Issue #<issue-number>" --json
 
 # 3. Dispatch an Implementer & Tester worker (agy with Gemini 3.8 Flash High)
 orca orchestration worker-start \
-  --task-title "<concise-task-title>" \
+  --task-title "Issue #<issue-number>: <concise-task-title>" \
   --spec "$(cat <path-to-spec.md>)" \
   --worktree new-child \
   --name "<branch-slug>" \
@@ -53,16 +57,23 @@ orca orchestration worker-start \
 
 # 4. Wait for worker completion, questions, or escalations
 orca orchestration check --wait --types "worker_done,escalation,question" --timeout-ms 900000 --json
+
+# 5. Record Implementation (## [IMPLEMENTATION]) and Testing (## [TESTING]) on the Issue
+./scripts/gh-issue-workflow.sh comment <issue-number> implementation "<summary-of-changes>"
+./scripts/gh-issue-workflow.sh comment <issue-number> testing "<verify-all-output>"
 ```
 
-### Dispatching the Read-Only Reviewer (`grok` with `grok-4.7` Medium)
+### Dispatching the Read-Only Reviewer (`grok` with `grok-4.7` Medium) & Posting `## [REVIEW]`
 
-Once an implementation worker settles with green tests, run the `grok` (`grok-4.7` medium effort) reviewer in headless read-only mode against the implementation worktree:
+Once an implementation worker settles with green tests, run the `grok` (`grok-4.7` medium effort) reviewer in headless read-only mode and automatically post its `## [REVIEW]` comment to the GitHub Issue:
 
 ```bash
-# Headless single-turn Grok 4.7 Medium review (--always-approve allows read-only inspection & test commands without blocking on interactive TUI trust prompts)
-grok -m grok-4.7 --effort medium --always-approve --cwd "<worktreePath>" \
-  -p "Perform a read-only code, architecture, and security/secret-hygiene review against docs/plan.md, docs/providers.md, and AGENTS.md. Do NOT modify any files. Output a structured Markdown review with Verdict (APPROVED or CHANGES_REQUESTED)."
+# Runs Grok 4.7 Medium review and posts ## [REVIEW] comment to Issue #<issue-number>
+./scripts/review-plan-and-code.sh worktree "<worktreePath>" --issue <issue-number>
+
+# Verify all 4 stages ([PLAN], [IMPLEMENTATION], [TESTING], [REVIEW]) exist and close the issue after merge
+./scripts/gh-issue-workflow.sh verify <issue-number>
+./scripts/gh-issue-workflow.sh close <issue-number>
 ```
 
 Note: In Orca `worker-start`, `--agent grok` does not accept `--model` or `--effort` flags and blocks on interactive folder trust (`agent-trust-workspace`) for newly created worktrees, so headless `grok -m grok-4.7 --effort medium --always-approve --cwd <worktreePath> -p ...` is the verified review invocation.

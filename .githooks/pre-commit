@@ -1,29 +1,76 @@
 #!/bin/sh
 set -e
 
-# 1. Block forbidden secret, keystore, capture, or local config files from being staged
-staged=$(git diff --cached --name-only --diff-filter=ACMR)
-if [ -z "$staged" ]; then
+# 1. Block forbidden secret, keystore, binary, capture, or local config files at ANY directory depth (handles spaces & case-insensitivity)
+staged_count=$(git diff --cached --name-only --diff-filter=ACMR | wc -l | tr -d ' ')
+if [ "$staged_count" = "0" ]; then
   exit 0
 fi
 
-for f in $staged; do
-  case "$f" in
-    *.har|*.token|*.jks|*.keystore|*.pem|*.key|*.db|*.sqlite|*.sqlite3|auth.json|local.properties|keystore.properties|signing.properties|config.yaml|config.yml|config.json|*.local.yaml|*.local.yml|*.local.json|.env|.env.*)
-      if [ "$f" != ".env.example" ]; then
-        echo "pre-commit: refusing to commit forbidden secret/local file: $f" >&2
+MAX_FILE_BYTES=5242880 # 5 MB
+
+git diff --cached --name-only --diff-filter=ACMR | while IFS= read -r f; do
+  if [ -z "$f" ]; then
+    continue
+  fi
+  base=$(basename "$f")
+  lower_base=$(printf '%s' "$base" | tr '[:upper:]' '[:lower:]')
+  case "$lower_base" in
+    *.har|*.token|*.jks|*.keystore|*.p12|*.pfx|*.pem|*.key|*.crt|*.cer|*.der|*.ovpn|*.db|*.sqlite|*.sqlite3|*.apk|*.aab|*.ap_|*.dex|*.hprof|*.log|id_rsa|id_rsa.*|id_ed25519|id_ed25519.*|auth.json|google-services.json|local.properties|keystore.properties|signing.properties|config.yaml|config.yml|config.json|*.local.yaml|*.local.yml|*.local.json|.ds_store|thumbs.db|.env|.env.*)
+      if [ "$lower_base" != ".env.example" ]; then
+        echo "pre-commit: refusing to commit forbidden secret, binary, or local config file: $f" >&2
         exit 1
       fi
       ;;
   esac
+
+  # 2. Block oversized files (> 5 MB) from bloating public git history (fail-closed if cat-file fails)
+  if ! size=$(git cat-file -s ":$f" 2>/dev/null); then
+    echo "pre-commit: unable to inspect staged blob size for: $f" >&2
+    exit 1
+  fi
+  if [ "$size" -gt "$MAX_FILE_BYTES" ]; then
+    echo "pre-commit: refusing to commit file larger than 5 MB ($size bytes): $f" >&2
+    exit 1
+  fi
 done
 
-# 2. Scan staged diff additions for leaked tokens, private paths, and credentials
-added_lines=$(git diff --cached -U0 | grep -E '^\+[^+]' || true)
-if [ -n "$added_lines" ]; then
-  # Check for JWTs, Bearer tokens (non-placeholder), API keys, or local home paths
-  if printf '%s\n' "$added_lines" | grep -Eq '(eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}|xai-[A-Za-z0-9_-]{16,}|AIza[0-9A-Za-z_-]{35}|sk-[A-Za-z0-9]{20,}|ghp_[A-Za-z0-9]{30,}|glpat-[A-Za-z0-9_-]{20,}|/Users/[a-zA-Z0-9][a-zA-Z0-9._-]*)'; then
-    echo "pre-commit: detected potential secret, token, or private local home path (/Users/...) in staged changes." >&2
+# 3. Block unresolved Git merge conflict markers in all staged additions (including lines starting with ++)
+all_added_lines=$(git diff --cached -U0 | grep -v '^+++' | grep '^+' || true)
+if [ -n "$all_added_lines" ]; then
+  if printf '%s\n' "$all_added_lines" | grep -Eq '^\+(<{7} |={7}$|>{7} )'; then
+    echo "pre-commit: detected unresolved Git merge conflict markers in staged changes." >&2
     exit 1
+  fi
+fi
+
+# 4. Scan staged diff additions (excluding hook/test regex definitions and third-party .agents skills) for leaked secrets, private keys, personal paths, and real emails
+added_lines=$(git diff --cached -U0 -- . ':!.githooks/*' ':!collector/tests/test_repo_hygiene.py' ':!.agents/*' | grep -v '^+++' | grep '^+' || true)
+if [ -n "$added_lines" ]; then
+  # 4a. Check for PEM private keys, JWTs, API keys, GitHub/GitLab/Slack/AWS tokens, or local home paths (/Users/... or /home/...)
+  if printf '%s\n' "$added_lines" | grep -Eq '(-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----|eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}|xai-[A-Za-z0-9_-]{16,}|AIza[0-9A-Za-z_-]{35}|sk-[A-Za-z0-9_-]{20,}|sk-ant-[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9_]{30,}|github_pat_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|ya29\.[A-Za-z0-9_-]{20,}|/Users/[a-zA-Z0-9][a-zA-Z0-9._-]*|/home/[a-zA-Z0-9][a-zA-Z0-9._-]*)'; then
+    echo "pre-commit: detected potential secret, private key, token, or private local home path (/Users/... or /home/...) in staged changes." >&2
+    exit 1
+  fi
+
+  # 4b. Check for non-synthetic email addresses (only exact @example.com/.org/.net, noreply@github.com, and *@users.noreply.github.com are permitted)
+  emails=$(printf '%s\n' "$added_lines" | sed 's/^+//' | grep -Eo '[A-Za-z0-9][A-Za-z0-9._%+-]*@[A-Za-z][A-Za-z0-9.-]*\.[A-Za-z]{2,}' || true)
+  if [ -n "$emails" ]; then
+    for em in $emails; do
+      case "$em" in
+        this@*|return@*|continue@*|break@*|super@*)
+          continue
+          ;;
+      esac
+      lower_em=$(printf '%s' "$em" | tr '[:upper:]' '[:lower:]')
+      case "$lower_em" in
+        *@example.com|*@example.org|*@example.net|noreply@github.com|*@users.noreply.github.com)
+          ;;
+        *)
+          echo "pre-commit: detected non-synthetic email address in staged changes: $em" >&2
+          exit 1
+          ;;
+      esac
+    done
   fi
 fi

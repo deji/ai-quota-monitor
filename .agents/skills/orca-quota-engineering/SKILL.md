@@ -17,21 +17,30 @@ All non-trivial work in this repository uses three distinct agent roles and **th
 | **Implementer & Tester** | `agy` (`antigravity`) | `gemini-3.8-flash-high` (`high`) | Feature implementation, unit/UI tests, Gradle builds, and emulator/device verification. |
 | **Plan & Code Reviewer** | `grok` (Grok Build CLI) | `grok-4.7` (`--effort medium`) | Read-only review of plans, worktree diffs, and cross-system contracts. |
 
-### The 3 Review Gates (`scripts/review-plan-and-code.sh`)
+### The GitHub Issue-First Lifecycle (`scripts/gh-issue-workflow.sh`) & 3 Review Gates (`scripts/review-plan-and-code.sh`)
+0. **Gate 0 — GitHub Issue Creation & Plan Comment (Mandatory Before Code)**:
+   Every bug or feature MUST be filed as a GitHub Issue first, and its architectural plan MUST be posted as a `## [PLAN]` comment on that issue:
+   ```bash
+   ./scripts/gh-issue-workflow.sh create "<title>" "<description>" "enhancement"
+   ./scripts/gh-issue-workflow.sh comment <issue-number> plan "<plan-markdown>"
+   ```
 1. **Gate 1 — Plan Review (Pre-Implementation)**:
    Before dispatching implementation workers for a new feature or architectural change, run `grok` against `docs/plan.md` and `docs/providers.md`:
    ```bash
-   ./scripts/review-plan-and-code.sh plan
+   ./scripts/review-plan-and-code.sh plan --issue <issue-number>
    ```
-2. **Gate 2 — Worktree Implementation Review**:
-   After an `antigravity` (`gemini-3.8-flash-high`) worker finishes and passes unit/hygiene tests, release its worker terminal and run `grok` against its worktree:
+2. **Gate 2 — Worktree Implementation, Testing & Review Comments**:
+   Every commit must reference `#<issue-number>` (enforced by `.githooks/commit-msg`). After an `antigravity` (`gemini-3.8-flash-high`) worker finishes and passes unit/hygiene tests, post the `## [IMPLEMENTATION]` and `## [TESTING]` comments, release its worker terminal, and run `grok` against its worktree with `--issue <issue-number>` to post `## [REVIEW]`:
    ```bash
-   ./scripts/review-plan-and-code.sh worktree "<worktree-path>"
+   ./scripts/gh-issue-workflow.sh comment <issue-number> implementation "<summary>"
+   ./scripts/gh-issue-workflow.sh comment <issue-number> testing "<test-output>"
+   ./scripts/review-plan-and-code.sh worktree "<worktree-path>" --issue <issue-number>
    ```
-3. **Gate 3 — Cross-System Integration Review (Pre-Merge / Release)**:
-   Whenever a change touches both `collector/` and `app/` (or `docs/`), run a cross-system review to verify JSON schemas, HTTP endpoints, and crypto envelopes match across Python and Kotlin:
+3. **Gate 3 — Cross-System Integration Review & Issue Verification (Pre-Merge / Close)**:
+   Whenever a change touches both `collector/` and `app/` (or `docs/`), run a cross-system review, and verify all 4 issue comment stages (`[PLAN]`, `[IMPLEMENTATION]`, `[TESTING]`, `[REVIEW]`) before closing the issue:
    ```bash
-   ./scripts/review-plan-and-code.sh cross-system
+   ./scripts/review-plan-and-code.sh cross-system --issue <issue-number>
+   ./scripts/gh-issue-workflow.sh close <issue-number>
    ```
 
 ---
@@ -40,9 +49,9 @@ All non-trivial work in this repository uses three distinct agent roles and **th
 
 1. **100% Native Android UI (Zero WebViews)**:
    - Every screen, gauge (`QuotaRadialArcGauge`), chart (`BurnVelocityChart`, `MiniSparkline`), sheet (`BucketDetailSheet`, `SyncHubSheet`), dock (`TimeTravelScrubberDock`), and home-screen widget (`QuotaCompactWidget` `2x2`, `QuotaWideWidget` `4x2`) must be pure Jetpack Compose / Glance with Material You Dynamic Color and `fontFeatureSettings = "tnum"`.
-2. **Public-Repo Secret & PII Hygiene**:
-   - Keep `git config core.hooksPath .githooks` enabled in the main repo and every worktree.
-   - Never commit or log tokens (`Bearer ...`, `eyJ...`, `xai-...`, `ghp_...`), account IDs, device serials, machine hostnames (`socket.gethostname()`), personal emails, or `/Users/<username>` paths.
+2. **Public-Repo Secret & PII Hygiene (`SEC-G1`)**:
+   - Keep `git config core.hooksPath .githooks` enabled in the main repo and every worktree so `pre-commit`, `commit-msg`, and `pre-push` all enforce public-repo safety.
+   - Never commit or log tokens (`Bearer ...`, `eyJ...`, `xai-...`, `gh[pousr]_...`, `github_pat_...`, `sk-ant-...`, `AKIA...`), PEM private keys, APK/keystore binaries, files `> 5 MB`, merge conflict markers, account IDs, device serials, machine hostnames (`socket.gethostname()`), non-synthetic emails, or `/Users/<username>` / `/home/<username>` paths.
 3. **Cross-Language AES-256-GCM Envelope Interoperability**:
    - `collector/crypto_relay.py` and `GistEnvelopeDecryptor.kt` share the v1 envelope schema (`v=1`, `alg="AES-256-GCM"`, `nonce` (12-byte Base64, `iv` accepted as alias), `ciphertext`, `tag` (16-byte Base64), `capturedAt`).
    - Any change to envelope encryption or decryption **must** keep the **Cross-Language Golden Test Vector** green in both `collector/tests/test_collector.py` and `GistEnvelopeDecryptorTest.kt`.
