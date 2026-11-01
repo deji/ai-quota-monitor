@@ -61,7 +61,7 @@ This document captures the hard-won architectural, security, wire-protocol, UI/U
    - Never fall back to returning plaintext if `AndroidKeyStore` encryption fails on a real device. Use an ephemeral in-memory AES key fallback *only* when `KeyStore.getInstance("AndroidKeyStore")` is unavailable in host JVM unit tests.
    - Always set `android:allowBackup="false"` and configure `@xml/data_extraction_rules` and `@xml/backup_rules` so encrypted preferences and cached snapshots are excluded from cloud/ADB backups.
 2. **Private-Network Cleartext HTTP Guard (`APP-H2`, `SYS-H3`)**:
-   - Android `targetSdk = 36` blocks cleartext HTTP by default, while the local Mac collector over Tailscale uses `http://100.x.y.z:8787`.
+   - Android `targetSdk = 36` blocks cleartext HTTP by default, while the local Mac collector over Tailscale uses `http://100.x.y.z:8741`.
    - Enforce in `TailscaleApiClient` that `http://` URLs are permitted **only** for Tailscale CGNAT (`100.64.0.0/10`), loopback (`127.0.0.1`, `localhost`), RFC1918 private LAN, and `*.ts.net` hosts—never send the bearer token over `http://` to a public internet host.
 3. **Glance Widget State Synchronization (`APP-M4`, `SYS-H6`)**:
    - `GlanceAppWidget` does not automatically re-render when `SharedPreferences` changes. Explicitly call `QuotaCompactWidget().updateAll(context)` and `QuotaWideWidget().updateAll(context)` whenever a new snapshot is saved or the `% Left` / `% Used` polarity toggle changes.

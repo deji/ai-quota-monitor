@@ -67,8 +67,8 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s collector/tests -v
 
 3. **Run the Collector Daemon Interactively (Bound to Tailscale IP or Loopback)**:
    ```bash
-   # Auto-detect Tailscale IPv4 (100.x.y.z) or bind to 127.0.0.1:8787
-   python3 -m collector serve --host tailscale --port 8787
+   # Auto-detect Tailscale IPv4 (100.x.y.z) or bind to 127.0.0.1:8741
+   python3 -m collector serve --host tailscale --port 8741
    ```
 
 4. **Install as a Background macOS `launchd` Agent**:
@@ -132,8 +132,8 @@ adb shell am start -n com.aiquotamonitor/.ui.MainActivity
 ```
 3. **Configure Sync in the App**:
    - Ensure the **Tailscale** app is active on your Pixel 8 Pro.
-   - Tap the **Sync Status Pill** in the top app bar (or switch to the **Sync** tab) to open the **Sync Hub**:
-     - **Tailscale Collector URL**: `http://<your-mac-tailscale-ip>:8787` (e.g., `http://100.x.y.z:8787`)
+   - Tap the **Sync Status Pill** in the top app bar (or switch to the **Widgets & Sync** tab) to open the **Sync Hub**:
+     - **Tailscale Collector URL**: `http://<your-mac-tailscale-ip>:8741` (e.g., `http://100.x.y.z:8741`)
      - **Bearer Token**: Copy `bearerToken` from `~/.config/ai-quota-monitor/config.json`
      - **Cloud Relay (Optional Offline Fallback)**:
        - Paste either the **Raw Gist URL** (`https://gist.githubusercontent.com/<owner>/<gist_id>/raw/quota_snapshot.enc.json`, no GitHub token required) **or** the **Gist ID** + a **GitHub Fine-Grained Read Token**
