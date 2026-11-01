@@ -17,4 +17,7 @@ data class SyncSettings(
     val githubToken: String = "",
     val activeHoursStart: String = "08:00",
     val activeHoursEnd: String = "22:00"
-)
+) {
+    val hasUsableTransport: Boolean
+        get() = tailscaleUrl.isNotBlank() || (gistId.isNotBlank() && gistAesKey.isNotBlank())
+}

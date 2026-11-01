@@ -44,6 +44,7 @@ import com.aiquotamonitor.data.repository.ConnectionState
 import com.aiquotamonitor.domain.model.QuotaBucket
 import com.aiquotamonitor.ui.components.AntigravityBucketsCard
 import com.aiquotamonitor.ui.components.BucketDetailSheet
+import com.aiquotamonitor.ui.components.ConnectCollectorCard
 import com.aiquotamonitor.ui.components.HeroBottleneckCard
 import com.aiquotamonitor.ui.components.OrcaRoleReadinessStrip
 import com.aiquotamonitor.ui.components.ProviderBentoRow
@@ -64,6 +65,7 @@ fun DashboardScreen(
 ) {
     val snapshot by viewModel.activeSnapshot.collectAsState()
     val polarity by viewModel.polarity.collectAsState()
+    val settings by viewModel.settings.collectAsState()
     val connectionState by viewModel.connectionState.collectAsState()
     val scrubOffset by viewModel.scrubOffsetHours.collectAsState()
     val isScrubbing by viewModel.isScrubbing.collectAsState()
@@ -104,13 +106,11 @@ fun DashboardScreen(
                 .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 136.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 1. Top Bar Row: Connection Status Pill + Refresh + Polarity Capsule Toggle
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Connection Status Pill: clickable to open SyncHubSheet
                 val dotColor = when {
                     isSyncError -> QuotaCoral
                     isStale -> QuotaAmber
@@ -195,7 +195,13 @@ fun DashboardScreen(
                 }
             }
 
-            // 2. Orca Role Readiness Strip
+            if (!settings.hasUsableTransport) {
+                ConnectCollectorCard(
+                    connectionState = connectionState,
+                    onConnectClick = { showSyncHub = true }
+                )
+            }
+
             if (snapshot.orcaRoles.isNotEmpty()) {
                 OrcaRoleReadinessStrip(
                     roles = snapshot.orcaRoles,
@@ -203,7 +209,6 @@ fun DashboardScreen(
                 )
             }
 
-            // 3. Hero Bottleneck Squircle Card
             if (bottleneckBucket != null) {
                 HeroBottleneckCard(
                     bucket = bottleneckBucket,
@@ -214,7 +219,6 @@ fun DashboardScreen(
                 )
             }
 
-            // 4. 2-Column Bento Row for OpenCode Go and Grok Build
             ProviderBentoRow(
                 openCodeProvider = openCodeProvider,
                 grokProvider = grokProvider,
@@ -231,7 +235,6 @@ fun DashboardScreen(
                 }
             )
 
-            // 5. Antigravity Secondary Buckets Card
             AntigravityBucketsCard(
                 agyProvider = agyProvider,
                 polarity = polarity,
@@ -241,7 +244,6 @@ fun DashboardScreen(
             Spacer(modifier = Modifier.height(8.dp))
         }
 
-        // Persistent Time-Travel Scrubber Dock at bottom of dashboard
         TimeTravelScrubberDock(
             scrubOffsetHours = scrubOffset,
             onScrubOffsetChanged = { viewModel.setScrubOffset(it) },
@@ -251,7 +253,6 @@ fun DashboardScreen(
         )
     }
 
-    // Modal Bottom Sheets
     selectedBucket?.let { bucket ->
         BucketDetailSheet(
             bucket = bucket,

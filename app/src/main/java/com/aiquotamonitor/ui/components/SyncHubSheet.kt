@@ -18,6 +18,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Warning
@@ -36,6 +38,9 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -70,6 +75,9 @@ fun SyncHubSheet(
     val isPriming by viewModel.isPriming.collectAsState()
     val userMessage by viewModel.userMessage.collectAsState()
 
+    val isConfigured = settings.hasUsableTransport
+    var isEditExpanded by rememberSaveable { mutableStateOf(false) }
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
@@ -83,7 +91,6 @@ fun SyncHubSheet(
                 .padding(horizontal = 20.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Header Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -118,7 +125,6 @@ fun SyncHubSheet(
                 }
             }
 
-            // Connection Status Card
             val statusColor = when {
                 isSyncError -> QuotaCoral
                 isStale -> QuotaAmber
@@ -169,7 +175,6 @@ fun SyncHubSheet(
                 }
             }
 
-            // Amber / Coral Sync Error Banner if falling back to cache or seed data
             if (!syncError.isNullOrBlank()) {
                 Box(
                     modifier = Modifier
@@ -209,82 +214,114 @@ fun SyncHubSheet(
                 }
             }
 
-            // Transport Endpoints Summary Card
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                    .padding(16.dp)
-            ) {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+            if (isConfigured) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                        .padding(16.dp)
                 ) {
-                    Text(
-                        text = "CONFIGURED TRANSPORTS",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 10.sp
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(
+                            text = "CONFIGURED TRANSPORTS",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 10.sp
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "1. Tailscale Live Daemon:",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = if (settings.tailscaleUrl.isNotBlank()) settings.tailscaleUrl else "Not configured",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (settings.tailscaleUrl.isNotBlank()) QuotaCyan else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "2. Cloud Relay (Gist):",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            val isGistConfigured = settings.gistId.isNotBlank() && settings.gistAesKey.isNotBlank()
+                            val isGistIncomplete = (settings.gistId.isNotBlank() || settings.gistAesKey.isNotBlank()) && !isGistConfigured
+                            Text(
+                                text = when {
+                                    isGistConfigured -> "Configured"
+                                    isGistIncomplete -> "Incomplete (needs ID & AES key)"
+                                    else -> "Not configured"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = when {
+                                    isGistConfigured -> QuotaEmerald
+                                    isGistIncomplete -> QuotaAmber
+                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                }
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "   GitHub Token:",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = if (settings.githubToken.isNotBlank()) "Configured" else "None (Raw URL / Public)",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (settings.githubToken.isNotBlank()) QuotaEmerald else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                OutlinedButton(
+                    onClick = { isEditExpanded = !isEditExpanded },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isEditExpanded) Icons.Default.ExpandLess else Icons.Default.Edit,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
                     )
-
-                    // Primary Tailscale Daemon
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = "1. Tailscale Live Daemon:",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = if (settings.tailscaleUrl.isNotBlank()) settings.tailscaleUrl else "Not configured",
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = if (settings.tailscaleUrl.isNotBlank()) QuotaCyan else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    // Fallback Gist Relay
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = "2. Cloud Relay (Gist):",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = if (settings.gistId.isNotBlank()) "Configured" else "Not configured",
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = if (settings.gistId.isNotBlank()) QuotaEmerald else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = "   GitHub Token:",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = if (settings.githubToken.isNotBlank()) "Configured" else "None (Raw URL / Public)",
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = if (settings.githubToken.isNotBlank()) QuotaEmerald else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    Spacer(modifier = Modifier.size(6.dp))
+                    Text(
+                        text = if (isEditExpanded) "Hide Connection Settings" else "Edit Connection Settings",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    )
                 }
             }
 
-            // Quick Actions
+            if (!isConfigured || isEditExpanded) {
+                ConnectionSettingsForm(
+                    viewModel = viewModel
+                )
+            }
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -331,7 +368,7 @@ fun SyncHubSheet(
                 }
             }
 
-            if (!userMessage.isNullOrBlank()) {
+            if (isConfigured && !isEditExpanded && !userMessage.isNullOrBlank()) {
                 Text(
                     text = userMessage ?: "",
                     style = MaterialTheme.typography.bodySmall,

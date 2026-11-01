@@ -141,8 +141,37 @@ class QuotaViewModel(
     }
 
     fun saveSettings(newSettings: SyncSettings) {
-        repository.updateSettings(newSettings)
-        refresh(forceTailscale = false, isManual = true)
+        viewModelScope.launch {
+            val result = repository.saveSettings(newSettings)
+            if (result.isFailure) {
+                _userMessage.value = "Save failed: ${result.exceptionOrNull()?.message}"
+            } else {
+                val err = repository.syncErrorFlow.value
+                if (!err.isNullOrBlank()) {
+                    _userMessage.value = err
+                } else {
+                    _userMessage.value = "Settings saved & synced successfully"
+                }
+            }
+            triggerWidgetUpdate()
+        }
+    }
+
+    fun testConnection(newSettings: SyncSettings? = null) {
+        viewModelScope.launch {
+            val result = repository.testConnection(newSettings)
+            if (result.isFailure) {
+                _userMessage.value = "Test connection failed: ${result.exceptionOrNull()?.message}"
+            } else {
+                val err = repository.syncErrorFlow.value
+                if (!err.isNullOrBlank()) {
+                    _userMessage.value = err
+                } else {
+                    _userMessage.value = "Connection test succeeded"
+                }
+            }
+            triggerWidgetUpdate()
+        }
     }
 
     fun updateActiveHours(start: String, end: String) {

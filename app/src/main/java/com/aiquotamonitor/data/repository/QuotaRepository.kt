@@ -13,7 +13,9 @@ interface QuotaRepository {
     suspend fun refresh(forceTailscale: Boolean = false, isManual: Boolean = false): Result<QuotaSnapshot>
     suspend fun primeGrok(): Result<SmartPrimeStatus>
     suspend fun updateActiveHours(start: String, end: String): Result<QuotaSnapshot>
-    fun updateSettings(settings: SyncSettings)
+    suspend fun updateSettings(settings: SyncSettings)
+    suspend fun saveSettings(settings: SyncSettings): Result<QuotaSnapshot>
+    suspend fun testConnection(overrideSettings: SyncSettings? = null): Result<QuotaSnapshot>
     fun setSnapshotForSimulation(simulated: QuotaSnapshot)
     fun resetSimulation()
 }

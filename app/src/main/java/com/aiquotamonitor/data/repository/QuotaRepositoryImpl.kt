@@ -16,6 +16,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 
@@ -26,6 +28,8 @@ class QuotaRepositoryImpl(
     private val json: Json = Json { ignoreUnknownKeys = true },
     private val context: Context? = null
 ) : QuotaRepository {
+
+    private val settingsMutex = Mutex()
 
     private var baseSnapshot: QuotaSnapshot
     private val _snapshotFlow: MutableStateFlow<QuotaSnapshot>
@@ -41,15 +45,10 @@ class QuotaRepositoryImpl(
 
     init {
         // Attempt to load cached snapshot from preferences or fallback to rich SeedData
-        val cachedJson = preferencesStore.getCachedSnapshotJson()
-        val initialSnapshot = if (!cachedJson.isNullOrBlank()) {
-            try {
-                json.decodeFromString<QuotaSnapshot>(cachedJson).also {
-                    _connectionStateFlow.value = ConnectionState.OFFLINE
-                }
-            } catch (_: Exception) {
-                SeedData.createSeedSnapshot()
-            }
+        val cachedSnapshot = loadValidCachedSnapshot()
+        val initialSnapshot = if (cachedSnapshot != null) {
+            _connectionStateFlow.value = ConnectionState.OFFLINE
+            cachedSnapshot
         } else {
             SeedData.createSeedSnapshot()
         }
@@ -117,20 +116,17 @@ class QuotaRepositoryImpl(
         )
         val failureReason = if (errorParts.isNotEmpty()) {
             errorParts.joinToString("; ")
-        } else if (settings.tailscaleUrl.isBlank() && settings.gistId.isBlank()) {
+        } else if (!settings.hasUsableTransport) {
             "No sync endpoints configured"
         } else {
             "Sync endpoints unreachable"
         }
 
-        val cached = preferencesStore.getCachedSnapshotJson()
-        if (!cached.isNullOrBlank()) {
-            try {
-                val snapshot = json.decodeFromString<QuotaSnapshot>(cached)
-                _syncErrorFlow.value = "$failureReason. Using cached snapshot."
-                applyNewSnapshot(snapshot, ConnectionState.OFFLINE)
-                return@withContext Result.success(snapshot)
-            } catch (_: Exception) {}
+        val cached = loadValidCachedSnapshot()
+        if (cached != null) {
+            _syncErrorFlow.value = "$failureReason. Using cached snapshot."
+            applyNewSnapshot(cached, ConnectionState.OFFLINE)
+            return@withContext Result.success(cached)
         }
 
         val seed = SeedData.createSeedSnapshot()
@@ -173,9 +169,12 @@ class QuotaRepositoryImpl(
     }
 
     override suspend fun updateActiveHours(start: String, end: String): Result<QuotaSnapshot> = withContext(Dispatchers.IO) {
-        val current = settingsFlow.value
-        val updated = current.copy(activeHoursStart = start, activeHoursEnd = end)
-        preferencesStore.saveSettings(updated)
+        val updated = settingsMutex.withLock {
+            val current = preferencesStore.settingsFlow.value
+            val merged = current.copy(activeHoursStart = start, activeHoursEnd = end)
+            preferencesStore.saveSettings(merged)
+            merged
+        }
 
         if (updated.tailscaleUrl.isNotBlank()) {
             try {
@@ -196,8 +195,133 @@ class QuotaRepositoryImpl(
         }
     }
 
-    override fun updateSettings(settings: SyncSettings) {
-        preferencesStore.saveSettings(settings)
+    override suspend fun saveSettings(settings: SyncSettings): Result<QuotaSnapshot> = withContext(Dispatchers.IO) {
+        settingsMutex.withLock {
+            val latest = preferencesStore.settingsFlow.value
+            val merged = latest.copy(
+                tailscaleUrl = settings.tailscaleUrl,
+                tailscaleToken = settings.tailscaleToken,
+                gistId = settings.gistId,
+                gistAesKey = settings.gistAesKey,
+                githubToken = settings.githubToken
+            )
+            preferencesStore.saveSettings(merged)
+        }
+        refresh(forceTailscale = false, isManual = true)
+    }
+
+    override suspend fun testConnection(overrideSettings: SyncSettings?): Result<QuotaSnapshot> = withContext(Dispatchers.IO) {
+        val candidate = if (overrideSettings != null) {
+            val latest = preferencesStore.settingsFlow.value
+            latest.copy(
+                tailscaleUrl = overrideSettings.tailscaleUrl,
+                tailscaleToken = overrideSettings.tailscaleToken,
+                gistId = overrideSettings.gistId,
+                gistAesKey = overrideSettings.gistAesKey,
+                githubToken = overrideSettings.githubToken
+            )
+        } else {
+            preferencesStore.settingsFlow.value
+        }
+
+        if (!candidate.hasUsableTransport) {
+            val error = "No sync endpoints configured to test"
+            _syncErrorFlow.value = error
+            return@withContext Result.failure(IllegalStateException(error))
+        }
+
+        val priorState = _connectionStateFlow.value
+        _connectionStateFlow.value = ConnectionState.SYNCING
+        val restoreState = if (priorState != ConnectionState.SYNCING) {
+            priorState
+        } else {
+            if (loadValidCachedSnapshot() != null) ConnectionState.OFFLINE else ConnectionState.DEMO_SEED
+        }
+        var tailscaleError: String? = null
+
+        if (candidate.tailscaleUrl.isNotBlank()) {
+            try {
+                val liveSnapshot = tailscaleClient.triggerRefresh(
+                    baseUrl = candidate.tailscaleUrl,
+                    token = candidate.tailscaleToken.ifBlank { null }
+                )
+                if (overrideSettings != null) {
+                    settingsMutex.withLock {
+                        val latest = preferencesStore.settingsFlow.value
+                        preferencesStore.saveSettings(
+                            latest.copy(
+                                tailscaleUrl = candidate.tailscaleUrl,
+                                tailscaleToken = candidate.tailscaleToken,
+                                gistId = candidate.gistId,
+                                gistAesKey = candidate.gistAesKey,
+                                githubToken = candidate.githubToken
+                            )
+                        )
+                    }
+                }
+                _syncErrorFlow.value = null
+                applyNewSnapshot(liveSnapshot, ConnectionState.TAILSCALE_LIVE)
+                return@withContext Result.success(liveSnapshot)
+            } catch (e: Exception) {
+                tailscaleError = e.message ?: "Connection failed"
+            }
+        }
+
+        if (candidate.gistId.isNotBlank() && candidate.gistAesKey.isNotBlank()) {
+            try {
+                val relaySnapshot = gistClient.fetchAndDecryptSnapshot(
+                    gistId = candidate.gistId,
+                    aesKey = candidate.gistAesKey,
+                    githubToken = candidate.githubToken.ifBlank { null }
+                )
+                if (overrideSettings != null) {
+                    settingsMutex.withLock {
+                        val latest = preferencesStore.settingsFlow.value
+                        preferencesStore.saveSettings(
+                            latest.copy(
+                                tailscaleUrl = candidate.tailscaleUrl,
+                                tailscaleToken = candidate.tailscaleToken,
+                                gistId = candidate.gistId,
+                                gistAesKey = candidate.gistAesKey,
+                                githubToken = candidate.githubToken
+                            )
+                        )
+                    }
+                }
+                _syncErrorFlow.value = null
+                applyNewSnapshot(relaySnapshot, ConnectionState.CLOUD_RELAY_SYNCED)
+                return@withContext Result.success(relaySnapshot)
+            } catch (e: Exception) {
+                val gistError = e.message ?: "Decryption or network error"
+                val combinedError = if (tailscaleError != null) {
+                    "Tailscale unreachable ($tailscaleError); Cloud relay failed ($gistError)"
+                } else {
+                    "Cloud relay failed ($gistError)"
+                }
+                _syncErrorFlow.value = combinedError
+                _connectionStateFlow.value = restoreState
+                return@withContext Result.failure(Exception(combinedError))
+            }
+        }
+
+        val errorMsg = "Tailscale live daemon unreachable ($tailscaleError)"
+        _syncErrorFlow.value = errorMsg
+        _connectionStateFlow.value = restoreState
+        Result.failure(IOException(errorMsg))
+    }
+
+    override suspend fun updateSettings(settings: SyncSettings) = withContext(Dispatchers.IO) {
+        settingsMutex.withLock {
+            val latest = preferencesStore.settingsFlow.value
+            val merged = latest.copy(
+                tailscaleUrl = settings.tailscaleUrl,
+                tailscaleToken = settings.tailscaleToken,
+                gistId = settings.gistId,
+                gistAesKey = settings.gistAesKey,
+                githubToken = settings.githubToken
+            )
+            preferencesStore.saveSettings(merged)
+        }
     }
 
     override fun setSnapshotForSimulation(simulated: QuotaSnapshot) {
@@ -208,13 +332,25 @@ class QuotaRepositoryImpl(
         _snapshotFlow.value = baseSnapshot
     }
 
+    private fun loadValidCachedSnapshot(): QuotaSnapshot? {
+        val cached = preferencesStore.getCachedSnapshotJson()
+        if (cached.isNullOrBlank()) return null
+        return try {
+            json.decodeFromString<QuotaSnapshot>(cached)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     private fun applyNewSnapshot(snapshot: QuotaSnapshot, state: ConnectionState) {
         baseSnapshot = snapshot
         _snapshotFlow.value = snapshot
         _connectionStateFlow.value = state
-        try {
-            preferencesStore.saveCachedSnapshotJson(json.encodeToString(snapshot))
-        } catch (_: Exception) {}
+        if (state == ConnectionState.TAILSCALE_LIVE || state == ConnectionState.CLOUD_RELAY_SYNCED) {
+            try {
+                preferencesStore.saveCachedSnapshotJson(json.encodeToString(snapshot))
+            } catch (_: Exception) {}
+        }
 
         // Trigger Glance AppWidgets update
         context?.let { ctx ->

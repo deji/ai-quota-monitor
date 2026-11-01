@@ -17,7 +17,7 @@ Following owner review of the three Stitch prototype sets (`projects/81570706549
 | **2-Column Provider Bento Row (`OpenCode Go` & `Grok Build`)** | **Modern** + **Avant-Garde** | Side-by-side `28dp` Bento cards with radial ring gauges, plus the **Grok OAuth Token Lease Countdown bar** & manual **`Prime Pulse`** trigger button. |
 | **Interactive Time-Travel Horizon Scrubber** | **Avant-Garde** (`01-dashboard`) | Bottom dock slider (`HorizonScrubberCard`: `NOW → +1H → +4H → RESET`) backed by `HorizonSimulator` that projects remaining quota across all buckets at current burn velocity. |
 | **Burn Velocity & Multi-Stream Horizon Screen** | **Modern** + **Avant-Garde** (`02-detail-history`) | Custom Compose `Canvas` bezier/horizon velocity chart (`BurnVelocityChart`) with diagonal linear pace line, `2x2` metric squircles, all-buckets pace list, and recent orchestration stage checkpoints. |
-| **Glance Widgets (`2x2` & `4x2`) & Dual-Transport Hub** | **Modern** + **Avant-Garde** (`03-widgets-settings`) | Native Jetpack Glance `2x2` Compact (`QuotaCompactWidget`) and `4x2` Wide Orca Stage Deck (`QuotaWideWidget`) + Tailscale Live / GitHub Gist AES-256-GCM Relay settings + **Active-Hours Wake Slider (`08:00–22:00`)**. |
+| **Glance Widgets (`2x2` & `4x2`) & Dual-Transport Hub** | **Modern** + **Avant-Garde** (`03-widgets-settings`) | Native Jetpack Glance `2x2` Compact (`QuotaCompactWidget`) and `4x2` Wide Orca Stage Deck (`QuotaWideWidget`) + reusable `ConnectionSettingsForm` (promoted to top of Widgets & Sync screen and embedded in `SyncHubSheet`), first-run `ConnectCollectorCard` on Dashboard, Tailscale Live (port `8741`) / GitHub Gist AES-256-GCM Relay settings + **Active-Hours Wake Slider (`08:00–22:00`)**. |
 
 ---
 
