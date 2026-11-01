@@ -2,4 +2,10 @@
 
 | ID | Title | Severity | Status | Owner / Notes |
 | :--- | :--- | :--- | :--- | :--- |
-| _None yet_ | — | — | — | Project in Phase 0 planning |
+| **H1** | Encrypt tokens at rest via Android Keystore & disallow cleartext backup | High | **Fixed** | Implemented `KeystoreSecretStore` (AES/GCM/NoPadding) with JVM unit-test fallback; added `android:allowBackup="false"`, `@xml/data_extraction_rules`, and `@xml/backup_rules`. |
+| **H2** | Allow private Tailscale daemon HTTP traffic & align compileSdk/targetSdk 36 | High | **Fixed** | Updated `targetSdk` to 36; added `@xml/network_security_config` permitting cleartext HTTP for private/Tailscale endpoints while strictly enforcing HTTPS for GitHub. |
+| **M1 / L4** | Live collector explicit refresh (`POST /v1/quota/refresh`) & real error state | Medium / Low | **Fixed** | `QuotaRepositoryImpl` triggers live collector refresh on manual refresh; checks `primeGrok()` follow-up refresh; surfaces real `syncError` / `isSyncError` state to Dashboard and Sync hub with amber/coral warning indicators. |
+| **M2 / L3** | Gist envelope IV length validation & Base64/Hex decoding collision fix | Medium / Low | **Fixed** | Validates exact 12-byte IV in `GistEnvelopeDecryptor`; prevents Base64 strings with hex characters from being misdecoded as hex; added comprehensive `QuotaRepositoryImplTest` JUnit suite (6 tests). |
+| **M3** | Master surfaces: Scrubber dock, Bucket detail sheet, and Sync hub sheet | Medium | **Fixed** | Implemented persistent `TimeTravelScrubberDock` with NOW/+1H/+3H/RESET presets; added `BucketDetailSheet` (with sparkline, pace vs actual, reset window, exhaustion projection); added `SyncHubSheet`; fixed Grok lease scaling > 5400s; labeled offline simulation when daemon unconfigured. |
+| **M4** | Glance home-screen widgets refresh & initial layout | Medium | **Fixed** | Wrapped widgets in `GlanceTheme`; added `@layout/widget_initial_loading`; wired `updateAll(context)` whenever snapshot or polarity changes. |
+| **M5 / L1 / L2** | State preservation, predictive back handling, and spring physics | Medium / Low | **Fixed** | Applied `rememberSaveable` to navigation tab and polarity; wired `BackHandler` for bottom sheets and tab navigation; applied `spring()` physics with instant `snap()` during scrubber drag; removed unused `Brush.sweepGradient` allocation in `QuotaRadialArcGauge`. |
