@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">AI Quota Monitor</string>
+    <string name="compact_widget_name">AI Quota Compact</string>
+    <string name="compact_widget_desc">2x2 Glance widget spotlighting the primary bottleneck model</string>
+    <string name="wide_widget_name">Orca Stage Deck</string>
+    <string name="wide_widget_desc">4x2 Glance widget displaying Planner, Builder, and Reviewer readiness</string>
+</resources>

@@ -57,36 +57,15 @@ orca orchestration check --wait --types "worker_done,escalation,question" --time
 
 ### Dispatching the Read-Only Reviewer (`grok` with `grok-4.7` Medium)
 
-Once an implementation worker settles with green tests, dispatch the `grok` reviewer against the implementation worktree/diff:
+Once an implementation worker settles with green tests, run the `grok` (`grok-4.7` medium effort) reviewer in headless read-only mode against the implementation worktree:
 
 ```bash
-# Option A: Direct worker-start if grok agent is enabled in Orca
-orca orchestration worker-start \
-  --task-title "review-<branch-slug>" \
-  --spec "$(cat <path-to-review-spec.md>)" \
-  --worktree id:<repoId>::<worktreePath> \
-  --agent grok \
-  --model grok-4.7 \
-  --effort medium \
-  --json
+# Headless single-turn Grok 4.7 Medium review (--always-approve allows read-only inspection & test commands without blocking on interactive TUI trust prompts)
+grok -m grok-4.7 --effort medium --always-approve --cwd "<worktreePath>" \
+  -p "Perform a read-only code, architecture, and security/secret-hygiene review against docs/plan.md, docs/providers.md, and AGENTS.md. Do NOT modify any files. Output a structured Markdown review with Verdict (APPROVED or CHANGES_REQUESTED)."
 ```
 
-If `worker-start --agent grok` is not registered as a direct `--model`/`--effort` target in the current Orca build, launch the Grok TUI in a managed terminal in that worktree and bind it via `worker-start --terminal`:
-
-```bash
-orca terminal create \
-  --worktree id:<repoId>::<worktreePath> \
-  --title "grok-reviewer" \
-  --command "/opt/homebrew/bin/grok -m grok-4.7" \
-  --json
-orca terminal wait --terminal <handle> --for tui-idle --timeout-ms 60000 --json
-orca orchestration worker-start \
-  --task-title "review-<branch-slug>" \
-  --spec "$(cat <path-to-review-spec.md>)" \
-  --worktree id:<repoId>::<worktreePath> \
-  --terminal <handle> \
-  --json
-```
+Note: In Orca `worker-start`, `--agent grok` does not accept `--model` or `--effort` flags and blocks on interactive folder trust (`agent-trust-workspace`) for newly created worktrees, so headless `grok -m grok-4.7 --effort medium --always-approve --cwd <worktreePath> -p ...` is the verified review invocation.
 
 ---
 
