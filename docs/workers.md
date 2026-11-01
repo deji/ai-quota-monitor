@@ -79,10 +79,11 @@ Every worker brief must be self-contained (<80 lines) and explicitly state:
    - Zero WebViews; 100% native Jetpack Compose.
    - Zero secrets, tokens, or personal paths (`/Users/...`).
 4. **Ownership**: Exact files the worker may create or edit, and whether committing is authorized.
-5. **Observable Acceptance Gates**:
-   - `./gradlew testDebugUnitTest lintDebug`
-   - `android preview render` (for UI tasks) or `orca emulator` verification
+5. **Observable Acceptance Gates (`./scripts/verify-all.sh`)**:
+   - `./gradlew lintDebug testDebugUnitTest assembleDebug`
+   - `python3 -m unittest discover -s collector/tests -v` (including `test_learnings_and_docs_sync_gate`)
    - Pre-commit secret hygiene check (`.githooks/pre-commit`)
+   - **Unprompted End-of-Task Learnings & Doc-Sync Check**: Update `docs/lessons.md`, `docs/bugs/index.md`, `docs/status.md`, `README.md`, and `.agents/skills/orca-quota-engineering/SKILL.md` in the same change before reporting `worker_done` or task completion.
 
 ---
 

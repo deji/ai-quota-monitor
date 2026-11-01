@@ -144,6 +144,43 @@ class TestRepoFreeOfSecretsAndPersonalIdentifiers(unittest.TestCase):
             f"Hygiene violations found:\n" + "\n".join(violations),
         )
 
+    def test_learnings_and_docs_sync_gate(self):
+        """Ensure living documentation, skills, and defect-to-lessons cross-references stay in sync."""
+        required_files = [
+            "AGENTS.md",
+            "README.md",
+            "docs/plan.md",
+            "docs/providers.md",
+            "docs/lessons.md",
+            "docs/bugs/index.md",
+            "docs/status.md",
+            "docs/workers.md",
+            ".agents/skills/orca-quota-engineering/SKILL.md",
+            "scripts/verify-all.sh",
+            "scripts/review-plan-and-code.sh",
+            "scripts/deploy-pixel8pro.sh",
+        ]
+        for rel in required_files:
+            path = os.path.join(self.repo_root, rel)
+            self.assertTrue(os.path.isfile(path), f"Missing required doc/skill/script file: {rel}")
+            self.assertGreater(os.path.getsize(path), 0, f"Required file is empty: {rel}")
+
+        bugs_path = os.path.join(self.repo_root, "docs/bugs/index.md")
+        lessons_path = os.path.join(self.repo_root, "docs/lessons.md")
+        with open(bugs_path, "r", encoding="utf-8") as fh:
+            bugs_text = fh.read()
+        with open(lessons_path, "r", encoding="utf-8") as fh:
+            lessons_text = fh.read()
+
+        bug_ids = re.findall(r"\|\s*\*\*([A-Z]+-[A-Z0-9]+)", bugs_text)
+        self.assertTrue(len(bug_ids) > 0, "Expected defect IDs in docs/bugs/index.md")
+        missing = [bid for bid in bug_ids if bid not in lessons_text]
+        self.assertEqual(
+            missing,
+            [],
+            f"Defect IDs in docs/bugs/index.md missing from docs/lessons.md: {missing}",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

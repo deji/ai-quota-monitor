@@ -70,7 +70,20 @@ Before completing any task or merging any branch, run:
 ./scripts/verify-all.sh
 ```
 
-This executes:
+This executes 5 automated gates:
 1. `.githooks/pre-commit` + repo-wide secret & PII scan (`test_repo_hygiene.py`)
 2. Python collector unit test suite (`python3 -m unittest discover -s collector/tests -v`)
 3. Android lint, JUnit unit tests, and debug APK build (`./gradlew lintDebug testDebugUnitTest assembleDebug`)
+4. APK artifact verification (`app/build/outputs/apk/debug/app-debug.apk`)
+5. **Learnings, Bug Ledger & Skill Sync Check**: Verifies all living docs (`docs/lessons.md`, `docs/bugs/index.md`, `docs/status.md`, `README.md`, and this `SKILL.md`) are present and that every defect ID in `docs/bugs/index.md` is documented in `docs/lessons.md`.
+
+---
+
+## 4. Mandatory Unprompted End-of-Task Closeout Protocol
+
+**Never wait for the user to ask you to update docs, record lessons, or update skills/scripts.** At the end of every task, bug fix, or `grok-4.7` review cycle, execute this checklist before reporting completion:
+
+1. **Capture Learnings (`docs/lessons.md`)**: Record every non-obvious root cause, Compose/Android quirk, wire-protocol edge case, or review finding in [`docs/lessons.md`](../../../docs/lessons.md) (both in the thematic section and the §5 Historical Bug Ledger).
+2. **Sync Defect & Status Trackers (`docs/bugs/index.md`, `docs/status.md`)**: Ensure every defect ID (`COL-*`, `APP-*`, `SYS-*`) is logged in [`docs/bugs/index.md`](../../../docs/bugs/index.md) and cross-referenced in `docs/lessons.md`.
+3. **Update User-Facing Run/Deploy Instructions (`README.md`)**: If any CLI flag, port, UI path, or ADB/deployment step changed, update [`README.md`](../../../README.md) immediately.
+4. **Codify Reusable Rules & Checks (`SKILL.md`, `scripts/`)**: If a new class of bug was discovered, add the invariant to Section 2 of this `SKILL.md` and, where possible, add an automated check in `scripts/verify-all.sh` or unit tests.
