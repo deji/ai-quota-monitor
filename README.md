@@ -81,16 +81,55 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s collector/tests -v
 
 ### 4. Deploy to Your Pixel 8 Pro (`scripts/deploy-pixel8pro.sh`)
 
-1. Connect your **Pixel 8 Pro** via USB (with **USB Debugging** enabled) or over Wireless Debugging / Tailscale (`adb connect <ip>:<port>`).
-2. Run the one-command build, install, and launch script:
-   ```bash
-   ./scripts/deploy-pixel8pro.sh
-   ```
-   Or manually via `adb`:
-   ```bash
-   adb install -r app/build/outputs/apk/debug/app-debug.apk
-   adb shell am start -n com.aiquotamonitor/.ui.MainActivity
-   ```
+#### Option A: Connect Your Pixel 8 Pro Wirelessly via ADB (No USB Cable Needed)
+
+1. **Enable Developer Options on the Pixel 8 Pro** (if not already enabled):
+   - Open **Settings → About phone**, scroll to the bottom, and tap **Build number** 7 times until you see *"You are now a developer!"* (enter your PIN when prompted).
+2. **Turn on Wireless Debugging**:
+   - Ensure your Pixel 8 Pro and this Mac are on the **same Wi-Fi network** (or connected to the same **Tailscale** tailnet).
+   - Open **Settings → System → Developer options**, scroll down to the **Debugging** section, and toggle **Wireless debugging** ON (tap into the **Wireless debugging** text to open its sub-screen, and choose **Always allow on this network**).
+3. **One-Time Device Pairing (`adb pair`)**:
+   - Inside the **Wireless debugging** screen on your phone, tap **Pair device with pairing code**.
+   - A popup will show a **Wi-Fi pairing code** (6 digits) and an **IP address & Port** (e.g., `192.168.1.50:37123` — note that the pairing port is *different* from the main connection port!).
+   - Keep that popup open on your phone and run on this Mac:
+     ```bash
+     adb pair <phone-ip>:<pairing-port> <6-digit-code>
+     # Example: adb pair 192.168.1.50:37123 482910
+     ```
+   - You will see: `Successfully paired to <phone-ip>:<pairing-port>`.
+4. **Connect ADB (`adb connect`)**:
+   - After the popup closes on your phone, look at the main **Wireless debugging** screen under **IP address & Port** (this port is different from the pairing port, e.g., `192.168.1.50:41555`).
+   - Run on this Mac:
+     ```bash
+     adb connect <phone-ip>:<connect-port>
+     # Example: adb connect 192.168.1.50:41555
+     ```
+   - Verify it shows `device` in:
+     ```bash
+     adb devices -l
+     ```
+   *(Tip: You can also run `./scripts/deploy-pixel8pro.sh --wireless` for an interactive prompt that pairs, connects, installs, and launches the app in one go.)*
+
+#### Option B: Connect via USB-C Cable
+
+1. Plug your Pixel 8 Pro into this Mac via USB-C.
+2. Open **Settings → System → Developer options** and toggle **USB debugging** ON.
+3. Tap **Allow** on the *"Allow USB debugging?"* prompt on your phone screen.
+
+#### Install & Launch the App
+
+Once `adb devices -l` shows your Pixel 8 Pro, run:
+
+```bash
+./scripts/deploy-pixel8pro.sh
+```
+
+Or manually via `adb`:
+
+```bash
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb shell am start -n com.aiquotamonitor/.ui.MainActivity
+```
 3. **Configure Sync in the App**:
    - Ensure the **Tailscale** app is active on your Pixel 8 Pro.
    - Tap the **Sync Status Pill** in the top app bar (or switch to the **Sync** tab) to open the **Sync Hub**:
