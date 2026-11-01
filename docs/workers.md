@@ -18,10 +18,10 @@ Per the project's orchestration rules, every stage uses a dedicated agent, model
 
 ## 2. Pre-Flight Quota Check
 
-Before starting a multi-worker wave, check current model quotas (especially `gemini-argon-wtu-weekly`, `gemini-5h`, and `grok` weekly credits + token expiry) using the host quota script:
+Before starting a multi-worker wave, check current model quotas (`gemini-argon-wtu-weekly`, `gemini-5h`, `opencode-rolling`, and `grok-weekly-credits` + token expiry) using the repository's built-in collector:
 
 ```bash
-python3 ~/exchange/scratch/ai-quota-monitor/quota.py
+python3 -m collector collect --json
 ```
 
 - Never log or paste raw tokens from `~/.grok/auth.json` or `~/.local/share/opencode/opencode.db`.
