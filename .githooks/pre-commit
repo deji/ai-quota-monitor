@@ -1,0 +1,29 @@
+#!/bin/sh
+set -e
+
+# 1. Block forbidden secret, keystore, capture, or local config files from being staged
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
+if [ -z "$staged" ]; then
+  exit 0
+fi
+
+for f in $staged; do
+  case "$f" in
+    *.har|*.token|*.jks|*.keystore|*.pem|*.key|*.db|*.sqlite|*.sqlite3|auth.json|local.properties|keystore.properties|signing.properties|config.yaml|config.yml|config.json|*.local.yaml|*.local.yml|*.local.json|.env|.env.*)
+      if [ "$f" != ".env.example" ]; then
+        echo "pre-commit: refusing to commit forbidden secret/local file: $f" >&2
+        exit 1
+      fi
+      ;;
+  esac
+done
+
+# 2. Scan staged diff additions for leaked tokens, private paths, and credentials
+added_lines=$(git diff --cached -U0 | grep -E '^\+[^+]' || true)
+if [ -n "$added_lines" ]; then
+  # Check for JWTs, Bearer tokens (non-placeholder), API keys, or local home paths
+  if printf '%s\n' "$added_lines" | grep -Eq '(eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}|xai-[A-Za-z0-9_-]{16,}|AIza[0-9A-Za-z_-]{35}|sk-[A-Za-z0-9]{20,}|ghp_[A-Za-z0-9]{30,}|glpat-[A-Za-z0-9_-]{20,}|/Users/[a-zA-Z0-9][a-zA-Z0-9._-]*)'; then
+    echo "pre-commit: detected potential secret, token, or private local home path (/Users/...) in staged changes." >&2
+    exit 1
+  fi
+fi

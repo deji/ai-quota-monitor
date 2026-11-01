@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>ORCA CHRONOS // KINETIC HUD</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&amp;family=Geist+Mono:wght@300;400;500;600;700&amp;family=Public+Sans:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "surface-container-low": "#0f1417",
+            "inverse-surface": "#f7f9fe",
+            "surface-tint": "#8efa94",
+            "secondary-fixed-dim": "#fcb64f",
+            "outline": "#72767a",
+            "background": "#0b0f12",
+            "tertiary-container": "#96eaf3",
+            "on-primary-fixed": "#004a16",
+            "on-secondary-fixed-variant": "#704800",
+            "secondary": "#f9b44c",
+            "primary-fixed-dim": "#80eb88",
+            "primary-dim": "#80eb88",
+            "on-error-container": "#ffd2c8",
+            "surface-bright": "#272d32",
+            "on-secondary": "#553600",
+            "on-surface": "#f7f9fe",
+            "surface-container-high": "#1b2024",
+            "secondary-dim": "#e9a640",
+            "error": "#ff7351",
+            "on-tertiary-fixed": "#004348",
+            "primary-container": "#4bb559",
+            "tertiary-dim": "#88dce4",
+            "error-dim": "#d53d18",
+            "surface-container": "#151a1e",
+            "error-container": "#b92902",
+            "tertiary": "#adf8ff",
+            "on-background": "#f7f9fe",
+            "inverse-on-surface": "#525559",
+            "surface-dim": "#0b0f12",
+            "inverse-primary": "#006f25",
+            "surface-container-highest": "#21262b",
+            "tertiary-fixed": "#96eaf3",
+            "tertiary-fixed-dim": "#88dce4",
+            "on-error": "#450900",
+            "outline-variant": "#44484c",
+            "secondary-fixed": "#ffc87d",
+            "surface": "#0b0f12",
+            "on-secondary-container": "#fff6ef",
+            "secondary-container": "#825500",
+            "on-surface-variant": "#a8abaf",
+            "primary": "#8efa94",
+            "on-tertiary-fixed-variant": "#006268",
+            "on-secondary-fixed": "#4a2e00",
+            "on-primary-fixed-variant": "#006b23",
+            "on-tertiary": "#006167",
+            "on-primary": "#005f1e",
+            "on-tertiary-container": "#00575d",
+            "primary-fixed": "#8efa94",
+            "surface-container-lowest": "#000000",
+            "on-primary-container": "#002a09",
+            "surface-variant": "#21262b"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "fontFamily": {
+            "headline": ["Space Grotesk", "sans-serif"],
+            "display": ["Space Grotesk", "sans-serif"],
+            "body": ["Geist Mono", "monospace"],
+            "mono": ["Geist Mono", "monospace"],
+            "label": ["Public Sans", "sans-serif"]
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    /* Phosphor subtle sweeps & radar animation */
+    @keyframes sweep {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    @keyframes pulse-glow {
+      0%, 100% { opacity: 0.35; }
+      50% { opacity: 0.85; }
+    }
+    .radar-sweep {
+      animation: sweep 12s linear infinite;
+      transform-origin: center center;
+    }
+    .hud-glow {
+      animation: pulse-glow 3s ease-in-out infinite;
+    }
+    .tabular-numbers {
+      font-variant-numeric: tabular-nums;
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-surface font-body antialiased min-h-screen pb-24 selection:bg-primary selection:text-surface-container-lowest overflow-x-hidden">
+<!-- ================= TOP APP BAR (Shared Components JSON) ================= -->
+<header class="fixed top-0 left-0 w-full z-50 flex items-center justify-between px-4 h-14 bg-background border-b border-outline-variant">
+<div class="flex items-center gap-2.5">
+<span class="material-symbols-outlined text-primary text-xl" data-icon="radar">radar</span>
+<span class="font-headline text-xs font-bold tracking-widest text-primary uppercase">ORCA CHRONOS // KINETIC HUD</span>
+</div>
+<div class="flex items-center gap-3">
+<div class="hidden sm:flex items-center gap-2 bg-surface-container px-2.5 py-1 rounded border border-outline-variant/60">
+<span class="w-1.5 h-1.5 rounded-full bg-primary animate-ping"></span>
+<span class="text-[10px] font-mono tracking-wider text-on-surface-variant">14ms · TAILSCALE</span>
+</div>
+<button class="flex items-center justify-center p-1.5 rounded hover:text-primary hover:bg-surface-container active:opacity-80 transition-opacity text-on-surface-variant" title="Telemetry Sensors">
+<span class="material-symbols-outlined text-lg" data-icon="sensors">sensors</span>
+</button>
+</div>
+</header>
+<!-- ================= MAIN TELEMETRY CANVAS ================= -->
+<main class="pt-16 max-w-2xl mx-auto px-3 sm:px-4 space-y-3">
+<!-- SUB-HEADER SYSTEM STATUS BANNER -->
+<div class="flex items-center justify-between bg-surface-container-low px-3 py-1.5 border border-outline-variant/70 text-[10px] font-mono tracking-wider">
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="text-primary font-bold">● ONLINE</span>
+<span class="text-outline">|</span>
+<span class="text-on-surface">SYS.VER: PIXEL-8P-CANVAS // KINETIC</span>
+</div>
+<div class="text-secondary font-mono tracking-tight">SYNC 19:39:02 UTC</div>
+</div>
+<!-- ORCA STAGE READINESS TRIAD -->
+<section class="grid grid-cols-3 gap-2">
+<!-- Planner: Argon -->
+<div class="bg-surface-container-low border border-tertiary/40 p-2.5 relative overflow-hidden group">
+<div class="absolute -top-6 -right-6 w-12 h-12 bg-tertiary/10 rounded-full blur-sm pointer-events-none"></div>
+<div class="flex items-center justify-between mb-1">
+<span class="text-[9px] font-mono font-semibold tracking-widest text-tertiary uppercase">PLANNER</span>
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary animate-pulse"></span>
+</div>
+<div class="font-headline text-xs font-bold text-on-surface leading-tight">GEMINI 4 ARGON</div>
+<div class="mt-1 flex items-baseline justify-between">
+<span class="text-lg font-headline font-bold text-tertiary tabular-numbers">55%</span>
+<span class="text-[9px] font-mono text-tertiary-dim">ACTIVE</span>
+</div>
+<div class="w-full bg-surface-container-highest h-0.5 mt-1.5">
+<div class="bg-tertiary h-0.5 w-[55%]"></div>
+</div>
+</div>
+<!-- Builder: Flash & OpenCode -->
+<div class="bg-surface-container-low border border-primary/40 p-2.5 relative overflow-hidden group">
+<div class="absolute -top-6 -right-6 w-12 h-12 bg-primary/10 rounded-full blur-sm pointer-events-none"></div>
+<div class="flex items-center justify-between mb-1">
+<span class="text-[9px] font-mono font-semibold tracking-widest text-primary uppercase">BUILDER</span>
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+</div>
+<div class="font-headline text-xs font-bold text-on-surface leading-tight">FLASH / OPEN</div>
+<div class="mt-1 flex items-baseline justify-between">
+<span class="text-lg font-headline font-bold text-primary tabular-numbers">100%</span>
+<span class="text-[9px] font-mono text-primary-dim">READY</span>
+</div>
+<div class="w-full bg-surface-container-highest h-0.5 mt-1.5">
+<div class="bg-primary h-0.5 w-full"></div>
+</div>
+</div>
+<!-- Reviewer: Grok 4.7 -->
+<div class="bg-surface-container-low border border-secondary/40 p-2.5 relative overflow-hidden group">
+<div class="absolute -top-6 -right-6 w-12 h-12 bg-secondary/10 rounded-full blur-sm pointer-events-none"></div>
+<div class="flex items-center justify-between mb-1">
+<span class="text-[9px] font-mono font-semibold tracking-widest text-secondary uppercase">REVIEWER</span>
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+</div>
+<div class="font-headline text-xs font-bold text-on-surface leading-tight">GROK 4.7 PRIMED</div>
+<div class="mt-1 flex items-baseline justify-between">
+<span class="text-lg font-headline font-bold text-secondary tabular-numbers">97%</span>
+<span class="text-[9px] font-mono text-secondary-dim">STANDBY</span>
+</div>
+<div class="w-full bg-surface-container-highest h-0.5 mt-1.5">
+<div class="bg-secondary h-0.5 w-[97%]"></div>
+</div>
+</div>
+</section>
+<!-- ================= CENTRAL CONCENTRIC ORBITAL CHRONOMETER ================= -->
+<section class="bg-surface-container-low border border-outline-variant/80 p-4 relative overflow-hidden">
+<!-- Tactical Grid Lines & Reticle Ambient Background -->
+<div class="absolute inset-0 pointer-events-none bg-[radial-gradient(#21262b_1px,transparent_1px)] [background-size:16px_16px] opacity-40"></div>
+<!-- Radar Header Micro-readout -->
+<div class="flex items-center justify-between text-[10px] font-mono tracking-wider text-on-surface-variant relative z-10 mb-2">
+<div class="flex items-center gap-1.5">
+<span class="text-primary font-bold">RADAR-CANVAS</span>
+<span class="text-outline">::</span>
+<span>ORBITAL KINETIC MATRIX</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="text-[9px] px-1.5 py-0.5 bg-surface-container border border-outline-variant font-mono text-on-surface">P8P COMPOSE ENGINE</span>
+</div>
+</div>
+<!-- Concentric Orbital Canvas Simulation -->
+<div class="relative w-full max-w-[340px] aspect-square mx-auto flex items-center justify-center my-1 select-none">
+<!-- Radar Crosshairs & Degree Cardinal Markings -->
+<div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+<div class="w-full h-px bg-outline-variant/30"></div>
+<div class="h-full w-px bg-outline-variant/30 absolute"></div>
+<!-- Degree Markers -->
+<span class="absolute top-1 font-mono text-[9px] text-outline tracking-wider">000°</span>
+<span class="absolute right-1 font-mono text-[9px] text-outline tracking-wider">090°</span>
+<span class="absolute bottom-1 font-mono text-[9px] text-outline tracking-wider">180°</span>
+<span class="absolute left-1 font-mono text-[9px] text-outline tracking-wider">270°</span>
+</div>
+<!-- SVG Concentric Arcs -->
+<svg class="w-full h-full -rotate-90 relative z-10" viewbox="0 0 340 340">
+<defs>
+<lineargradient id="primaryArcGrad" x1="0%" x2="100%" y1="0%" y2="100%">
+<stop offset="0%" stop-color="#8efa94" stop-opacity="1"></stop>
+<stop offset="100%" stop-color="#4bb559" stop-opacity="0.8"></stop>
+</lineargradient>
+<lineargradient id="cyanArcGrad" x1="0%" x2="100%" y1="0%" y2="100%">
+<stop offset="0%" stop-color="#adf8ff" stop-opacity="1"></stop>
+<stop offset="100%" stop-color="#88dce4" stop-opacity="0.6"></stop>
+</lineargradient>
+<radialgradient id="radarSweepGrad">
+<stop offset="0%" stop-color="#8efa94" stop-opacity="0.15"></stop>
+<stop offset="100%" stop-color="#8efa94" stop-opacity="0"></stop>
+</radialgradient>
+</defs>
+<!-- Radar Sweeper Sector -->
+<g class="radar-sweep">
+<path d="M 170 170 L 320 170 A 150 150 0 0 1 276 276 Z" fill="url(#radarSweepGrad)"></path>
+</g>
+<!-- Outer Ring Track (30-Day Strategic Horizon) r=150 -->
+<circle cx="170" cy="170" fill="none" r="148" stroke="#21262b" stroke-dasharray="3,3" stroke-width="2"></circle>
+<circle cx="170" cy="170" fill="none" r="148" stroke="#44484c" stroke-dasharray="930" stroke-dashoffset="10" stroke-linecap="round" stroke-width="2"></circle>
+<!-- Middle Ring Track (7-Day Tactical Horizon) r=118 -->
+<circle cx="170" cy="170" fill="none" r="118" stroke="#1b2024" stroke-width="7"></circle>
+<!-- 55% Active Arc for Argon: Circumference = 2 * pi * 118 = 741.4 -->
+<!-- 55% of 741.4 = 407.7 => stroke-dasharray="407.7 741.4" -->
+<circle class="hud-glow" cx="170" cy="170" fill="none" r="118" stroke="url(#primaryArcGrad)" stroke-dasharray="408 741" stroke-linecap="round" stroke-width="7"></circle>
+<!-- Tactical Target Vector Pace Notch on Middle Ring (96.8% elapsed) -->
+<!-- 96.8% of 360 deg = ~348 deg -->
+<g transform="rotate(348, 170, 170)">
+<line stroke="#ff7351" stroke-width="3" x1="170" x2="170" y1="46" y2="58"></line>
+<polygon fill="#ff7351" points="170,42 167,46 173,46"></polygon>
+</g>
+<!-- Inner Ring Track (5-Hour Rolling Horizon) r=86 -->
+<circle cx="170" cy="170" fill="none" r="86" stroke="#1b2024" stroke-dasharray="2,2" stroke-width="5"></circle>
+<!-- 100% Cyan-Green Rolling Horizon Arc (Circumference = 2 * pi * 86 = 540) -->
+<circle cx="170" cy="170" fill="none" r="86" stroke="url(#cyanArcGrad)" stroke-dasharray="535 540" stroke-linecap="round" stroke-width="5"></circle>
+<!-- Center Axis Radar Dot -->
+<circle cx="170" cy="170" fill="#8efa94" r="3"></circle>
+</svg>
+<!-- Center Tabular Readout (Oversized Asymmetric HUD Core) -->
+<div class="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none z-20">
+<div class="text-[9px] font-mono tracking-widest text-outline uppercase">ARGON 7D PACE</div>
+<div class="font-headline text-5xl sm:text-6xl font-extrabold tracking-tighter text-on-surface tabular-numbers leading-none my-1">
+            55<span class="text-2xl text-primary font-normal">%</span>
+</div>
+<div class="px-2 py-0.5 rounded bg-surface-container border border-primary/30 text-[9px] font-mono text-primary font-semibold tracking-wider">
+            -51% UNDER PACE · RESETS 19:39 UTC
+          </div>
+<div class="text-[9px] font-mono text-on-surface-variant mt-1">
+            Window: <span class="text-on-surface font-semibold">96.8%</span> | Surplus: <span class="text-primary font-semibold">+52%</span>
+</div>
+</div>
+</div>
+<!-- Ring Legend / Breakdown -->
+<div class="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-outline-variant/60 text-[10px] font-mono relative z-10">
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-tertiary"></span>
+<div>
+<div class="text-on-surface font-bold">5H ROLLING</div>
+<div class="text-[9px] text-tertiary-dim">100% Flash · 4h 59m</div>
+</div>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-primary"></span>
+<div>
+<div class="text-on-surface font-bold">7D TACTICAL</div>
+<div class="text-[9px] text-primary-dim">55% Argon · Pace 96.8%</div>
+</div>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-outline"></span>
+<div>
+<div class="text-on-surface font-bold">30D STRATEGIC</div>
+<div class="text-[9px] text-on-surface-variant">99% OpenCode Mon</div>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= ASYMMETRIC MONOSPACE TELEMETRY STRIP ================= -->
+<section class="bg-surface-container-low border border-outline-variant divide-y divide-outline-variant">
+<div class="px-3 py-2 bg-surface-container flex items-center justify-between text-[10px] font-mono tracking-widest text-on-surface-variant">
+<span class="text-primary font-semibold">STAGE TELEMETRY // REAL-TIME BURNS</span>
+<span class="text-outline">HAIRLINE SYNCHRONIZER</span>
+</div>
+<!-- Row 1: Gemini 4 Argon -->
+<div class="p-3 hover:bg-surface-container transition-colors">
+<div class="flex items-center justify-between font-mono text-xs">
+<div class="flex items-center gap-2">
+<span class="w-1.5 h-1.5 rounded-sm bg-primary"></span>
+<span class="font-bold text-on-surface">GEMINI 4 ARGON</span>
+<span class="text-[10px] text-outline">[WTU-WEEKLY]</span>
+</div>
+<span class="text-[10px] text-primary font-semibold bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20">+51.8% SURPLUS</span>
+</div>
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2 text-[11px] font-mono tabular-numbers text-on-surface-variant">
+<div><span class="text-outline text-[9px] block">CAP PACE</span><span class="text-on-surface">0.59% / hr</span></div>
+<div><span class="text-outline text-[9px] block">ACTUAL BURN</span><span class="text-primary">0.28% / hr</span></div>
+<div><span class="text-outline text-[9px] block">TTL REMAINING</span><span class="text-on-surface">4h 22m</span></div>
+<div><span class="text-outline text-[9px] block">STATUS</span><span class="text-tertiary">STABLE FLIGHT</span></div>
+</div>
+</div>
+<!-- Row 2: Gemini 3.8 Flash -->
+<div class="p-3 hover:bg-surface-container transition-colors">
+<div class="flex items-center justify-between font-mono text-xs">
+<div class="flex items-center gap-2">
+<span class="w-1.5 h-1.5 rounded-sm bg-tertiary"></span>
+<span class="font-bold text-on-surface">GEMINI 3.8 FLASH</span>
+<span class="text-[10px] text-outline">[5H-ROLLING]</span>
+</div>
+<span class="text-[10px] text-tertiary font-semibold bg-tertiary/10 px-1.5 py-0.5 rounded border border-tertiary/20">100% UNTOUCHED</span>
+</div>
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2 text-[11px] font-mono tabular-numbers text-on-surface-variant">
+<div><span class="text-outline text-[9px] block">RPM ALLOC</span><span class="text-on-surface">2,000 / 2,000</span></div>
+<div><span class="text-outline text-[9px] block">ROLLING RESET</span><span class="text-tertiary">20:04 UTC</span></div>
+<div><span class="text-outline text-[9px] block">PEAK BURST</span><span class="text-on-surface">0 req/s</span></div>
+<div><span class="text-outline text-[9px] block">BACKPRESSURE</span><span class="text-primary">0.0 ms</span></div>
+</div>
+</div>
+<!-- Row 3: OpenCode DeepSeek 4.1 -->
+<div class="p-3 hover:bg-surface-container transition-colors">
+<div class="flex items-center justify-between font-mono text-xs">
+<div class="flex items-center gap-2">
+<span class="w-1.5 h-1.5 rounded-sm bg-primary"></span>
+<span class="font-bold text-on-surface">OPENCODE DEEPSEEK 4.1</span>
+<span class="text-[10px] text-outline">[WEEKLY]</span>
+</div>
+<span class="text-[10px] text-on-surface-variant font-mono">UNMETERED PIPE</span>
+</div>
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2 text-[11px] font-mono tabular-numbers text-on-surface-variant">
+<div><span class="text-outline text-[9px] block">QUOTA ALLOC</span><span class="text-on-surface">98% ALLOCATED</span></div>
+<div><span class="text-outline text-[9px] block">RUN BURN</span><span class="text-primary">0.03% / hr</span></div>
+<div><span class="text-outline text-[9px] block">PIPE STATE</span><span class="text-primary font-semibold">ACTIVE STREAM</span></div>
+<div><span class="text-outline text-[9px] block">POOL QUEUE</span><span class="text-on-surface">0 PENDING</span></div>
+</div>
+</div>
+<!-- Row 4: Grok 4.7 Coding -->
+<div class="p-3 hover:bg-surface-container transition-colors">
+<div class="flex items-center justify-between font-mono text-xs">
+<div class="flex items-center gap-2">
+<span class="w-1.5 h-1.5 rounded-sm bg-secondary"></span>
+<span class="font-bold text-on-surface">GROK 4.7 CODING</span>
+<span class="text-[10px] text-outline">[CREDITS]</span>
+</div>
+<span class="text-[10px] text-secondary font-semibold bg-secondary/10 px-1.5 py-0.5 rounded border border-secondary/20">TOKEN GUARD: PRIMED</span>
+</div>
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2 text-[11px] font-mono tabular-numbers text-on-surface-variant">
+<div><span class="text-outline text-[9px] block">SAFE BALANCE</span><span class="text-secondary font-semibold">$24.25 SAFE</span></div>
+<div><span class="text-outline text-[9px] block">REMAINING</span><span class="text-on-surface">97% REM</span></div>
+<div><span class="text-outline text-[9px] block">GUARD TTL</span><span class="text-secondary">1h 19m TTL</span></div>
+<div><span class="text-outline text-[9px] block">FAILOVER</span><span class="text-on-surface">STANDBY</span></div>
+</div>
+</div>
+</section>
+<!-- ================= TACTILE ACTION DOCK ================= -->
+<div class="grid grid-cols-2 gap-2 pt-1">
+<button class="flex items-center justify-center gap-2 px-3 py-2.5 bg-surface-container border border-outline-variant hover:border-primary text-xs font-mono font-bold tracking-wider text-on-surface hover:text-primary transition-all active:scale-[0.98]">
+<span class="material-symbols-outlined text-sm text-primary" data-icon="terminal">terminal</span>
+<span>INSPECT VECTOR LOG</span>
+</button>
+<button class="flex items-center justify-center gap-2 px-3 py-2.5 bg-surface-container border border-outline-variant hover:border-secondary text-xs font-mono font-bold tracking-wider text-on-surface hover:text-secondary transition-all active:scale-[0.98]">
+<span class="material-symbols-outlined text-sm text-secondary" data-icon="tune">tune</span>
+<span>ADJUST THROTTLE MESH</span>
+</button>
+</div>
+<!-- ================= INTERACTIVE TIME-TRAVEL HORIZON SCRUBBER ================= -->
+<section class="bg-surface-container-low border border-outline-variant p-3.5 space-y-2.5">
+<div class="flex items-center justify-between text-[10px] font-mono">
+<span class="text-primary font-bold tracking-wider flex items-center gap-1.5">
+<span class="material-symbols-outlined text-xs text-primary" data-icon="history_toggle_off">history_toggle_off</span>
+          PROJECTED HORIZON SCRUBBER
+        </span>
+<span class="text-on-surface-variant">BURN SIMULATOR</span>
+</div>
+<!-- Scrubber Track & Markers -->
+<div class="relative pt-3 pb-2 px-1">
+<div class="h-2 bg-surface-container rounded relative flex items-center border border-outline-variant/60">
+<!-- Active Scrubber Fill (to +4H mark, roughly 68%) -->
+<div class="h-full bg-gradient-to-r from-primary/60 via-primary to-secondary w-[68%] rounded-l"></div>
+<!-- Tactile Drag Pill Handle at +4H -->
+<div class="absolute left-[68%] -translate-x-1/2 w-4 h-6 bg-primary border-2 border-surface-container-lowest rounded shadow-[0_0_8px_#8efa94] flex items-center justify-center cursor-pointer transition-transform hover:scale-110 active:scale-95">
+<div class="w-0.5 h-3 bg-surface-container-lowest"></div>
+</div>
+</div>
+<!-- Milestones Row -->
+<div class="flex justify-between items-center text-[9px] font-mono text-outline mt-2 tracking-tight">
+<span class="text-on-surface font-semibold">NOW [0h]</span>
+<span class="text-on-surface-variant">+1H</span>
+<span class="text-primary font-bold">+4H [SCRUB]</span>
+<span class="text-secondary font-semibold">RESET (19:39 UTC)</span>
+</div>
+</div>
+<!-- Dynamic Projection Readout Card -->
+<div class="bg-surface-container px-3 py-2 border border-outline-variant/50 text-[10px] font-mono flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+<div class="text-on-surface">
+<span class="text-outline">AT 0.28%/HR BURN →</span>
+<span class="font-bold text-primary ml-1">+4H PROJECTION: 53.9% REMAINING</span>
+</div>
+<div class="text-on-surface-variant text-[9px] tabular-numbers">
+          (-1.1% BURN DELTA, <span class="text-primary font-semibold">+50.2% HEADROOM</span>)
+        </div>
+</div>
+</section>
+</main>
+<!-- ================= BOTTOM NAVIGATION BAR (Shared Components JSON) ================= -->
+<!-- Active Tab: HORIZON (Selected intentionally as current telemetry horizon interface) -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex items-center justify-around px-2 py-2 border-t border-outline-variant bg-surface-container-lowest">
+<!-- Tab 1: HORIZON (Active State from style_active_navigation) -->
+<a class="flex flex-col items-center justify-center text-primary bg-surface-container-high rounded px-3 py-1.5 border border-primary/30 transition-transform active:scale-95" href="#horizon">
+<span class="material-symbols-outlined text-lg" data-icon="timelapse">timelapse</span>
+<span class="font-headline text-[10px] tracking-widest uppercase mt-0.5">HORIZON</span>
+</a>
+<!-- Tab 2: ORBITAL (Inactive State from style_inactive_navigation) -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant px-3 py-1.5 hover:text-primary hover:bg-surface-container-high transition-transform active:scale-95" href="#orbital">
+<span class="material-symbols-outlined text-lg" data-icon="all_inclusive">all_inclusive</span>
+<span class="font-headline text-[10px] tracking-widest uppercase mt-0.5">ORBITAL</span>
+</a>
+<!-- Tab 3: TELEMETRY (Inactive State from style_inactive_navigation) -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant px-3 py-1.5 hover:text-primary hover:bg-surface-container-high transition-transform active:scale-95" href="#telemetry">
+<span class="material-symbols-outlined text-lg" data-icon="query_stats">query_stats</span>
+<span class="font-headline text-[10px] tracking-widest uppercase mt-0.5">TELEMETRY</span>
+</a>
+<!-- Tab 4: SCRUBBER (Inactive State from style_inactive_navigation) -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant px-3 py-1.5 hover:text-primary hover:bg-surface-container-high transition-transform active:scale-95" href="#scrubber">
+<span class="material-symbols-outlined text-lg" data-icon="history_toggle_off">history_toggle_off</span>
+<span class="font-headline text-[10px] tracking-widest uppercase mt-0.5">SCRUBBER</span>
+</a>
+</nav>
+<!-- Micro-interaction JS for Scrubber drag feedback simulation -->
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const scrubberPill = document.querySelector('.cursor-pointer');
+      if (scrubberPill) {
+        scrubberPill.addEventListener('click', () => {
+          scrubberPill.classList.add('scale-125');
+          setTimeout(() => scrubberPill.classList.remove('scale-125'), 200);
+        });
+      }
+    });
+  </script>
+</body></html>

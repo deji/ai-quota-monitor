@@ -1,0 +1,13 @@
+{
+  "slug": "01-dashboard",
+  "title": "Modern \u2014 M3 Expressive Bento Dashboard",
+  "set": "modern",
+  "designSystem": "assets/8610081051554797998",
+  "screenId": "dcbdaa137efc40e98213718674f73b8d",
+  "screenName": "projects/8157070654946262217/screens/dcbdaa137efc40e98213718674f73b8d",
+  "screenshotPath": ".stitch/designs/modern/01-dashboard.png",
+  "htmlPath": ".stitch/designs/modern/01-dashboard.html",
+  "aiNotes": [
+    "### Flagship Material 3 Expressive Bento Dashboard \u2014 Pixel 8 Pro\n\nI have generated the **Quota Pulse** flagship mobile dashboard tailored to Android 16 Material 3 Expressive guidelines (`Quota Pulse - M3 Expressive Bento`), using the **Material 3 Expressive Bento & Arcs** design system (`[Design_System]`).\n\n#### Key Architecture & Highlights:\n1. **Expressive Header & Polarity Segment Toggle:**\n   - Pixel status bar (9:41, 5G, 94% battery) with brand mark and encrypted live state: `Tailscale Live \u00b7 Gist Encrypted Backup`.\n   - Dual-state polarity toggle pill switching between `% Left (Remaining)` and `% Used (Burned)`.\n2. **Hero Bottleneck Bento Card (Full-Width 28dp Squircle):**\n   - Spotlights the tightest planning bucket (`Gemini 4 Argon \u00b7 Weekly`) with `#GA-8942` tracker and `Active Safe Guard` pill badge.\n   - Large sweeping Compose Canvas **radial arc gauge** (270\u00b0 sweep) displaying `55% LEFT` with a glowing pace needle indicating target notch headroom (`Target Notch: 96.8%`).\n   - Side telemetry stack featuring reset countdown (`4h 22m`), `-51% Linear` pace delta badge, and a glowing 7-day velocity bezier curve (`0.27%/hr`).\n3. **Asymmetric 2-Column Bento Row:**\n   - **OpenCode Go (DeepSeek 4.1):** High-density squircle card with radial ring indicator at `98% Weekly`, secondary status pills for 5h rolling (`100%`) and monthly quota (`99%`), and zero-burn state.\n   - **Grok Build (Grok 4.7):** Warm amber themed bento card displaying `97% Credits` ($25 Safe), `Smart Primed` keepalive TTL pill badge (`1h 19m`), and overage safety lock.\n4. **Antigravity Multi-Bucket Bento Strip:**\n   - Grouped fast execution models with high-contrast pill progress tracks: `Gemini 3.8 Flash (5h Rolling)`, `Gemini 3.8 Flash (Weekly)`, and unmetered `Claude & GPT 3P`.\n   - Actionable `Inspect CLI Checkpoints & Sync` interaction trigger.\n5. **Floating Bottom Pill Toolbar:**\n   - Material 3 Expressive floating rounded capsule dock containing navigation items (`Pulse`, `Velocity`, `Widgets`, `Settings`) and a prominent cyan `Refresh Now` FAB."
+  ]
+}

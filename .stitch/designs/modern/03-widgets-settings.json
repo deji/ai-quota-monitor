@@ -1,0 +1,13 @@
+{
+  "slug": "03-widgets-settings",
+  "title": "Modern \u2014 Expressive Glance Widgets & Relay Hub",
+  "set": "modern",
+  "designSystem": "assets/8610081051554797998",
+  "screenId": "6bad3877e733409890e83d4350adac90",
+  "screenName": "projects/8157070654946262217/screens/6bad3877e733409890e83d4350adac90",
+  "screenshotPath": ".stitch/designs/modern/03-widgets-settings.png",
+  "htmlPath": ".stitch/designs/modern/03-widgets-settings.html",
+  "aiNotes": [
+    "Here is the high-fidelity **Pixel Home Widgets & Sync Hub** screen built with the **Material 3 Expressive** design system (`Pixel Home Widgets & Sync Hub`):\n\n### What Was Designed & Key Elements:\n1. **Live Launcher Preview Canvas (Pixel 8 Pro)**:\n   - **4\u00d72 Wide Expressive Glance Widget**: An Android 14+ Jetpack Glance container hosting three side-by-side squircle pods: **Argon Flash (55%)**, **DeepSeek 4.1 (98%)**, and **Grok Primed (97%)** with individual radial progress rings, live connection pills (`Tailscale Live \u00b7 15:04`), and adaptive broadcast badge.\n   - **2\u00d72 Dual Concentric Squircle Widget**: Features concentric circular arc rings displaying both Argon quota and Grok priming window alongside a live countdown pill (`4h 22m`) and tap-to-sync control.\n   - **Glance RemoteViews Bridge Card**: Displays live telemetry on memory footprint (4.2 MB) and the 15-minute Glance reload delta.\n\n2. **Dual-Transport Bento Cards**:\n   - **Tailscale Direct Node**: Priority 1 WireGuard mesh channel showing `14ms` latency, active status toggle, and direct HTTP zero-proxy push indicators.\n   - **GitHub Gist Encrypted Relay**: Standby roaming fallback with verified `AES-256-GCM` badge, hardware-backed Android Keystore enclave verification, and on-demand `Test Decrypt` / `Force Push` controls.\n\n3. **Grok Smart Prime Expressive Slider**:\n   - Expressive 24-hour timeline range (`08:00 \u2013 22:00 Local`) visualizing user wake/sleep cycles to prevent overnight quota bleed, annotated with current position (`15:04 (Now)`), active priming window highlight, and the executable CLI keepalive policy command.\n\n4. **Material 3 Expressive Floating Navigation**:\n   - Floating pill bottom navigation bar highlighting `Widgets & Sync` with tonal elevation."
+  ]
+}

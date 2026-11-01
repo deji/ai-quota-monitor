@@ -1,0 +1,13 @@
+{
+  "slug": "03-widgets-settings",
+  "title": "Conservative \u2014 Glance Widgets & Dual-Transport Settings",
+  "set": "conservative",
+  "designSystem": "assets/6341266814161057284",
+  "screenId": "57070ad8a8924fd888ea928322510c47",
+  "screenName": "projects/8157070654946262217/screens/57070ad8a8924fd888ea928322510c47",
+  "screenshotPath": ".stitch/designs/conservative/03-widgets-settings.png",
+  "htmlPath": ".stitch/designs/conservative/03-widgets-settings.html",
+  "aiNotes": [
+    "Here is the native Android **Widgets & Sync Transport** screen designed according to the **Pixel Material You Tonal Utility** system:\n\n### Key Highlights & Structure:\n1. **Top App Bar & Connectivity State**:\n   - Clean native Android header with back navigation and a prominent status badge indicator (`Connected` with active status dot, referencing Tailscale Direct + Encrypted Gist Relay).\n2. **Jetpack Glance Widget Previews (Pixel 8 Pro Launcher)**:\n   - **2\u00d72 Compact Widget**: Rounded preview card displaying real-time telemetry quota state (`Argon Wk: 55% [4h 22m]` in cyan and `Grok 4.7: 97% [4d]` in amber) with a one-tap refresh control.\n   - **4\u00d72 Wide Widget**: Multi-agent launcher preview showcasing 3-column micro-dashboards for **Antigravity**, **OpenCode Go**, and **Grok 4.7** alongside live Glance sync actions.\n3. **Dual-Path Data Transport Settings**:\n   - Native Material 3 grouped preference rows.\n   - **Primary Live Path**: Tailscale Daemon showing online status (`14ms latency`), direct daemon push details, and an active toggle switch.\n   - **Fallback Cloud Relay**: GitHub Secret Gist with `AES-256-GCM Encrypted` badge and automatic failover explanation when the Mac host sleeps.\n4. **Token Keepalive & Refresh Policy**:\n   - Radio selector configured for **Smart Prime** active hours.\n   - Configured local window (`08:00 \u2013 22:00 Local Time`) running `grok -p reply with ok` keepalive commands only when token TTL < 15m.\n   - Quick action controls for **Test Tailscale Ping** and **Force Gist Sync**."
+  ]
+}

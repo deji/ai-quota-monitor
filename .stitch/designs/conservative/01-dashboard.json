@@ -1,0 +1,13 @@
+{
+  "slug": "01-dashboard",
+  "title": "Conservative \u2014 Primary Quota Dashboard",
+  "set": "conservative",
+  "designSystem": "assets/6341266814161057284",
+  "screenId": "ee361537d42d404a82eec1e27a0feae2",
+  "screenName": "projects/8157070654946262217/screens/ee361537d42d404a82eec1e27a0feae2",
+  "screenshotPath": ".stitch/designs/conservative/01-dashboard.png",
+  "htmlPath": ".stitch/designs/conservative/01-dashboard.html",
+  "aiNotes": [
+    "I have designed and generated the **AI Quota Monitor** mobile dashboard for Pixel 8 Pro, modeled precisely on Google Pixel Settings and Digital Wellbeing utility patterns.\n\n### Design Highlights:\n- **Material 3 Expressive & Tonal Architecture:** Applied the Pixel Tonal Utility palette with `surfaceContainerLow` and high-contrast typography, matching native Pixel 8 Pro system settings.\n- **Top App Bar & Segmented Controls:** Features the `\"AI Quota Monitor\"` header with live Tailscale sync state (`\"Synced via Tailscale \u00b7 1m ago\"`), refresh action, and an M3 Segmented Button switching between **% Remaining** and **% Used**.\n- **System Summary Card (Tightest Bucket):** Highlights **Gemini 4 Argon Weekly** at 55% remaining with time-to-reset countdown (`4h 22m remaining`) and a tonal badge indicating burn rate performance (`51% Under Linear Pace`).\n- **Antigravity (CLI) Provider Card:** Formatted as structured vertical list cards with linear progress indicators and vertical pace markers:\n  - *Gemini 4 Argon (Weekly)*: Tabular 55% remaining with a distinct vertical pace tick marker at the 96% window progression mark.\n  - *Gemini 3.8 Flash (5h Rolling & Weekly)*: Full capacity metrics with window resets and operational stages.\n- **OpenCode Go & Grok Build Cards:** \n  - OpenCode Go tracking DeepSeek 4.1 across 5h rolling, weekly, and monthly allocations with percentage used breakdown.\n  - Grok Build displaying token lease expiration (`16:23 UTC`), 97% weekly credits remaining, and on-demand overage caps.\n- **M3 Navigation Bar:** Standard 3-destination Android navigation bar anchored with **Quotas (Active)**, **Pace & History**, and **Relay & Widgets**."
+  ]
+}

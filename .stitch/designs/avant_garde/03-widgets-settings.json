@@ -1,0 +1,13 @@
+{
+  "slug": "03-widgets-settings",
+  "title": "Avant-Garde \u2014 Orbital Glance Widgets & Cryptographic Topology",
+  "set": "avant_garde",
+  "designSystem": "assets/5766478320191827137",
+  "screenId": "e73b80c7d69b40a681b4e578302fd235",
+  "screenName": "projects/8157070654946262217/screens/e73b80c7d69b40a681b4e578302fd235",
+  "screenshotPath": ".stitch/designs/avant_garde/03-widgets-settings.png",
+  "htmlPath": ".stitch/designs/avant_garde/03-widgets-settings.html",
+  "aiNotes": [
+    "Here is the avant-garde **\"Launcher Surfaces & Cryptographic Topology\"** mobile screen, created using the **Chronos Orbital Kinetic HUD** design language:\n\n### Key Design & Architectural Highlights:\n1. **HUD Header & Hardware Attestation**:\n   - System headline with `SEC-RING 0`, live heartbeat latency monitor (`1.2s`), and `KEYMASTER VERIFIED` security badges.\n   - Quick action controls for **\"Push to Launcher\"** and **\"Simulate Invalidation\"**.\n\n2. **Sculptural Android 14+ Jetpack Glance Widget Previews**:\n   - **2x2 Orbital Chronometer Widget**: Dark glass container with concentric glowing SVG rings tracking Grok 4.7 (97% outer amber) and Argon pace (55% inner cyan) wrapped around the digital countdown anchor (`T-04:22:00` / `19:39 UTC`).\n   - **4x2 Orca Stage Deck Widget**: High-density 3-stage tactical readout detailing:\n     - **Stage 01 // PLAN**: Argon 55% with negative pace vector (`-51.8%`).\n     - **Stage 02 // BUILD**: Flash 100% / OC 98% in parallel.\n     - **Stage 03 // REVIEW**: Grok 4.7 97% guarded and enclave-locked.\n     - Broadcast metadata badge: Mac Studio Tailscale source + `0x4F12` reload broadcast token.\n\n3. **Interactive Cryptographic Node Topology Map**:\n   - Visual data-flow diagram tracking telemetry from **MAC HOST (`launchd` daemon)** through the active **Tailscale Live (14ms WireGuard)** fork and standby **GitHub Gist (AES-256-GCM)** envelope.\n   - Destination node highlighting the **Pixel 8 Pro Hardware Enclave** (Titan M2 + StrongBox v4 Keymaster verification).\n   - Tactical toggles for **Smart Prime Active Window** (08:00\u201322:00 Local) and **Mesh Transport Polarity** (Direct vs Relay Lock).\n   - Terminal stdout log viewer capturing zero-nonce expiration, IPC broadcasts, and glance updates."
+  ]
+}

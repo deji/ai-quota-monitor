@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Chronos // Topology - Orbital Kinetic HUD</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&amp;family=Public+Sans:wght@400;600;700&amp;family=Space+Grotesk:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "on-background": "#f7f9fe",
+            "error": "#ff7351",
+            "tertiary-fixed-dim": "#88dce4",
+            "on-tertiary": "#006167",
+            "primary-container": "#4bb559",
+            "outline": "#72767a",
+            "on-primary-fixed-variant": "#006b23",
+            "surface-container-lowest": "#000000",
+            "outline-variant": "#44484c",
+            "surface-container-highest": "#21262b",
+            "secondary": "#f9b44c",
+            "secondary-fixed": "#ffc87d",
+            "tertiary": "#adf8ff",
+            "on-tertiary-fixed": "#004348",
+            "on-primary-fixed": "#004a16",
+            "surface-container-high": "#1b2024",
+            "on-error-container": "#ffd2c8",
+            "on-surface": "#f7f9fe",
+            "on-error": "#450900",
+            "on-secondary": "#553600",
+            "on-surface-variant": "#a8abaf",
+            "on-secondary-fixed": "#4a2e00",
+            "primary": "#8efa94",
+            "on-primary-container": "#002a09",
+            "on-tertiary-fixed-variant": "#006268",
+            "secondary-dim": "#e9a640",
+            "tertiary-dim": "#88dce4",
+            "surface-tint": "#8efa94",
+            "primary-fixed-dim": "#80eb88",
+            "error-dim": "#d53d18",
+            "error-container": "#b92902",
+            "inverse-primary": "#006f25",
+            "tertiary-container": "#96eaf3",
+            "inverse-surface": "#f7f9fe",
+            "background": "#0b0f12",
+            "surface": "#0b0f12",
+            "surface-dim": "#0b0f12",
+            "on-primary": "#005f1e",
+            "tertiary-fixed": "#96eaf3",
+            "secondary-container": "#825500",
+            "primary-dim": "#80eb88",
+            "on-secondary-fixed-variant": "#704800",
+            "surface-container": "#151a1e",
+            "secondary-fixed-dim": "#fcb64f",
+            "surface-container-low": "#0f1417",
+            "on-tertiary-container": "#00575d",
+            "on-secondary-container": "#fff6ef",
+            "surface-bright": "#272d32",
+            "surface-variant": "#21262b",
+            "inverse-on-surface": "#525559",
+            "primary-fixed": "#8efa94"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "fontFamily": {
+            "headline": ["Space Grotesk"],
+            "display": ["Space Grotesk"],
+            "body": ["Geist"],
+            "label": ["Public Sans"]
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      display: inline-block;
+      line-height: 1;
+    }
+    .hud-grid {
+      background-image: radial-gradient(rgba(142, 250, 148, 0.08) 1px, transparent 1px),
+                        linear-gradient(to right, rgba(68, 72, 76, 0.15) 1px, transparent 1px),
+                        linear-gradient(to bottom, rgba(68, 72, 76, 0.15) 1px, transparent 1px);
+      background-size: 24px 24px, 48px 48px, 48px 48px;
+    }
+    @keyframes pulse-scan {
+      0%, 100% { opacity: 0.2; transform: translateY(0); }
+      50% { opacity: 0.8; transform: translateY(4px); }
+    }
+    .scan-line {
+      animation: pulse-scan 3s ease-in-out infinite;
+    }
+    @keyframes dash-flow {
+      to { stroke-dashoffset: -32; }
+    }
+    .anim-dash {
+      stroke-dasharray: 6 6;
+      animation: dash-flow 1.5s linear infinite;
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body min-h-screen selection:bg-primary selection:text-on-primary antialiased relative pb-28">
+<!-- Shared TopAppBar -->
+<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-4 py-3 bg-surface-container-lowest/90 backdrop-blur-md border-b border-outline-variant">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary text-xl" data-icon="terminal">terminal</span>
+<div>
+<span class="font-headline font-bold text-sm tracking-widest text-primary uppercase">CHRONOS // TOPOLOGY</span>
+<span class="block font-label text-[9px] uppercase tracking-widest text-on-surface-variant">NODE::880-ORCA-PIXEL</span>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded border border-outline-variant bg-surface-container text-[10px] font-label font-bold text-tertiary tracking-wider">
+<span class="w-1.5 h-1.5 rounded-full bg-primary animate-ping"></span>
+        SEC-0
+      </span>
+<button aria-label="Security Token" class="p-1.5 rounded hover:bg-surface-container-high text-on-surface-variant hover:text-primary transition-colors" title="Keymaster Shield">
+<span class="material-symbols-outlined text-xl" data-icon="security">security</span>
+</button>
+</div>
+</header>
+<!-- Main Canvas -->
+<main class="hud-grid pt-16 px-3.5 max-w-4xl mx-auto space-y-6">
+<!-- Top Telemetry Header -->
+<section class="mt-2 border border-outline-variant/80 rounded bg-surface-container-low/90 backdrop-blur-sm p-3.5 relative overflow-hidden">
+<div class="absolute -right-12 -top-12 w-32 h-32 rounded-full bg-primary/5 blur-2xl pointer-events-none"></div>
+<div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b border-outline-variant/60 pb-3">
+<div>
+<div class="flex items-center gap-2 mb-1">
+<span class="text-[10px] font-label font-bold tracking-widest text-primary bg-primary/10 border border-primary/30 px-1.5 py-0.5 rounded">
+              SURFACE MATRIX ACTIVE
+            </span>
+<span class="text-[10px] font-label text-on-surface-variant tracking-wider">REV 4.9.1-TITAN</span>
+</div>
+<h1 class="font-headline text-lg sm:text-xl font-bold tracking-tight text-on-surface">
+            LAUNCHER SURFACES &amp; CRYPTOGRAPHIC TOPOLOGY
+          </h1>
+<p class="font-label text-[11px] tracking-wider text-on-surface-variant mt-0.5">
+            PIXEL 8 PRO GLANCE ENGINE // HARDWARE ENCLAVE V4
+          </p>
+</div>
+<div class="flex flex-wrap sm:flex-col items-start sm:items-end gap-1.5 shrink-0">
+<div class="flex items-center gap-1.5 text-[11px] font-headline text-primary bg-surface-container-lowest px-2 py-1 rounded border border-outline-variant">
+<span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+<span>HEARTBEAT: <strong class="text-on-surface">1.2s</strong></span>
+</div>
+<span class="text-[10px] font-label text-secondary tracking-widest px-2 py-0.5 rounded bg-secondary/10 border border-secondary/30">
+            KEYMASTER VERIFIED
+          </span>
+</div>
+</div>
+<!-- Quick Action Pills -->
+<div class="mt-3 flex flex-wrap items-center justify-between gap-2.5">
+<div class="flex items-center gap-2">
+<button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-primary text-on-primary font-headline text-xs font-bold tracking-wide active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-sm" data-icon="rocket_launch">rocket_launch</span>
+            Push to Launcher
+          </button>
+<button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-surface-container-high hover:bg-surface-container-highest border border-outline-variant text-on-surface font-headline text-xs tracking-wide active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-sm text-error" data-icon="sync_problem">sync_problem</span>
+            Simulate Invalidation
+          </button>
+</div>
+<div class="text-[10px] font-label text-on-surface-variant tracking-widest uppercase flex items-center gap-1">
+<span class="material-symbols-outlined text-xs text-tertiary" data-icon="bolt">bolt</span>
+          Glance AppWidgetProvider 0x4F12
+        </div>
+</div>
+</section>
+<!-- SECTION 1: Sculptural Glance Widget Previews (Compose Canvas v3) -->
+<section class="space-y-3">
+<div class="flex items-center justify-between px-0.5">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded bg-tertiary"></span>
+<h2 class="font-headline text-xs sm:text-sm font-bold tracking-wider text-on-surface uppercase">
+            ANDROID 14+ GLANCE DECK PREVIEWS
+          </h2>
+</div>
+<span class="inline-flex items-center gap-1.5 text-[10px] font-label font-bold text-primary bg-primary/10 border border-primary/40 px-2 py-0.5 rounded">
+<span class="w-1.5 h-1.5 rounded-full bg-primary animate-ping"></span>
+          LIVE GLANCE
+        </span>
+</div>
+<!-- Widgets Layout: 2x2 & 4x2 representations -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-3.5">
+<!-- 2x2 Orbital Chronometer Widget (5 cols on wide) -->
+<div class="lg:col-span-5 rounded border border-outline-variant bg-surface-container-lowest/95 p-3.5 relative overflow-hidden flex flex-col justify-between">
+<div class="absolute inset-0 hud-grid opacity-20 pointer-events-none"></div>
+<!-- Widget Card Header -->
+<div class="flex items-center justify-between pb-2 border-b border-outline-variant/50">
+<div class="flex items-center gap-1.5">
+<span class="px-1.5 py-0.5 rounded bg-surface-container text-[9px] font-headline font-bold text-tertiary border border-outline-variant">
+                2x2 CELL
+              </span>
+<span class="text-[11px] font-headline font-bold tracking-tight text-on-surface">CHRONOS ORBITAL</span>
+</div>
+<span class="text-[9px] font-label text-primary tracking-widest uppercase">14ms Tailscale Push</span>
+</div>
+<!-- Dual-Ring Concentric Graphic -->
+<div class="py-4 relative flex items-center justify-center">
+<svg class="w-48 h-48 -rotate-90 transform" viewbox="0 0 160 160">
+<!-- Outer Ring Background (Grok 4.7) -->
+<circle cx="80" cy="80" fill="transparent" r="66" stroke="#21262b" stroke-width="6"></circle>
+<!-- Outer Progress Arc (Grok 4.7 97%) -->
+<circle class="transition-all duration-700" cx="80" cy="80" fill="transparent" r="66" stroke="#adf8ff" stroke-dasharray="414.69" stroke-dashoffset="12.4" stroke-linecap="round" stroke-width="6"></circle>
+<!-- Inner Ring Background (Argon Pace) -->
+<circle cx="80" cy="80" fill="transparent" r="50" stroke="#21262b" stroke-width="6"></circle>
+<!-- Inner Progress Arc (Argon 55%) -->
+<circle class="transition-all duration-700" cx="80" cy="80" fill="transparent" r="50" stroke="#8efa94" stroke-dasharray="314.16" stroke-dashoffset="141.37" stroke-linecap="round" stroke-width="6"></circle>
+<!-- Orbital Markers -->
+<circle cx="80" cy="14" fill="#adf8ff" r="2.5"></circle>
+<circle cx="80" cy="30" fill="#8efa94" r="2.5"></circle>
+</svg>
+<!-- Center Digital Readout -->
+<div class="absolute inset-0 flex flex-col items-center justify-center text-center">
+<span class="font-label text-[10px] text-on-surface-variant tracking-widest uppercase">COUNTDOWN</span>
+<span class="font-headline text-xl sm:text-2xl font-bold tracking-tight text-on-surface">T-04:22:00</span>
+<div class="flex items-center gap-1 text-[10px] font-label text-tertiary">
+<span class="material-symbols-outlined text-[12px]" data-icon="schedule">schedule</span>
+<span>19:39 UTC</span>
+</div>
+</div>
+</div>
+<!-- Legend Rings -->
+<div class="space-y-1.5 pt-2 border-t border-outline-variant/40">
+<div class="flex items-center justify-between text-[11px] font-label">
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-primary"></span>
+<span class="text-on-surface-variant font-medium">Inner // Argon Pace</span>
+</div>
+<div class="font-headline font-bold text-primary">55% <span class="text-[10px] font-normal text-error">(-51.8%)</span></div>
+</div>
+<div class="flex items-center justify-between text-[11px] font-label">
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-tertiary"></span>
+<span class="text-on-surface-variant font-medium">Outer // Grok 4.7 Quota</span>
+</div>
+<div class="font-headline font-bold text-tertiary">97% <span class="text-[10px] font-normal text-on-surface-variant">ACTIVE</span></div>
+</div>
+</div>
+<!-- Footnote -->
+<div class="mt-3 pt-2 border-t border-outline-variant/30 flex items-center justify-between text-[9px] font-label text-on-surface-variant">
+<span>Glance AppWidgetProvider 2x2</span>
+<span class="text-primary font-bold">STATE: COMPOSED</span>
+</div>
+</div>
+<!-- 4x2 Orca Stage Deck Widget (7 cols on wide) -->
+<div class="lg:col-span-7 rounded border border-outline-variant bg-surface-container-lowest/95 p-3.5 flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between pb-2 border-b border-outline-variant/50">
+<div class="flex items-center gap-2">
+<span class="px-1.5 py-0.5 rounded bg-surface-container text-[9px] font-headline font-bold text-secondary border border-outline-variant">
+                  4x2 DECK
+                </span>
+<span class="text-[11px] font-headline font-bold tracking-tight text-on-surface">ORCA STAGE DECK WIDGET</span>
+</div>
+<span class="text-[9px] font-label text-on-surface-variant tracking-wider">PIPELINE RUN 0x88F</span>
+</div>
+<!-- 3-Stage Tactical Matrix -->
+<div class="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+<!-- Stage 01 -->
+<div class="rounded border border-outline-variant/70 bg-surface-container-low p-2.5 relative">
+<div class="flex items-center justify-between text-[10px] font-label mb-1">
+<span class="text-on-surface-variant font-bold tracking-wider">STAGE 01</span>
+<span class="px-1 rounded bg-primary/20 text-primary text-[9px] font-bold">ACTIVE</span>
+</div>
+<div class="font-headline text-xs font-bold text-on-surface">PLAN // ARGON</div>
+<div class="mt-2 flex items-baseline justify-between">
+<span class="font-headline text-lg font-bold text-primary">55%</span>
+<div class="flex items-center text-[10px] font-headline text-error font-medium">
+<span class="material-symbols-outlined text-[13px]" data-icon="arrow_downward">arrow_downward</span>
+<span>-51.8%</span>
+</div>
+</div>
+<p class="text-[9px] font-label text-on-surface-variant mt-0.5">Under linear burn</p>
+<div class="w-full bg-surface-container-highest h-1 rounded-full mt-2 overflow-hidden">
+<div class="bg-primary h-full w-[55%]"></div>
+</div>
+</div>
+<!-- Stage 02 -->
+<div class="rounded border border-outline-variant/70 bg-surface-container-low p-2.5 relative">
+<div class="flex items-center justify-between text-[10px] font-label mb-1">
+<span class="text-on-surface-variant font-bold tracking-wider">STAGE 02</span>
+<span class="px-1 rounded bg-tertiary/20 text-tertiary text-[9px] font-bold">PARALLEL</span>
+</div>
+<div class="font-headline text-xs font-bold text-on-surface">BUILD // FLASH + OC</div>
+<div class="mt-2 flex items-baseline justify-between">
+<span class="font-headline text-lg font-bold text-tertiary">100%<span class="text-xs text-on-surface-variant">/98%</span></span>
+<span class="material-symbols-outlined text-sm text-tertiary" data-icon="bolt">bolt</span>
+</div>
+<p class="text-[9px] font-label text-on-surface-variant mt-0.5">DeepSeek 4.1 + Gemini 3.8</p>
+<div class="w-full bg-surface-container-highest h-1 rounded-full mt-2 overflow-hidden">
+<div class="bg-tertiary h-full w-[99%]"></div>
+</div>
+</div>
+<!-- Stage 03 -->
+<div class="rounded border border-outline-variant/70 bg-surface-container-low p-2.5 relative">
+<div class="flex items-center justify-between text-[10px] font-label mb-1">
+<span class="text-on-surface-variant font-bold tracking-wider">STAGE 03</span>
+<span class="px-1 rounded bg-secondary/20 text-secondary text-[9px] font-bold">GUARD</span>
+</div>
+<div class="font-headline text-xs font-bold text-on-surface">REVIEW // GROK 4.7</div>
+<div class="mt-2 flex items-baseline justify-between">
+<span class="font-headline text-lg font-bold text-secondary">97%</span>
+<span class="text-[9px] font-label text-primary font-bold uppercase">ALIVE</span>
+</div>
+<p class="text-[9px] font-label text-on-surface-variant mt-0.5">Primed 4d, Enclave Locked</p>
+<div class="w-full bg-surface-container-highest h-1 rounded-full mt-2 overflow-hidden">
+<div class="bg-secondary h-full w-[97%]"></div>
+</div>
+</div>
+</div>
+<!-- Tactical Stats Row -->
+<div class="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px] font-label bg-surface-container-high/60 p-2 rounded border border-outline-variant/40">
+<div>
+<span class="text-on-surface-variant block">THROUGHPUT</span>
+<span class="font-headline font-bold text-on-surface text-xs">1,489 tok/s</span>
+</div>
+<div>
+<span class="text-on-surface-variant block">HORIZON RING</span>
+<span class="font-headline font-bold text-tertiary text-xs">5h ROLLING</span>
+</div>
+<div>
+<span class="text-on-surface-variant block">FAILOVER</span>
+<span class="font-headline font-bold text-primary text-xs">READY (0.4s)</span>
+</div>
+<div>
+<span class="text-on-surface-variant block">KEYMASTER</span>
+<span class="font-headline font-bold text-secondary text-xs">V4 STRONG</span>
+</div>
+</div>
+</div>
+<!-- Glance Sync Metadata Badge -->
+<div class="mt-3 pt-2.5 border-t border-outline-variant/40 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-[10px] font-label">
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-xs text-primary" data-icon="lan">lan</span>
+<span>Source: <strong class="text-on-surface">Mac Studio via Tailscale</strong></span>
+</div>
+<div class="text-primary font-headline text-[10px] bg-primary/10 border border-primary/20 px-2 py-0.5 rounded self-start sm:self-auto">
+              Glance reload broadcast: <strong>0x4F12</strong>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- SECTION 2: Interactive Node Topology Map (Cryptographic Pipeline) -->
+<section class="border border-outline-variant rounded bg-surface-container-lowest/95 p-3.5 space-y-4">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pb-2 border-b border-outline-variant/60">
+<div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-tertiary text-base" data-icon="hub">hub</span>
+<h2 class="font-headline text-xs sm:text-sm font-bold tracking-wider text-on-surface uppercase">
+              CRYPTOGRAPHIC NODE TOPOLOGY // SEC_TRANSIT ZERO-KNOWLEDGE
+            </h2>
+</div>
+<p class="font-label text-[10px] tracking-wider text-on-surface-variant mt-0.5">
+            END-TO-END SIGNED ATTESTATION • ECIES SECP256R1 TUNNEL
+          </p>
+</div>
+<span class="text-[10px] font-label text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/30 tracking-widest self-start sm:self-auto">
+          ZK-ENVELOPE ACTIVE
+        </span>
+</div>
+<!-- Node Graph Canvas Visualization -->
+<div class="relative bg-surface-container-low rounded border border-outline-variant/80 p-4 overflow-hidden">
+<!-- SVG Vector Flow Connectors -->
+<svg class="hidden md:block absolute inset-0 w-full h-full pointer-events-none z-0" xmlns="http://www.w3.org/2000/svg">
+<!-- Root to Fork 1 -->
+<path class="anim-dash" d="M 230 42 L 340 42 L 370 70 L 470 70" fill="none" opacity="0.8" stroke="#8efa94" stroke-width="1.8"></path>
+<!-- Root to Fork 2 -->
+<path d="M 230 42 L 340 42 L 370 160 L 470 160" fill="none" opacity="0.6" stroke="#f9b44c" stroke-dasharray="4 4" stroke-width="1.5"></path>
+<!-- Fork 1 to Titan Destination -->
+<path class="anim-dash" d="M 720 70 L 760 70 L 780 115 L 820 115" fill="none" opacity="0.8" stroke="#8efa94" stroke-width="1.8"></path>
+<!-- Fork 2 to Titan Destination -->
+<path d="M 720 160 L 760 160 L 780 115 L 820 115" fill="none" opacity="0.5" stroke="#44484c" stroke-width="1.5"></path>
+</svg>
+<div class="relative z-10 flex flex-col md:flex-row items-stretch justify-between gap-4">
+<!-- 1. ROOT NODE: MAC HOST -->
+<div class="w-full md:w-64 rounded bg-surface-container border border-outline-variant p-3 flex flex-col justify-between shrink-0">
+<div>
+<div class="flex items-center justify-between mb-1.5">
+<span class="text-[9px] font-label uppercase text-primary font-bold tracking-widest flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-primary animate-ping"></span>
+                  ROOT NODE 01
+                </span>
+<span class="material-symbols-outlined text-sm text-on-surface-variant" data-icon="desktop_mac">desktop_mac</span>
+</div>
+<div class="font-headline text-xs font-bold text-on-surface">MAC HOST (launchd daemon)</div>
+<div class="mt-2.5 space-y-1 font-headline text-[10px] text-on-surface-variant">
+<div class="flex justify-between border-b border-outline-variant/30 pb-0.5">
+<span>PID</span>
+<span class="text-on-surface font-bold">41922</span>
+</div>
+<div class="flex justify-between border-b border-outline-variant/30 pb-0.5">
+<span>STDOUT</span>
+<span class="text-tertiary">1,489 tok/sec</span>
+</div>
+<div class="flex justify-between">
+<span>UPTIME</span>
+<span class="text-on-surface">18d 04h</span>
+</div>
+</div>
+</div>
+<div class="mt-3 pt-2 border-t border-outline-variant/40 flex items-center justify-between text-[9px] font-label">
+<span class="text-on-surface-variant">PIPE: IPC UNIX</span>
+<span class="text-primary font-bold">EMITTING</span>
+</div>
+</div>
+<!-- 2. FORK NODES (PRIMARY & FALLBACK) -->
+<div class="flex-1 flex flex-col gap-3 justify-center">
+<!-- Fork 1: Tailscale Live (Primary) -->
+<div class="rounded bg-surface-container-high border-2 border-primary/50 p-2.5 relative shadow-[0_0_12px_rgba(142,250,148,0.15)]">
+<div class="flex items-center justify-between mb-1">
+<div class="flex items-center gap-1.5">
+<span class="px-1.5 py-0.2 rounded bg-primary text-on-primary text-[9px] font-label font-bold">
+                    PRIMARY
+                  </span>
+<span class="font-headline text-xs font-bold text-on-surface">TAILSCALE LIVE (14ms)</span>
+</div>
+<span class="text-[9px] font-label text-primary font-bold tracking-widest uppercase">PUSH ACTIVE</span>
+</div>
+<div class="grid grid-cols-2 gap-2 text-[10px] font-label mt-1.5 text-on-surface-variant">
+<div>Tunnel: <span class="text-on-surface font-headline">Direct WireGuard</span></div>
+<div>Direct IP: <span class="text-tertiary font-headline font-bold">100.92.14.8</span></div>
+</div>
+<div class="mt-1.5 text-[9px] font-label text-on-surface-variant flex items-center justify-between">
+<span>Loss: 0.00% • MTU: 1280</span>
+<span class="text-primary flex items-center gap-1 font-bold">
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span> CONNECTED
+                </span>
+</div>
+</div>
+<!-- Fork 2: Fallback Relay -->
+<div class="rounded bg-surface-container-low border border-outline-variant p-2.5 relative opacity-85 hover:opacity-100 transition-opacity">
+<div class="flex items-center justify-between mb-1">
+<div class="flex items-center gap-1.5">
+<span class="px-1.5 py-0.2 rounded bg-secondary/20 text-secondary text-[9px] font-label font-bold">
+                    FALLBACK
+                  </span>
+<span class="font-headline text-xs font-bold text-on-surface">GITHUB GIST RELAY (AES-256-GCM)</span>
+</div>
+<span class="text-[9px] font-label text-secondary font-bold tracking-widest uppercase">STANDBY</span>
+</div>
+<div class="grid grid-cols-2 gap-2 text-[10px] font-label mt-1.5 text-on-surface-variant">
+<div>Payload: <span class="text-on-surface font-headline">Zero-Knowledge Enc</span></div>
+<div>Sync: <span class="text-on-surface font-headline">2m ago</span></div>
+</div>
+<div class="mt-1.5 text-[9px] font-label text-on-surface-variant flex items-center justify-between">
+<span>Nonce: 0x9AF8 • TTL: 300s</span>
+<span class="text-secondary font-bold">HOT SPARE</span>
+</div>
+</div>
+</div>
+<!-- 3. DESTINATION NODE: HARDWARE ENCLAVE -->
+<div class="w-full md:w-64 rounded bg-surface-container border border-outline-variant p-3 flex flex-col justify-between shrink-0">
+<div>
+<div class="flex items-center justify-between mb-1.5">
+<span class="text-[9px] font-label uppercase text-tertiary font-bold tracking-widest flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span>
+                  ENCLAVE DEST
+                </span>
+<span class="material-symbols-outlined text-sm text-tertiary" data-icon="lock">lock</span>
+</div>
+<div class="font-headline text-xs font-bold text-on-surface">PIXEL 8 PRO HARDWARE ENCLAVE</div>
+<div class="mt-2.5 space-y-1 font-headline text-[10px] text-on-surface-variant">
+<div class="flex justify-between border-b border-outline-variant/30 pb-0.5">
+<span>CO-PROCESSOR</span>
+<span class="text-on-surface font-bold">Titan M2</span>
+</div>
+<div class="flex justify-between border-b border-outline-variant/30 pb-0.5">
+<span>KEYMASTER</span>
+<span class="text-primary font-bold">StrongBox v4</span>
+</div>
+<div class="flex justify-between">
+<span>STATE</span>
+<span class="text-tertiary font-bold">GLANCE BOUND</span>
+</div>
+</div>
+</div>
+<div class="mt-3 pt-2 border-t border-outline-variant/40 flex items-center justify-between text-[9px] font-label">
+<span class="text-on-surface-variant">HW REATTESTATION</span>
+<span class="text-primary font-bold">VERIFIED</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Interactive Control Panel & Telemetry Sliders -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+<!-- Toggle: Smart Prime Active Window -->
+<div class="rounded border border-outline-variant/70 bg-surface-container p-3 flex items-center justify-between">
+<div class="space-y-0.5 pr-2">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-primary text-sm" data-icon="bedtime_off">bedtime_off</span>
+<span class="font-headline text-xs font-bold text-on-surface">Smart Prime Active Window</span>
+</div>
+<p class="font-label text-[10px] text-on-surface-variant">
+              08:00 - 22:00 Local • Prevents nocturnal quota burn
+            </p>
+</div>
+<!-- Native-like HUD Switch -->
+<button aria-checked="true" aria-label="Toggle Smart Prime Active Window" class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-primary/50 bg-primary/20 transition-colors duration-200 ease-in-out" role="switch">
+<span class="translate-x-5 inline-block h-4 w-4 transform rounded-full bg-primary shadow-lg ring-0 transition duration-200 ease-in-out mt-0.5 ml-0.5"></span>
+</button>
+</div>
+<!-- Toggle: Transport Polarity -->
+<div class="rounded border border-outline-variant/70 bg-surface-container p-3 flex items-center justify-between">
+<div class="space-y-0.5 pr-2">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-secondary text-sm" data-icon="swap_horiz">swap_horiz</span>
+<span class="font-headline text-xs font-bold text-on-surface">Mesh Transport Polarity</span>
+</div>
+<p class="font-label text-[10px] text-on-surface-variant">
+              Mesh Direct (WireGuard) vs Relay Lock
+            </p>
+</div>
+<div class="flex rounded border border-outline-variant bg-surface-container-lowest p-0.5 text-[10px] font-label font-bold">
+<button class="px-2 py-0.5 rounded bg-primary text-on-primary">DIRECT</button>
+<button class="px-2 py-0.5 text-on-surface-variant hover:text-on-surface">RELAY</button>
+</div>
+</div>
+</div>
+<!-- Action Cluster -->
+<div class="flex flex-wrap items-center gap-2 pt-1">
+<button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-surface-container-high hover:bg-surface-container-highest border border-outline-variant text-on-surface font-headline text-xs font-bold active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-xs text-primary" data-icon="network_ping">network_ping</span>
+          Ping WireGuard Mesh
+        </button>
+<button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-surface-container-high hover:bg-surface-container-highest border border-outline-variant text-on-surface font-headline text-xs font-bold active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-xs text-secondary" data-icon="refresh">refresh</span>
+          Rotate Gist Nonce
+        </button>
+<button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-surface-container-high hover:bg-surface-container-highest border border-outline-variant text-on-surface font-headline text-xs font-bold active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-xs text-tertiary" data-icon="verified_user">verified_user</span>
+          Verify Titan Keystore Attestation
+        </button>
+</div>
+<!-- Stdout / Glance Live Stream Log Terminal -->
+<div class="rounded border border-outline-variant/60 bg-surface-container-lowest p-3 font-headline text-[10px]">
+<div class="flex items-center justify-between pb-1.5 mb-1.5 border-b border-outline-variant/30 text-on-surface-variant">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-xs text-primary" data-icon="terminal">terminal</span>
+<span class="uppercase tracking-widest font-bold">SYSTEM STDOUT // GLANCE RELOAD STREAM</span>
+</div>
+<span class="text-primary font-bold">STREAM LIVE</span>
+</div>
+<div class="space-y-1 font-mono text-on-surface-variant/90 leading-relaxed">
+<div><span class="text-outline">19:39:01.12</span> [launchd] <span class="text-tertiary">BROADCAST_STATE</span> -&gt; Payload serialized: 4.2KB (OrcaStageDeck + ChronosOrbital)</div>
+<div><span class="text-outline">19:39:01.14</span> [tailscale] <span class="text-primary">PUSH_ACK</span> 100.92.14.8:51820 • RTT 13.88ms • ZeroPacketLoss</div>
+<div><span class="text-outline">19:39:01.15</span> [keymaster] StrongBox verify ECDSA_SHA256 signature 0x7E3F..91A <span class="text-primary font-bold">[OK]</span></div>
+<div><span class="text-outline">19:39:01.16</span> [glance-host] AppWidgetManager.updateAppWidget(id=0x4F12) -&gt; <span class="text-on-surface font-bold">COMPOSE CANVAS RENDERED IN 2.1ms</span></div>
+</div>
+</div>
+</section>
+<!-- Bottom Time-Travel Horizon Scrubber (+1h / +4h / +24h burn projection) -->
+<section class="border border-outline-variant rounded bg-surface-container-low p-3.5 space-y-2.5">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-secondary text-sm" data-icon="fast_forward">fast_forward</span>
+<span class="font-headline text-xs font-bold text-on-surface uppercase tracking-wider">
+            Time-Travel Horizon Scrubber // Burn Projection
+          </span>
+</div>
+<span class="text-[10px] font-label text-secondary font-bold bg-secondary/10 px-2 py-0.5 rounded border border-secondary/30">
+          DELTA SIMULATION
+        </span>
+</div>
+<div class="grid grid-cols-3 gap-2">
+<button class="rounded border border-outline-variant bg-surface-container p-2 text-left hover:border-primary transition-colors">
+<div class="text-[9px] font-label text-on-surface-variant font-bold">+1H PROJECTION</div>
+<div class="font-headline text-sm font-bold text-primary mt-0.5">Argon 64%</div>
+<div class="text-[9px] font-label text-on-surface-variant">Quota Safe • Delta +9%</div>
+</button>
+<button class="rounded border-2 border-primary bg-primary/10 p-2 text-left">
+<div class="text-[9px] font-label text-primary font-bold">+4H PROJECTION</div>
+<div class="font-headline text-sm font-bold text-on-surface mt-0.5">Argon 88%</div>
+<div class="text-[9px] font-label text-tertiary">Optimal Limit Crossing</div>
+</button>
+<button class="rounded border border-outline-variant bg-surface-container p-2 text-left hover:border-secondary transition-colors">
+<div class="text-[9px] font-label text-on-surface-variant font-bold">+24H ROLLOVER</div>
+<div class="font-headline text-sm font-bold text-secondary mt-0.5">Reset Cycle</div>
+<div class="text-[9px] font-label text-on-surface-variant">New 5h Horizon Frame</div>
+</button>
+</div>
+</section>
+</main>
+<!-- Shared BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-2 py-2 bg-surface-container-lowest/95 backdrop-blur-md border-t border-outline-variant">
+<!-- Tab 1: Orbital (Inactive) -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant gap-1 active:scale-95 transition-transform" href="#orbital">
+<span class="material-symbols-outlined text-lg" data-icon="timelapse">timelapse</span>
+<span class="font-label text-[10px] tracking-widest uppercase">Orbital</span>
+</a>
+<!-- Tab 2: Topology (ACTIVE: EXACT MATCH WITH PAGE TITLE & PURPOSE) -->
+<a class="flex flex-col items-center justify-center text-primary font-bold gap-1 active:scale-95 transition-transform" href="#topology">
+<span class="material-symbols-outlined text-lg text-primary" data-icon="hub" style="font-variation-settings: 'FILL' 1;">hub</span>
+<span class="font-label text-[10px] tracking-widest uppercase">Topology</span>
+</a>
+<!-- Tab 3: Deck (Inactive) -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant gap-1 active:scale-95 transition-transform" href="#deck">
+<span class="material-symbols-outlined text-lg" data-icon="view_agenda">view_agenda</span>
+<span class="font-label text-[10px] tracking-widest uppercase">Deck</span>
+</a>
+<!-- Tab 4: Enclave (Inactive) -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant gap-1 active:scale-95 transition-transform" href="#enclave">
+<span class="material-symbols-outlined text-lg" data-icon="key">key</span>
+<span class="font-label text-[10px] tracking-widest uppercase">Enclave</span>
+</a>
+</nav>
+</body></html>

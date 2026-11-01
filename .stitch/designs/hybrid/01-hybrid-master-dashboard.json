@@ -1,0 +1,13 @@
+{
+  "slug": "01-hybrid-master-dashboard",
+  "title": "Hybrid Master \u2014 M3 Expressive Bento + Orca Roles + Horizon Scrubber",
+  "set": "hybrid",
+  "designSystem": "assets/8610081051554797998",
+  "screenId": "ba6a7ff92f2b4444a97025cc0551ae64",
+  "screenName": "projects/8157070654946262217/screens/ba6a7ff92f2b4444a97025cc0551ae64",
+  "screenshotPath": ".stitch/designs/hybrid/01-hybrid-master-dashboard.png",
+  "htmlPath": ".stitch/designs/hybrid/01-hybrid-master-dashboard.html",
+  "aiNotes": [
+    "I have crafted the flagship **Android 16 Material 3 Expressive** mobile dashboard for Pixel 8 Pro (**Quota Pulse v4.0**), published to your canvas as `Quota Pulse \u2014 Flagship M3 Expressive`.\n\n### Key Design Highlights:\n1. **Top App Bar & Polarity Pill:**\n   - Features the expressive branding `AI Quota Pulse v4.0` with connection status (`Tailscale Live 14ms \u00b7 Gist AES-256-GCM`) and a tactile pill toggle between `% Left (Selected)` and `% Used`.\n2. **Orca Role Readiness Strip:**\n   - A 3-column capsule matrix at the top displaying real-time agent status:\n     - **Planner:** Gemini 4 Argon (`35% Active`)\n     - **Builder:** Flash / OpenCode (`99% / 98% Ready`)\n     - **Reviewer:** Grok 4.7 (`97% Token Primed`)\n3. **Hero Bottleneck Bento Card (28dp Squircle):**\n   - High-fidelity radial Compose Canvas arc gauge spotlighting `35% LEFT` with a luminous glowing orange **Pace Target Notch** at `98.1% elapsed`.\n   - Dedicated stat tiles for window reset (`3h 11m / 19:39 UTC`), **Safe Headroom** (`-33.1% vs Linear Run-rate`), and a smooth bezier velocity sparkline (`0.39%/hr`).\n4. **2-Column Bento Row:**\n   - **OpenCode Go (DeepSeek 4.1):** Dual mini-gauges for `98% Weekly` reserve along with compact pills for `5h Rolling: 100%` and `Monthly: 99% Safe`.\n   - **Grok Build (Grok 4.7):** Credits ring gauge at `97%`, a 90-minute OAuth token lease status bar with schedule window (`08:00\u201322:00`), and a tactile **Prime Pulse** action trigger.\n5. **Interactive Time-Travel Horizon Scrubber:**\n   - Tactile timeline slider with multi-hour projection steps (`NOW [0h]`, `+1H`, `+3H [SELECTED]`, `RESET`), dynamically projecting future quota consumption (`Argon 33.8% remaining \u00b7 +31.2% safe reserve`).\n6. **Floating Bottom Capsule Navigation Bar:**\n   - Android 16 floating pill navigation featuring `Pulse`, `Burn & Pace`, `Widgets & Sync`, and a dedicated `Refresh` action button."
+  ]
+}

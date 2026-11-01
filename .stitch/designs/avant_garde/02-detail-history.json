@@ -1,0 +1,13 @@
+{
+  "slug": "02-detail-history",
+  "title": "Avant-Garde \u2014 Phase-Space Multi-Stream Velocity Graph",
+  "set": "avant_garde",
+  "designSystem": "assets/5766478320191827137",
+  "screenId": "6560c8d87fa742f6997a7db793c85651",
+  "screenName": "projects/8157070654946262217/screens/6560c8d87fa742f6997a7db793c85651",
+  "screenshotPath": ".stitch/designs/avant_garde/02-detail-history.png",
+  "htmlPath": ".stitch/designs/avant_garde/02-detail-history.html",
+  "aiNotes": [
+    "I have designed and generated the avant-garde native Android **Chronos Orbital Kinetic HUD** telemetry screen (Chronos Orbital Kinetic HUD), adhering strictly to the Chronos design language ([Design_System]).\n\n### Key Architectural & Visual Components:\n1. **Asymmetric Tabular Header**:\n   - Oversized monospace readout `45.0% USED / 96.8% WINDOW ELAPSED` under the category moniker `PHASE-SPACE VELOCITY // ALL SUBSCRIPTIONS`.\n   - Native telemetry readouts featuring Current Burn Rate (`0.28%/HR OPTIMAL`), Projected Reserve (`+51.8% SAFE`), and Phase Drift (`0.00% LOCKED`).\n   - Split linear pace indicator with a `+51.8% CRITICAL SURPLUS` margin indicator.\n\n2. **Compose Canvas Multi-Stream Horizon Graph**:\n   - 7-day layered horizon stream tracking `agy` (Gemini 4 Argon & Flash, cyan), `opencode` (DeepSeek 4.1, neon green), and `grok` (Grok 4.7, amber).\n   - Dynamic vertical telemetry run markers flagging autonomous orchestrations: `Orca #104 (Tree Synth)`, `Orca #108 (Full Pipeline)`, and `Orca #112`.\n   - Time-travel scrub controls (`SCRUB T-MINUS: 4h 22m TO UTC RESET`) with delta projection quick-actions (`+1h BURN`, `+4h PROJECTION`, `+24h RESET`).\n\n3. **Grok Token Lifecycle Pulse Module**:\n   - High-contrast kinetic countdown gauge tracking the 90-minute Grok OAuth lease lifecycle (`31m 14s remaining \u00b7 65.2% depleted`).\n   - Hardware security context (`STRONGBOX KEYMASTER: ARMED`) with scheduled keepalive prime status (`SMART PRIME ARMED FOR 16:08 UTC`).\n   - Tactile interactive terminal trigger button (`PRIME PULSE [grok -p \"reply with ok\"]`).\n\n4. **High-Density Monospace Bucket Matrix**:\n   - Hairline grid table providing unified telemetry across all 9 tracked allocation buckets:\n     * `gemini-argon-wtu-weekly`\n     * `gemini-3.8-flash-5h` & `gemini-3.8-flash-weekly`\n     * `deepseek-4.1-5h`, `weekly`, and `monthly`\n     * `grok-4.7-credits`\n     * `claude-gpt-3p-5h` & `claude-gpt-3p-weekly` standby channels.\n   - Fixed HUD bottom navigation bar anchored to the `HORIZON` view."
+  ]
+}

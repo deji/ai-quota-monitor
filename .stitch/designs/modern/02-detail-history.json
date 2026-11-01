@@ -1,0 +1,13 @@
+{
+  "slug": "02-detail-history",
+  "title": "Modern \u2014 Expressive Burn Velocity & Pace Projection",
+  "set": "modern",
+  "designSystem": "assets/8610081051554797998",
+  "screenId": "d479a20cb8ae4a779e733b966fe58265",
+  "screenName": "projects/8157070654946262217/screens/d479a20cb8ae4a779e733b966fe58265",
+  "screenshotPath": ".stitch/designs/modern/02-detail-history.png",
+  "htmlPath": ".stitch/designs/modern/02-detail-history.html",
+  "aiNotes": [
+    "I have designed and generated the **Material 3 Expressive Burn Velocity & Pace** mobile analytics screen (Burn Velocity & Pace \u2014 M3 Expressive) tailored for Pixel 8 Pro.\n\n### Key Design Highlights:\n1. **Interactive Bezier Area Sparkline Card**:\n   - High-contrast, glowing squircle hero container featuring a smooth cubic bezier quota trajectory dropping from 100% to 55%.\n   - Soft luminous aquamarine/cyan area gradient fill underneath the curve.\n   - Dual-reference lines: a diagonal dashed linear benchmark line (`100% Linear Window Pace`) alongside a forward-looking dotted trajectory terminating safely at an interactive waypoint badge: **\"52% Reserve at Reset (19:39 UTC)\"**.\n   - Contextual pace pill highlighting **\"-51.8% Under Linear Pace\"**.\n\n2. **Provider & Time-Horizon Pill Selector**:\n   - Pixel-native rounded pills with active cyan state for **Antigravity (agy)**, alongside quick-switch pills for **OpenCode Go** and **Grok 4.7 Build**.\n   - Horizon selector chips toggle between 5h Rolling, 7 Days (Active), 30d Monthly, and Custom ranges.\n\n3. **2x2 Expressive Telemetry Bento Grid**:\n   - **Current Burn Rate**: `0.28% / hr` (annotated with `Below 0.59%/hr cap`).\n   - **Window Elapsed**: `96.8%` (`6d 19h of 7d cycle`).\n   - **Exhaustion Forecast**: Large bold **`Never`** safe badge with `+51.8% surplus margin`.\n   - **Next Reset**: `19:39 UTC` (`In 4h 22m`).\n\n4. **Multi-Horizon Bucket Comparison Cards & Insight Banner**:\n   - Expressive 28dp squircle cards comparing the 5-Hour Rolling (`gemini-3.8-flash`), 7-Day Weekly (`gemini-argon-wtu-weekly`), and 30-Day Monthly allocations with pill progress capsules and pace indicator notches.\n   - Autonomous dynamic throttle card detailing relaxed headroom policies.\n   - Floating Material 3 Expressive bottom navigation bar with gesture bar clearance."
+  ]
+}

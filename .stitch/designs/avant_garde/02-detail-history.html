@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>CHRONOS // KINETIC HUD</title>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Google Fonts: Space Grotesk, Geist Mono / Geist, Public Sans -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@300;400;500;600;700&amp;family=Public+Sans:wght@400;600;700&amp;family=Space+Grotesk:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "outline": "#72767a",
+            "background": "#0b0f12",
+            "tertiary-dim": "#88dce4",
+            "inverse-on-surface": "#525559",
+            "secondary-fixed-dim": "#fcb64f",
+            "on-tertiary-fixed-variant": "#006268",
+            "on-tertiary": "#006167",
+            "secondary-fixed": "#ffc87d",
+            "outline-variant": "#44484c",
+            "surface-tint": "#8efa94",
+            "inverse-primary": "#006f25",
+            "primary": "#8efa94",
+            "on-tertiary-fixed": "#004348",
+            "on-tertiary-container": "#00575d",
+            "inverse-surface": "#f7f9fe",
+            "on-surface": "#f7f9fe",
+            "tertiary-fixed-dim": "#88dce4",
+            "surface-variant": "#21262b",
+            "on-secondary-fixed-variant": "#704800",
+            "on-background": "#f7f9fe",
+            "surface-container-highest": "#21262b",
+            "error-container": "#b92902",
+            "tertiary-container": "#96eaf3",
+            "primary-fixed": "#8efa94",
+            "surface-container-high": "#1b2024",
+            "on-primary-fixed-variant": "#006b23",
+            "surface-container-lowest": "#000000",
+            "error-dim": "#d53d18",
+            "tertiary-fixed": "#96eaf3",
+            "surface-container": "#151a1e",
+            "surface-dim": "#0b0f12",
+            "secondary-container": "#825500",
+            "on-error": "#450900",
+            "on-primary-fixed": "#004a16",
+            "on-surface-variant": "#a8abaf",
+            "surface": "#0b0f12",
+            "on-primary": "#005f1e",
+            "on-primary-container": "#002a09",
+            "tertiary": "#adf8ff",
+            "on-secondary": "#553600",
+            "primary-fixed-dim": "#80eb88",
+            "primary-container": "#4bb559",
+            "error": "#ff7351",
+            "on-error-container": "#ffd2c8",
+            "surface-container-low": "#0f1417",
+            "secondary": "#f9b44c",
+            "on-secondary-fixed": "#4a2e00",
+            "surface-bright": "#272d32",
+            "secondary-dim": "#e9a640",
+            "primary-dim": "#80eb88",
+            "on-secondary-container": "#fff6ef"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "fontFamily": {
+            "headline": ["Space Grotesk", "sans-serif"],
+            "display": ["Space Grotesk", "sans-serif"],
+            "body": ["Geist Mono", "monospace"],
+            "label": ["Public Sans", "sans-serif"],
+            "mono": ["Geist Mono", "monospace"]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      display: inline-block;
+      vertical-align: middle;
+      line-height: 1;
+    }
+    /* Subtle scanline and terminal overlay */
+    .telemetry-grid {
+      background-size: 24px 24px;
+      background-image: 
+        linear-gradient(to right, rgba(68, 72, 76, 0.15) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(68, 72, 76, 0.15) 1px, transparent 1px);
+    }
+    /* Kinetic Pulsing */
+    @keyframes pulse-glow {
+      0%, 100% { opacity: 0.9; }
+      50% { opacity: 0.4; }
+    }
+    .kinetic-pulse {
+      animation: pulse-glow 2s infinite ease-in-out;
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface-dim text-on-surface font-body antialiased min-h-screen pb-24 telemetry-grid selection:bg-primary selection:text-surface-container-lowest">
+<!-- TopAppBar Component (from Shared Components JSON) -->
+<header class="sticky top-0 z-50 flex justify-between items-center w-full px-4 h-14 max-w-full backdrop-blur-md bg-surface-container-lowest/80 border-b border-outline-variant/30">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-lg" data-icon="hub">hub</span>
+<span class="font-display font-black tracking-widest text-primary text-sm flex items-center gap-2">
+        CHRONOS // KINETIC HUD
+      </span>
+<span class="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded bg-surface-container-high text-[10px] text-primary tracking-normal font-mono border border-primary/20">
+<span class="w-1.5 h-1.5 rounded-full bg-primary inline-block mr-1 kinetic-pulse"></span>
+        TAILSCALE SYNC · 14ms | DAEMON v2.4
+      </span>
+</div>
+<div class="flex items-center gap-3">
+<div class="sm:hidden flex items-center gap-1.5 text-[10px] text-tertiary font-mono">
+<span class="w-1.5 h-1.5 rounded-full bg-primary kinetic-pulse"></span>
+        14ms
+      </div>
+<button class="p-1.5 text-outline hover:text-primary hover:bg-surface-container-high transition-colors duration-150 rounded active:opacity-75 transition-opacity" title="Manual Sync">
+<span class="material-symbols-outlined text-xl" data-icon="sync_saved_locally">sync_saved_locally</span>
+</button>
+</div>
+</header>
+<!-- Mobile HUD Canvas Container -->
+<main class="max-w-4xl mx-auto px-3 sm:px-5 py-4 space-y-4">
+<!-- 1. Asymmetric Header Readout -->
+<section class="bg-surface-container-low border border-outline-variant/40 rounded-lg p-4 sm:p-5 relative overflow-hidden backdrop-blur-sm">
+<!-- Glow ambient backdrop -->
+<div class="absolute -top-12 -right-12 w-48 h-48 bg-primary/10 rounded-full blur-3xl pointer-events-none"></div>
+<!-- Top Row Badges -->
+<div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+<div class="flex items-center gap-2">
+<span class="px-2 py-0.5 rounded bg-surface-container text-primary font-display font-bold text-[11px] tracking-wider border border-primary/20">
+            PHASE-SPACE VELOCITY // ALL SUBSCRIPTIONS
+          </span>
+</div>
+<div class="flex items-center gap-1.5 px-2 py-0.5 rounded bg-primary/15 border border-primary/30 text-primary text-[10px] font-mono font-semibold tracking-wide">
+<span class="w-1.5 h-1.5 rounded-full bg-primary kinetic-pulse"></span>
+          TELEMETRY LOCK
+        </div>
+</div>
+<!-- Massive Oversized Monospace Tabular Readout -->
+<div class="my-3">
+<div class="font-display font-bold text-2xl sm:text-4xl text-on-surface tracking-tight leading-tight">
+          45.0% <span class="text-outline text-lg sm:text-2xl font-light">USED</span> <span class="text-primary-container">/</span> 96.8% <span class="text-tertiary text-lg sm:text-2xl font-light">WINDOW ELAPSED</span>
+</div>
+<p class="text-on-surface-variant font-mono text-[11px] mt-1 tracking-wide">
+          CYCLE: 7-DAY ROLLING HORIZON · NEXT REBALANCE IN 03:22:18 UTC
+        </p>
+</div>
+<!-- Kinetic Linear Pace Progress Indicator -->
+<div class="mt-4 mb-3 space-y-1.5">
+<div class="flex justify-between text-[11px] font-mono text-outline">
+<span>0% INGESTION</span>
+<span class="text-primary font-semibold">▲ +51.8% CRITICAL SURPLUS</span>
+<span>100% QUOTA</span>
+</div>
+<!-- Multi-segment Asymmetric Bar -->
+<div class="h-3 w-full bg-surface-container-highest rounded-full overflow-hidden flex relative p-0.5 border border-outline-variant/30">
+<!-- Actual Burn (45%) -->
+<div class="h-full bg-primary rounded-l-full relative flex items-center justify-end pr-1" style="width: 45%;">
+<span class="w-1 h-2 bg-on-primary-container rounded-sm"></span>
+</div>
+<!-- Surplus / Headroom (51.8%) -->
+<div class="h-full bg-tertiary/20 relative flex items-center justify-start" style="width: 51.8%;">
+<!-- Paced position marker indicator at 96.8% of total -->
+<div class="absolute right-[4%] top-0 bottom-0 w-1 bg-secondary shadow-sm" title="Elapsed Time Horizon: 96.8%"></div>
+</div>
+</div>
+<div class="flex justify-between text-[10px] font-mono text-on-surface-variant">
+<span class="text-primary">Burn: 45.0%</span>
+<span class="text-secondary font-mono">Elapsed Pace: 96.8%</span>
+<span class="text-tertiary">Safe Headroom</span>
+</div>
+</div>
+<!-- Telemetry Metric Chips Bento -->
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-outline-variant/20 font-mono text-xs">
+<div class="bg-surface-container/70 border border-outline-variant/30 rounded p-2.5 flex flex-col justify-between">
+<span class="text-on-surface-variant text-[10px] uppercase tracking-wider">Current Burn Rate</span>
+<div class="flex items-baseline justify-between mt-1">
+<span class="font-bold text-on-surface text-sm">0.28%/HR</span>
+<span class="text-primary text-[10px] px-1.5 py-0.2 rounded bg-primary/10 border border-primary/20 font-semibold">OPTIMAL</span>
+</div>
+</div>
+<div class="bg-surface-container/70 border border-outline-variant/30 rounded p-2.5 flex flex-col justify-between">
+<span class="text-on-surface-variant text-[10px] uppercase tracking-wider">Reserve at Reset</span>
+<div class="flex items-baseline justify-between mt-1">
+<span class="font-bold text-on-surface text-sm">+51.8%</span>
+<span class="text-tertiary text-[10px] px-1.5 py-0.2 rounded bg-tertiary/10 border border-tertiary/20 font-semibold">SAFE</span>
+</div>
+</div>
+<div class="bg-surface-container/70 border border-outline-variant/30 rounded p-2.5 flex flex-col justify-between">
+<span class="text-on-surface-variant text-[10px] uppercase tracking-wider">Orbital Drift</span>
+<div class="flex items-baseline justify-between mt-1">
+<span class="font-bold text-on-surface text-sm">0.00%</span>
+<span class="text-secondary text-[10px] px-1.5 py-0.2 rounded bg-secondary/10 border border-secondary/20 font-semibold">LOCKED</span>
+</div>
+</div>
+</div>
+</section>
+<!-- 2. Multi-Stream Horizon Graph (Compose Canvas aesthetic) -->
+<section class="bg-surface-container-low border border-outline-variant/40 rounded-lg p-4 sm:p-5 relative">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-outline-variant/25">
+<div>
+<h2 class="font-display font-bold text-sm tracking-wide text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-tertiary text-base" data-icon="show_chart">show_chart</span>
+            HORIZON VELOCITY STREAM // 7-DAY COMPOSE MATRIX
+          </h2>
+<p class="text-[11px] text-on-surface-variant font-mono">Continuous token-vector consumption stream</p>
+</div>
+<!-- Multi-stream legend -->
+<div class="flex items-center gap-3 font-mono text-[11px]">
+<div class="flex items-center gap-1.5">
+<span class="w-2.5 h-1 bg-tertiary rounded-sm"></span>
+<span class="text-tertiary font-semibold">agy: 0.27%/h</span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="w-2.5 h-1 bg-primary rounded-sm"></span>
+<span class="text-primary font-semibold">opencode: 0.01%/h</span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="w-2.5 h-1 bg-secondary rounded-sm"></span>
+<span class="text-secondary font-semibold">grok: 0.03%/h</span>
+</div>
+</div>
+</div>
+<!-- Rich Native Canvas SVG Graph -->
+<div class="relative w-full h-56 sm:h-64 my-3 bg-surface-container-lowest/60 rounded border border-outline-variant/20 p-2 overflow-hidden">
+<!-- SVG telemetry streams -->
+<svg class="w-full h-full" fill="none" preserveaspectratio="none" viewbox="0 0 700 240">
+<defs>
+<!-- Cyan gradient for agy stream -->
+<lineargradient id="gradCyan" x1="0" x2="0" y1="0" y2="1">
+<stop offset="0%" stop-color="#88dce4" stop-opacity="0.35"></stop>
+<stop offset="100%" stop-color="#88dce4" stop-opacity="0.0"></stop>
+</lineargradient>
+<!-- Lime gradient for opencode stream -->
+<lineargradient id="gradLime" x1="0" x2="0" y1="0" y2="1">
+<stop offset="0%" stop-color="#8efa94" stop-opacity="0.3"></stop>
+<stop offset="100%" stop-color="#8efa94" stop-opacity="0.0"></stop>
+</lineargradient>
+<!-- Amber gradient for grok stream -->
+<lineargradient id="gradAmber" x1="0" x2="0" y1="0" y2="1">
+<stop offset="0%" stop-color="#f9b44c" stop-opacity="0.25"></stop>
+<stop offset="100%" stop-color="#f9b44c" stop-opacity="0.0"></stop>
+</lineargradient>
+</defs>
+<!-- Hairline Grid Horizontal Lines -->
+<line stroke="#21262b" stroke-dasharray="3 3" stroke-width="1" x1="0" x2="700" y1="40" y2="40"></line>
+<line stroke="#21262b" stroke-dasharray="3 3" stroke-width="1" x1="0" x2="700" y1="90" y2="90"></line>
+<line stroke="#21262b" stroke-dasharray="3 3" stroke-width="1" x1="0" x2="700" y1="140" y2="140"></line>
+<line stroke="#21262b" stroke-width="1" x1="0" x2="700" y1="190" y2="190"></line>
+<!-- Vertical Orca Milestone 1: D2 (x=160) -->
+<line stroke="#44484c" stroke-dasharray="4 4" stroke-width="1" x1="160" x2="160" y1="10" y2="210"></line>
+<circle cx="160" cy="120" fill="#88dce4" r="3"></circle>
+<text fill="#a8abaf" font-family="Geist Mono" font-size="9" x="165" y="24">Orca #104 (Tree Synth)</text>
+<!-- Vertical Orca Milestone 2: D4 (x=380) -->
+<line stroke="#44484c" stroke-dasharray="4 4" stroke-width="1" x1="380" x2="380" y1="10" y2="210"></line>
+<circle cx="380" cy="85" fill="#8efa94" r="3"></circle>
+<text fill="#8efa94" font-family="Geist Mono" font-size="9" x="385" y="24">Orca #108 (Full Pipeline)</text>
+<!-- Vertical Orca Milestone 3: D6 (x=570) -->
+<line stroke="#44484c" stroke-dasharray="4 4" stroke-width="1" x1="570" x2="570" y1="10" y2="210"></line>
+<circle cx="570" cy="55" fill="#f9b44c" r="3"></circle>
+<text fill="#f9b44c" font-family="Geist Mono" font-size="9" x="575" y="24">Orca #112</text>
+<!-- Stream 1: agy (Cyan) -->
+<path d="M0,195 L60,190 L120,175 L160,150 L220,140 L300,120 L380,95 L460,90 L540,75 L620,62 L700,50 L700,210 L0,210 Z" fill="url(#gradCyan)"></path>
+<path d="M0,195 L60,190 L120,175 L160,150 L220,140 L300,120 L380,95 L460,90 L540,75 L620,62 L700,50" fill="none" stroke="#88dce4" stroke-width="2"></path>
+<!-- Stream 2: opencode (Lime - Stepped Acceleration) -->
+<path d="M0,205 L100,203 L160,198 L240,195 L320,185 L380,155 L440,150 L520,142 L600,135 L700,120 L700,210 L0,210 Z" fill="url(#gradLime)"></path>
+<path d="M0,205 L100,203 L160,198 L240,195 L320,185 L380,155 L440,150 L520,142 L600,135 L700,120" fill="none" stroke="#8efa94" stroke-width="1.8"></path>
+<!-- Stream 3: grok (Amber - Sporadic bursts) -->
+<path d="M0,208 L80,207 L160,205 L240,200 L300,195 L380,190 L420,188 L480,185 L560,170 L640,165 L700,155 L700,210 L0,210 Z" fill="url(#gradAmber)"></path>
+<path d="M0,208 L80,207 L160,205 L240,200 L300,195 L380,190 L420,188 L480,185 L560,170 L640,165 L700,155" fill="none" stroke="#f9b44c" stroke-dasharray="4 2" stroke-width="1.5"></path>
+<!-- Time Axis Markers -->
+<text fill="#72767a" font-family="Geist Mono" font-size="9" x="10" y="228">D-7</text>
+<text fill="#72767a" font-family="Geist Mono" font-size="9" x="115" y="228">D-6</text>
+<text fill="#72767a" font-family="Geist Mono" font-size="9" x="225" y="228">D-5</text>
+<text fill="#72767a" font-family="Geist Mono" font-size="9" x="335" y="228">D-4</text>
+<text fill="#72767a" font-family="Geist Mono" font-size="9" x="445" y="228">D-3</text>
+<text fill="#72767a" font-family="Geist Mono" font-size="9" x="555" y="228">D-2</text>
+<text fill="#8efa94" font-family="Geist Mono" font-size="9" font-weight="bold" x="660" y="228">NOW</text>
+</svg>
+<!-- Current Live Telemetry Cursor Pin -->
+<div class="absolute right-3 top-10 flex flex-col items-end pointer-events-none">
+<span class="text-[9px] font-mono text-primary bg-surface-container-high px-1.5 py-0.5 rounded border border-primary/30">
+            AGG: 0.31%/H
+          </span>
+<span class="w-1.5 h-1.5 bg-primary rounded-full mt-1 mr-2 ring-4 ring-primary/20"></span>
+</div>
+</div>
+<!-- Time-Travel Horizon Scrubber Module -->
+<div class="bg-surface-container/60 border border-outline-variant/30 rounded p-2.5 flex flex-wrap items-center justify-between gap-3">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary text-sm" data-icon="schedule">schedule</span>
+<span class="font-mono text-xs font-medium text-on-surface">
+            SCRUB T-MINUS: <span class="text-secondary font-bold">4h 22m</span> TO UTC RESET
+          </span>
+</div>
+<!-- Scrubber Projections Action Chips -->
+<div class="flex items-center gap-1.5 text-xs font-mono">
+<button class="px-2 py-1 rounded bg-surface-container-high text-on-surface border border-outline-variant/40 hover:border-primary/50 hover:text-primary transition-colors active:scale-95">
+            +1h BURN
+          </button>
+<button class="px-2 py-1 rounded bg-secondary/15 text-secondary border border-secondary/40 hover:bg-secondary/25 transition-colors font-semibold active:scale-95">
+            +4h PROJECTION
+          </button>
+<button class="px-2 py-1 rounded bg-surface-container-high text-on-surface border border-outline-variant/40 hover:border-primary/50 hover:text-primary transition-colors active:scale-95">
+            +24h RESET
+          </button>
+</div>
+</div>
+</section>
+<!-- 3. Grok Token Lifecycle Pulse Module -->
+<section class="bg-surface-container-low border border-outline-variant/40 rounded-lg p-4 sm:p-5 relative overflow-hidden">
+<!-- Glow ambient warning aura -->
+<div class="absolute -bottom-10 right-0 w-36 h-36 bg-secondary/10 rounded-full blur-2xl pointer-events-none"></div>
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 pb-2 border-b border-outline-variant/20">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary text-base" data-icon="vpn_key">vpn_key</span>
+<h2 class="font-display font-bold text-xs sm:text-sm tracking-wider text-on-surface">
+            GROK TOKEN LIFECYCLE PULSE // 90-MIN OAUTH LEASE
+          </h2>
+</div>
+<div class="flex items-center gap-2 font-mono text-[10px]">
+<span class="px-2 py-0.5 rounded bg-surface-container-high text-secondary border border-secondary/30">
+            EXPIRES 16:23 UTC
+          </span>
+<span class="px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
+            STRONGBOX KEYMASTER: ARMED
+          </span>
+</div>
+</div>
+<!-- Pulse Telemetry Status & Countdown Progress -->
+<div class="space-y-2 my-2">
+<div class="flex justify-between items-baseline font-mono text-xs">
+<div class="text-on-surface-variant flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-secondary kinetic-pulse"></span>
+<span>LEASE REMAINING: <span class="font-bold text-on-surface">31m 14s</span></span>
+<span class="text-secondary text-[11px]">(65.2% depleted)</span>
+</div>
+<div class="text-[11px] text-primary">
+            SMART PRIME ARMED FOR 16:08 UTC
+          </div>
+</div>
+<!-- Kinetic Countdown Bar -->
+<div class="h-2.5 w-full bg-surface-container-highest rounded-full overflow-hidden flex relative p-0.5 border border-outline-variant/30">
+<div class="h-full bg-secondary-container rounded-l-full relative flex items-center" style="width: 65.2%;">
+<div class="w-full h-full bg-secondary rounded-l-full"></div>
+</div>
+<div class="h-full flex-1 bg-surface-container-high relative">
+<div class="absolute left-1/2 top-0 bottom-0 w-0.5 bg-primary" title="Prime trigger point"></div>
+</div>
+</div>
+</div>
+<!-- Tactile Manual Trigger Button & Microtelemetry -->
+<div class="mt-4 pt-3 border-t border-outline-variant/20 flex flex-col sm:flex-row items-center justify-between gap-3">
+<div class="text-[11px] font-mono text-on-surface-variant flex items-center gap-2">
+<span class="material-symbols-outlined text-outline text-sm" data-icon="lock_clock">lock_clock</span>
+          Sub-routine PID #8902 · Grok 4.7 Multi-tenant Bridge
+        </div>
+<button class="w-full sm:w-auto px-4 py-2 rounded bg-surface-container-high border border-secondary text-secondary hover:bg-secondary/10 active:scale-95 transition-all text-xs font-mono font-bold tracking-wider flex items-center justify-center gap-2 shadow-[0_0_12px_rgba(249,180,76,0.15)]">
+<span class="material-symbols-outlined text-sm text-secondary" data-icon="bolt">bolt</span>
+          PRIME PULSE [grok -p "reply with ok"]
+        </button>
+</div>
+</section>
+<!-- 4. High-Density Monospace Bucket Matrix (Hairline Grid) -->
+<section class="bg-surface-container-low border border-outline-variant/40 rounded-lg p-4 sm:p-5">
+<div class="flex items-center justify-between mb-3 pb-2 border-b border-outline-variant/30">
+<div>
+<h2 class="font-display font-bold text-xs sm:text-sm tracking-wide text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-base" data-icon="grid_4x4">grid_4x4</span>
+            HIGH-DENSITY MONOSPACE BUCKET MATRIX // 9 TRACKED UNITS
+          </h2>
+<span class="text-[10px] font-mono text-on-surface-variant">Active dynamic allocation quotas across Orca agent tiers</span>
+</div>
+<span class="text-[10px] font-mono px-2 py-0.5 rounded bg-surface-container-high text-primary border border-primary/20">
+          9/9 SYNCED
+        </span>
+</div>
+<!-- Hairline Grid Table -->
+<div class="overflow-x-auto">
+<table class="w-full text-left font-mono text-[11px] border-collapse">
+<thead>
+<tr class="border-b border-outline-variant/40 text-on-surface-variant text-[10px] uppercase tracking-wider">
+<th class="py-2 px-2 font-medium">Bucket Identifier</th>
+<th class="py-2 px-2 font-medium">Horizon</th>
+<th class="py-2 px-2 font-medium">Remaining</th>
+<th class="py-2 px-2 font-medium">Pace</th>
+<th class="py-2 px-2 font-medium">Telemetry Delta</th>
+<th class="py-2 px-2 font-medium text-right">Reset Window</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant/20">
+<!-- Row 1 -->
+<tr class="hover:bg-surface-container/80 transition-colors">
+<td class="py-2 px-2 font-semibold text-primary flex items-center gap-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+                gemini-argon-wtu-weekly
+              </td>
+<td class="py-2 px-2 text-on-surface">Weekly</td>
+<td class="py-2 px-2 font-bold text-on-surface">55.0% rem</td>
+<td class="py-2 px-2 text-secondary">96.8% pace</td>
+<td class="py-2 px-2 text-primary font-bold">-51.8% delta</td>
+<td class="py-2 px-2 text-right text-outline">19:39 UTC</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-surface-container/80 transition-colors">
+<td class="py-2 px-2 font-medium text-tertiary flex items-center gap-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span>
+                gemini-3.8-flash-5h
+              </td>
+<td class="py-2 px-2 text-on-surface">5h Rolling</td>
+<td class="py-2 px-2 text-on-surface">100% rem</td>
+<td class="py-2 px-2 text-outline">0.0% pace</td>
+<td class="py-2 px-2 text-primary">Optimal</td>
+<td class="py-2 px-2 text-right text-outline">20:04 UTC</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-surface-container/80 transition-colors">
+<td class="py-2 px-2 font-medium text-tertiary flex items-center gap-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span>
+                gemini-3.8-flash-weekly
+              </td>
+<td class="py-2 px-2 text-on-surface">Weekly</td>
+<td class="py-2 px-2 text-on-surface">100% rem</td>
+<td class="py-2 px-2 text-outline">0.0% pace</td>
+<td class="py-2 px-2 text-primary">Full cap</td>
+<td class="py-2 px-2 text-right text-outline">8 Nov</td>
+</tr>
+<!-- Row 4 -->
+<tr class="hover:bg-surface-container/80 transition-colors">
+<td class="py-2 px-2 font-medium text-on-surface-variant flex items-center gap-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-outline"></span>
+                deepseek-4.1-5h
+              </td>
+<td class="py-2 px-2 text-on-surface">5h Rolling</td>
+<td class="py-2 px-2 text-on-surface">100% rem</td>
+<td class="py-2 px-2 text-outline">0.0% pace</td>
+<td class="py-2 px-2 text-outline">Dormant</td>
+<td class="py-2 px-2 text-right text-outline">20:04 UTC</td>
+</tr>
+<!-- Row 5 -->
+<tr class="hover:bg-surface-container/80 transition-colors">
+<td class="py-2 px-2 font-medium text-on-surface flex items-center gap-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span>
+                deepseek-4.1-weekly
+              </td>
+<td class="py-2 px-2 text-on-surface">Weekly</td>
+<td class="py-2 px-2 text-on-surface">98.0% rem</td>
+<td class="py-2 px-2 text-outline">2.0% pace</td>
+<td class="py-2 px-2 text-primary">+96.0%</td>
+<td class="py-2 px-2 text-right text-outline">Mon 00:00</td>
+</tr>
+<!-- Row 6 -->
+<tr class="hover:bg-surface-container/80 transition-colors">
+<td class="py-2 px-2 font-medium text-on-surface flex items-center gap-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span>
+                deepseek-4.1-monthly
+              </td>
+<td class="py-2 px-2 text-on-surface">30d Monthly</td>
+<td class="py-2 px-2 text-on-surface">99.0% rem</td>
+<td class="py-2 px-2 text-outline">1.0% pace</td>
+<td class="py-2 px-2 text-primary">+98.0%</td>
+<td class="py-2 px-2 text-right text-outline">29 Nov</td>
+</tr>
+<!-- Row 7 -->
+<tr class="hover:bg-surface-container/80 transition-colors">
+<td class="py-2 px-2 font-medium text-secondary flex items-center gap-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+                grok-4.7-credits
+              </td>
+<td class="py-2 px-2 text-on-surface">Weekly</td>
+<td class="py-2 px-2 text-on-surface">97.0% rem</td>
+<td class="py-2 px-2 text-outline">3.0% pace</td>
+<td class="py-2 px-2 text-secondary font-semibold">$24.25 safe</td>
+<td class="py-2 px-2 text-right text-outline">5 Nov</td>
+</tr>
+<!-- Row 8 -->
+<tr class="hover:bg-surface-container/80 transition-colors">
+<td class="py-2 px-2 font-medium text-on-surface-variant flex items-center gap-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-outline"></span>
+                claude-gpt-3p-5h
+              </td>
+<td class="py-2 px-2 text-on-surface">5h Rolling</td>
+<td class="py-2 px-2 text-on-surface">100% rem</td>
+<td class="py-2 px-2 text-outline">Standby</td>
+<td class="py-2 px-2 text-outline">Unallocated</td>
+<td class="py-2 px-2 text-right text-outline">20:04 UTC</td>
+</tr>
+<!-- Row 9 -->
+<tr class="hover:bg-surface-container/80 transition-colors">
+<td class="py-2 px-2 font-medium text-on-surface-variant flex items-center gap-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-outline"></span>
+                claude-gpt-3p-weekly
+              </td>
+<td class="py-2 px-2 text-on-surface">Weekly</td>
+<td class="py-2 px-2 text-on-surface">100% rem</td>
+<td class="py-2 px-2 text-outline">Standby</td>
+<td class="py-2 px-2 text-outline">Reserve</td>
+<td class="py-2 px-2 text-right text-outline">8 Nov</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+</main>
+<!-- BottomNavBar Component (from Shared Components JSON) -->
+<!-- Contextual check: On Horizon telemetry view, Horizon tab is active -->
+<nav class="fixed bottom-0 w-full z-50 flex justify-around items-center px-2 py-2 h-16 bg-surface-container-lowest/90 backdrop-blur-lg border-t border-outline-variant/30">
+<!-- Item 0: Orbit -->
+<a class="flex flex-col items-center justify-center text-outline px-3 py-1 font-normal opacity-70 hover:text-primary hover:bg-surface-container-high/40 transition-colors active:scale-95 transition-transform duration-100" href="#orbit">
+<span class="material-symbols-outlined text-lg" data-icon="motion_photos_on">motion_photos_on</span>
+<span class="font-label uppercase tracking-widest text-[10px] mt-0.5">Orbit</span>
+</a>
+<!-- Item 1: Horizon (ACTIVE ITEM) -->
+<a class="flex flex-col items-center justify-center text-primary font-bold px-3 py-1 rounded bg-primary/10 border border-primary/20 active:scale-95 transition-transform duration-100" href="#horizon">
+<span class="material-symbols-outlined text-lg" data-icon="hourglass_bottom">hourglass_bottom</span>
+<span class="font-label uppercase tracking-widest text-[10px] mt-0.5">Horizon</span>
+</a>
+<!-- Item 2: Agents -->
+<a class="flex flex-col items-center justify-center text-outline px-3 py-1 font-normal opacity-70 hover:text-primary hover:bg-surface-container-high/40 transition-colors active:scale-95 transition-transform duration-100" href="#agents">
+<span class="material-symbols-outlined text-lg" data-icon="neurology">neurology</span>
+<span class="font-label uppercase tracking-widest text-[10px] mt-0.5">Agents</span>
+</a>
+<!-- Item 3: Relay -->
+<a class="flex flex-col items-center justify-center text-outline px-3 py-1 font-normal opacity-70 hover:text-primary hover:bg-surface-container-high/40 transition-colors active:scale-95 transition-transform duration-100" href="#relay">
+<span class="material-symbols-outlined text-lg" data-icon="cell_tower">cell_tower</span>
+<span class="font-label uppercase tracking-widest text-[10px] mt-0.5">Relay</span>
+</a>
+</nav>
+</body></html>

@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, user-scalable=no" name="viewport"/>
+<title>Telemetry Horizon - AI Quota Pulse</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;family=Public+Sans:wght@500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            // M3 Expressive Custom Tokens for Flagship Pixel 8 Pro
+            surface: "#0F1517",
+            "surface-dim": "#0B1012",
+            "surface-container-lowest": "#0D1315",
+            "surface-container-low": "#131A1C",
+            "surface-container": "#1B2225",
+            "surface-container-high": "#222B2F",
+            "surface-container-highest": "#283338",
+            "on-surface": "#E5EEF1",
+            "on-surface-variant": "#92A2A8",
+            outline: "#455358",
+            "outline-variant": "#2D383D",
+            primary: "#80D4DC",
+            "on-primary": "#00363B",
+            "primary-container": "#004F56",
+            "on-primary-container": "#9EEFF8",
+            secondary: "#FFB77C",
+            "on-secondary": "#4D2700",
+            "secondary-container": "#6F3800",
+            "on-secondary-container": "#FFDCC2",
+            tertiary: "#7AE582",
+            "on-tertiary": "#00390E",
+            "tertiary-container": "#005318",
+            "on-tertiary-container": "#96FF9D"
+          },
+          borderRadius: {
+            "DEFAULT": "1rem",
+            "lg": "2rem",
+            "xl": "3rem",
+            "full": "9999px"
+          },
+          fontFamily: {
+            headline: ["Public Sans", "sans-serif"],
+            display: ["Public Sans", "sans-serif"],
+            body: ["Plus Jakarta Sans", "sans-serif"],
+            label: ["Public Sans", "sans-serif"]
+          }
+        },
+      }
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      display: inline-block;
+      vertical-align: middle;
+      line-height: 1;
+    }
+    /* Squircle 28px standard for M3 Expressive */
+    .squircle-28 {
+      border-radius: 1.75rem;
+    }
+    .squircle-20 {
+      border-radius: 1.25rem;
+    }
+    /* Glow highlights */
+    .glow-cyan {
+      box-shadow: 0 0 24px -4px rgba(128, 212, 220, 0.25);
+    }
+    .glow-orange {
+      box-shadow: 0 0 16px -2px rgba(255, 183, 124, 0.35);
+    }
+    /* Smooth meter animation transitions */
+    .meter-arc {
+      transition: stroke-dashoffset 0.8s cubic-bezier(0.2, 0, 0, 1);
+    }
+    /* Custom range thumb */
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      height: 22px;
+      width: 22px;
+      border-radius: 50%;
+      background: #80D4DC;
+      border: 3px solid #0F1517;
+      box-shadow: 0 0 10px rgba(128, 212, 220, 0.8);
+      cursor: pointer;
+      margin-top: -8px;
+    }
+    input[type=range]::-webkit-slider-runnable-track {
+      width: 100%;
+      height: 6px;
+      cursor: pointer;
+      background: #283338;
+      border-radius: 9999px;
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface font-body antialiased min-h-screen selection:bg-primary selection:text-on-primary pb-32">
+<!-- Mobile Device Constraint Shell (Pixel 8 Pro Profile) -->
+<div class="max-w-md mx-auto min-h-screen bg-surface relative flex flex-col shadow-2xl overflow-hidden">
+<!-- Top System Status Bar Mockup (Android 16 Flagship) -->
+<div class="w-full flex justify-between items-center px-6 pt-3 pb-1 text-xs text-on-surface-variant font-medium select-none z-40">
+<span class="tracking-tight text-on-surface font-headline font-semibold">9:41</span>
+<div class="flex items-center space-x-2 opacity-90">
+<span class="material-symbols-outlined text-[15px]">wifi</span>
+<span class="text-[10px] font-bold tracking-wider font-headline text-on-surface">5G</span>
+<div class="flex items-center space-x-1">
+<span class="text-[11px] font-headline font-semibold text-on-surface">94%</span>
+<span class="material-symbols-outlined text-[15px] -rotate-90">battery_horiz_075</span>
+</div>
+</div>
+</div>
+<!-- SHARED COMPONENT: TopAppBar (Strict JSON adherence with required classes) -->
+<header class="flex justify-between items-center w-full px-5 pt-3 pb-2 max-w-md mx-auto bg-transparent z-40">
+<div class="flex items-center space-x-2">
+<button aria-label="Leading Action" class="hover:opacity-80 transition-opacity active:scale-95 transition-transform duration-150 p-1.5 -ml-1 text-on-surface flex items-center justify-center rounded-full">
+<span class="material-symbols-outlined text-primary text-2xl">hub</span>
+</button>
+<div>
+<span class="font-headline text-lg font-bold tracking-tight text-on-surface flex items-center gap-1.5">
+            AI Quota Pulse
+            <span class="text-[10px] uppercase font-bold tracking-wider bg-surface-container-high text-primary px-1.5 py-0.5 rounded-md border border-outline-variant/60">v4.0</span>
+</span>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<button aria-label="System Theme" class="hover:opacity-80 transition-opacity active:scale-95 transition-transform duration-150 p-1.5 text-on-surface flex items-center justify-center rounded-full">
+<span class="material-symbols-outlined text-on-surface-variant text-xl">contrast</span>
+</button>
+</div>
+</header>
+<!-- Sub-Header Connection Ribbon & Polarity Toggle -->
+<section class="px-5 pb-3 pt-1 flex flex-col gap-2.5">
+<!-- Tailscale Mesh Badge -->
+<div class="flex items-center justify-between">
+<div class="flex items-center space-x-2 bg-surface-container-low px-3 py-1.5 rounded-full border border-outline-variant/40">
+<span class="relative flex h-2 w-2">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-tertiary opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-tertiary"></span>
+</span>
+<span class="text-[11px] font-label font-medium text-on-surface-variant tracking-tight">
+            Tailscale Live (14ms) · Gist AES-256-GCM
+          </span>
+</div>
+<span class="material-symbols-outlined text-tertiary text-sm" style="font-variation-settings: 'FILL' 1;">format_image_left</span>
+</div>
+<!-- Material 3 Polarity Capsule Toggle -->
+<div class="bg-surface-container-low p-1 rounded-full flex items-center justify-between border border-outline-variant/30">
+<button class="flex-1 py-1.5 rounded-full bg-primary-container text-on-primary-container font-headline text-xs font-bold tracking-wide transition-all duration-200 shadow-sm flex items-center justify-center gap-1.5" id="toggle-left">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">pie_chart</span>
+          % Left (Selected)
+        </button>
+<button class="flex-1 py-1.5 rounded-full text-on-surface-variant font-headline text-xs font-semibold tracking-wide hover:text-on-surface transition-all duration-200 flex items-center justify-center gap-1" id="toggle-used">
+<span class="material-symbols-outlined text-sm">donut_large</span>
+          % Used
+        </button>
+</div>
+</section>
+<!-- MAIN SCROLLABLE CONTENT CANVAS -->
+<main class="flex-1 px-4 space-y-4 overflow-y-auto pb-6">
+<!-- SECTION 2: Orca Multi-Agent Role Readiness Strip -->
+<section class="bg-surface-container-low border border-outline-variant/30 squircle-20 p-2.5">
+<div class="flex items-center justify-between px-1.5 mb-2">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-xs text-primary">diversity_3</span>
+<h2 class="text-[11px] font-headline font-bold uppercase tracking-wider text-on-surface-variant">Multi-Agent Readiness Pool</h2>
+</div>
+<span class="text-[10px] font-label text-tertiary font-bold tracking-tight bg-tertiary/10 px-2 py-0.5 rounded-full border border-tertiary/20">3 / 3 Prime</span>
+</div>
+<div class="grid grid-cols-3 gap-2">
+<!-- Capsule 1: Planner -->
+<div class="bg-surface-container squircle-20 p-2.5 border border-primary/40 flex flex-col justify-between relative overflow-hidden group hover:border-primary transition-colors">
+<div class="flex items-center justify-between">
+<span class="text-[9px] font-label font-black tracking-wider text-primary">PLANNER</span>
+<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+</div>
+<div class="my-1.5">
+<p class="text-xs font-headline font-extrabold text-on-surface truncate">Gemini 4</p>
+<p class="text-[10px] text-on-surface-variant">Argon</p>
+</div>
+<div class="bg-primary/10 rounded-full px-2 py-0.5 border border-primary/30 flex items-center justify-between">
+<span class="text-[10px] font-display font-bold text-primary">35%</span>
+<span class="text-[8px] font-semibold text-primary/80">Active</span>
+</div>
+</div>
+<!-- Capsule 2: Builder -->
+<div class="bg-surface-container squircle-20 p-2.5 border border-outline-variant/40 flex flex-col justify-between group hover:border-tertiary transition-colors">
+<div class="flex items-center justify-between">
+<span class="text-[9px] font-label font-black tracking-wider text-tertiary">BUILDER</span>
+<span class="w-2 h-2 rounded-full bg-tertiary"></span>
+</div>
+<div class="my-1.5">
+<p class="text-xs font-headline font-bold text-on-surface truncate">Flash / Open</p>
+<p class="text-[10px] text-on-surface-variant">99% / 98%</p>
+</div>
+<div class="bg-tertiary/10 rounded-full px-2 py-0.5 border border-tertiary/30 flex items-center justify-center">
+<span class="text-[9px] font-semibold text-tertiary">Ready</span>
+</div>
+</div>
+<!-- Capsule 3: Reviewer -->
+<div class="bg-surface-container squircle-20 p-2.5 border border-outline-variant/40 flex flex-col justify-between group hover:border-secondary transition-colors">
+<div class="flex items-center justify-between">
+<span class="text-[9px] font-label font-black tracking-wider text-secondary">REVIEWER</span>
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+</div>
+<div class="my-1.5">
+<p class="text-xs font-headline font-bold text-on-surface truncate">Grok 4.7</p>
+<p class="text-[10px] text-on-surface-variant">Auth Warm</p>
+</div>
+<div class="bg-secondary/10 rounded-full px-1.5 py-0.5 border border-secondary/30 flex items-center justify-between">
+<span class="text-[10px] font-display font-bold text-secondary">97%</span>
+<span class="text-[8px] font-semibold text-secondary/80">Primed</span>
+</div>
+</div>
+</div>
+</section>
+<!-- SECTION 3: Hero Bottleneck Bento Card (Full-Width 28dp Squircle) -->
+<section class="squircle-28 bg-surface-container p-4 border border-outline-variant/60 shadow-lg relative overflow-hidden">
+<!-- Ambient Top Accent Gradient -->
+<div class="absolute -right-16 -top-16 w-48 h-48 bg-primary/10 rounded-full blur-3xl pointer-events-none"></div>
+<!-- Card Header -->
+<div class="flex items-center justify-between mb-3 relative z-10">
+<div class="flex items-center space-x-2">
+<div class="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1;">speed</span>
+</div>
+<div>
+<div class="flex items-center gap-1.5">
+<h3 class="text-sm font-headline font-extrabold text-on-surface">Gemini 4 Argon</h3>
+<span class="text-[9px] bg-secondary/15 text-secondary border border-secondary/30 px-1.5 py-0.5 rounded-full font-bold">Bottleneck Tier</span>
+</div>
+<p class="text-[11px] text-on-surface-variant font-medium">Weekly Multi-turn Allocation</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-on-surface transition-colors text-xl">more_vert</span>
+</div>
+<!-- Core Gauge & Metric Split Grid -->
+<div class="grid grid-cols-12 gap-3 items-center relative z-10">
+<!-- Left Side: Radial Compose Canvas Gauge (5 Cols) -->
+<div class="col-span-5 flex flex-col items-center justify-center relative">
+<div class="relative w-36 h-36 flex items-center justify-center">
+<svg class="w-full h-full transform -rotate-90" viewbox="0 0 120 120">
+<!-- Track background -->
+<circle cx="60" cy="60" fill="transparent" r="48" stroke="#222B2F" stroke-linecap="round" stroke-width="9"></circle>
+<!-- Linear pace guide marker ring -->
+<circle cx="60" cy="60" fill="transparent" r="48" stroke="#37474F" stroke-dasharray="2 6" stroke-width="2"></circle>
+<!-- Consumption Arc (35% Left -> Dashoffset) -->
+<!-- Circumference = 2 * PI * 48 = 301.59; 35% = 105.5 stroke -->
+<circle class="meter-arc" cx="60" cy="60" fill="transparent" r="48" stroke="url(#cyanGlowGrad)" stroke-dasharray="301.59" stroke-dashoffset="196" stroke-linecap="round" stroke-width="9"></circle>
+<!-- Pace Target Notch marker at 98.1% elapsed (approx 353 deg or -7 deg) -->
+<!-- Angle ~ 353 deg: cx=60 + 48*cos(353 deg), cy=60 + 48*sin(353 deg) -->
+<circle class="glow-orange" cx="107.6" cy="54.2" fill="#FFB77C" r="3.5"></circle>
+<defs>
+<lineargradient id="cyanGlowGrad" x1="0%" x2="100%" y1="0%" y2="100%">
+<stop offset="0%" stop-color="#4FD8EB"></stop>
+<stop offset="100%" stop-color="#80D4DC"></stop>
+</lineargradient>
+</defs>
+</svg>
+<!-- Central Telemetry Readout -->
+<div class="absolute inset-0 flex flex-col items-center justify-center text-center">
+<span class="text-3xl font-display font-black tracking-tight text-on-surface leading-none">35<span class="text-lg text-primary font-bold">%</span></span>
+<span class="text-[10px] font-label font-black tracking-widest text-primary uppercase mt-0.5">LEFT</span>
+<span class="text-[9px] text-on-surface-variant font-medium mt-0.5">(65% used)</span>
+</div>
+</div>
+<!-- Target Notch Indicator Tag -->
+<div class="flex items-center gap-1 mt-1 bg-surface-container-high px-2 py-0.5 rounded-full border border-secondary/40">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+<span class="text-[9px] font-semibold text-secondary">Pace Target 98.1%</span>
+</div>
+</div>
+<!-- Right Side: Bento Telemetry Metrics (7 Cols) -->
+<div class="col-span-7 space-y-2">
+<!-- Stat Tile 1: Reset Countdown -->
+<div class="bg-surface-container-low p-2.5 squircle-20 border border-outline-variant/30 flex items-center justify-between">
+<div>
+<span class="text-[9px] font-label font-bold uppercase text-on-surface-variant block">Quota Window</span>
+<p class="text-xs font-headline font-bold text-on-surface flex items-center gap-1 mt-0.5">
+                  Resets in <span class="text-primary font-extrabold">3h 11m</span>
+</p>
+<span class="text-[10px] text-on-surface-variant/80">19:39 UTC tonight</span>
+</div>
+<span class="material-symbols-outlined text-primary text-xl">schedule</span>
+</div>
+<!-- Stat Tile 2: Safe Headroom & Linear Margin -->
+<div class="bg-surface-container-low p-2.5 squircle-20 border border-outline-variant/30">
+<div class="flex items-center justify-between mb-1">
+<span class="text-[9px] font-label font-bold uppercase text-on-surface-variant">Burn Headroom</span>
+<span class="text-[9px] font-bold text-tertiary bg-tertiary/10 px-1.5 py-0.5 rounded-md border border-tertiary/30">Safe Headroom</span>
+</div>
+<div class="flex items-baseline justify-between">
+<span class="text-base font-display font-extrabold text-tertiary">-33.1%</span>
+<span class="text-[10px] text-on-surface-variant">vs. Linear Run-rate</span>
+</div>
+</div>
+<!-- Stat Tile 3: Bezier Velocity Sparkline -->
+<div class="bg-surface-container-low p-2 squircle-20 border border-outline-variant/30 flex items-center justify-between">
+<div>
+<span class="text-[9px] font-label font-semibold text-on-surface-variant block">Burn Slope</span>
+<span class="text-xs font-display font-extrabold text-on-surface">0.39%<span class="text-[9px] font-normal text-on-surface-variant">/hr</span></span>
+</div>
+<!-- Smooth Bezier Sparkline SVG -->
+<div class="w-20 h-7">
+<svg class="w-full h-full overflow-visible" viewbox="0 0 80 28">
+<path d="M 0,22 C 20,24 35,16 50,14 C 65,12 72,6 80,4" fill="none" stroke="#7AE582" stroke-linecap="round" stroke-width="2"></path>
+<circle class="animate-pulse" cx="80" cy="4" fill="#7AE582" r="2.5"></circle>
+<path d="M 0,22 C 20,24 35,16 50,14 C 65,12 72,6 80,4 L 80,28 L 0,28 Z" fill="url(#sparkGrad)" opacity="0.2"></path>
+<defs>
+<lineargradient id="sparkGrad" x1="0" x2="0" y1="0" y2="1">
+<stop offset="0%" stop-color="#7AE582"></stop>
+<stop offset="100%" stop-color="#7AE582" stop-opacity="0"></stop>
+</lineargradient>
+</defs>
+</svg>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- SECTION 4: 2-Column Bento Row (OpenCode Go & Grok Build) -->
+<section class="grid grid-cols-2 gap-3">
+<!-- Left Bento: OpenCode Go (DeepSeek 4.1) -->
+<div class="bg-surface-container squircle-28 p-3.5 border border-outline-variant/40 flex flex-col justify-between shadow-sm">
+<div>
+<div class="flex items-center justify-between mb-2">
+<div class="flex items-center space-x-1.5">
+<span class="material-symbols-outlined text-primary text-base">bolt</span>
+<h4 class="text-xs font-headline font-extrabold text-on-surface leading-tight">OpenCode Go</h4>
+</div>
+<span class="text-[8px] bg-surface-container-high text-primary px-1.5 py-0.5 rounded-full font-bold">DS 4.1</span>
+</div>
+<!-- Mini Circular Gauge -->
+<div class="flex items-center gap-2.5 my-2">
+<div class="relative w-12 h-12 flex-shrink-0 flex items-center justify-center">
+<svg class="w-full h-full -rotate-90" viewbox="0 0 36 36">
+<path class="text-surface-container-high" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3.5"></path>
+<path class="text-tertiary" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-dasharray="98, 100" stroke-linecap="round" stroke-width="3.5"></path>
+</svg>
+<span class="absolute text-[10px] font-display font-extrabold text-on-surface">98%</span>
+</div>
+<div>
+<span class="text-[9px] font-bold text-tertiary block">Weekly Reserve</span>
+<span class="text-[9px] text-on-surface-variant font-medium">Unmetered Idle</span>
+</div>
+</div>
+<!-- Compact Sub-metrics -->
+<div class="space-y-1.5 mt-2 pt-2 border-t border-outline-variant/30">
+<div class="flex justify-between items-center text-[10px]">
+<span class="text-on-surface-variant font-medium">5h Rolling:</span>
+<span class="font-bold text-on-surface font-headline">100%</span>
+</div>
+<div class="flex justify-between items-center text-[10px]">
+<span class="text-on-surface-variant font-medium">Monthly:</span>
+<span class="font-bold text-on-surface font-headline">99% Safe</span>
+</div>
+</div>
+</div>
+<div class="mt-3 pt-2 bg-surface-container-low rounded-xl px-2 py-1 text-center border border-outline-variant/20">
+<span class="text-[9px] text-on-surface-variant">Syncs: 4h 12m</span>
+</div>
+</div>
+<!-- Right Bento: Grok Build (Grok 4.7) -->
+<div class="bg-surface-container squircle-28 p-3.5 border border-outline-variant/40 flex flex-col justify-between shadow-sm">
+<div>
+<div class="flex items-center justify-between mb-2">
+<div class="flex items-center space-x-1.5">
+<span class="material-symbols-outlined text-secondary text-base">token</span>
+<h4 class="text-xs font-headline font-extrabold text-on-surface leading-tight">Grok Build</h4>
+</div>
+<span class="text-[8px] bg-secondary/10 text-secondary border border-secondary/20 px-1.5 py-0.5 rounded-full font-bold">$25 Safe</span>
+</div>
+<!-- Radial Readout & Credit State -->
+<div class="flex items-center gap-2.5 my-2">
+<div class="relative w-12 h-12 flex-shrink-0 flex items-center justify-center">
+<svg class="w-full h-full -rotate-90" viewbox="0 0 36 36">
+<path class="text-surface-container-high" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3.5"></path>
+<path class="text-secondary" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-dasharray="97, 100" stroke-linecap="round" stroke-width="3.5"></path>
+</svg>
+<span class="absolute text-[10px] font-display font-extrabold text-on-surface">97%</span>
+</div>
+<div>
+<span class="text-[9px] font-bold text-secondary block">Credits Left</span>
+<span class="text-[9px] text-on-surface-variant font-medium">90m OAuth TTL</span>
+</div>
+</div>
+<!-- OAuth Token Lease Countdown Bar -->
+<div class="mt-2 pt-2 border-t border-outline-variant/30 space-y-1">
+<div class="flex justify-between items-center text-[9px] text-on-surface-variant">
+<span>Smart Lease</span>
+<span class="font-bold text-on-surface">5h 50m TTL</span>
+</div>
+<div class="w-full bg-surface-container-high rounded-full h-1.5 overflow-hidden">
+<div class="bg-gradient-to-r from-secondary to-primary h-full w-[85%] rounded-full"></div>
+</div>
+<span class="text-[8px] text-on-surface-variant/70 block text-right">Schedule: 08:00–22:00</span>
+</div>
+</div>
+<!-- Tactile 'Prime Pulse' Button -->
+<button class="mt-2 w-full py-1.5 px-2 bg-surface-container-high hover:bg-outline-variant active:scale-95 transition-all rounded-xl text-primary font-headline text-[10px] font-bold flex items-center justify-center gap-1 border border-primary/20">
+<span class="material-symbols-outlined text-xs">bolt</span>
+            Prime Pulse
+          </button>
+</div>
+</section>
+<!-- SECTION 5: Interactive Time-Travel Horizon Scrubber Card -->
+<section class="squircle-28 bg-surface-container-low p-4 border border-outline-variant/40 space-y-3">
+<div class="flex items-center justify-between">
+<div class="flex items-center space-x-1.5">
+<span class="material-symbols-outlined text-primary text-base">timeline</span>
+<h3 class="text-xs font-headline font-black tracking-wider text-on-surface uppercase">HORIZON SIMULATOR</h3>
+</div>
+<span class="text-[10px] font-label font-bold text-tertiary bg-tertiary/10 px-2 py-0.5 rounded-full border border-tertiary/30">
+            Linear Safe Projection
+          </span>
+</div>
+<p class="text-[11px] text-on-surface-variant">
+          Predict quota burn against multi-agent batch queues across future hours.
+        </p>
+<!-- Scrubber Track & Marks -->
+<div class="pt-2 px-1">
+<input class="w-full h-2 bg-surface-container-highest rounded-lg appearance-none cursor-pointer" id="horizon-range" max="3" min="0" step="1" type="range" value="2"/>
+<div class="flex justify-between text-[10px] font-headline font-bold text-on-surface-variant pt-2">
+<span class="opacity-60">NOW [0h]</span>
+<span class="opacity-60">+1H</span>
+<span class="text-primary font-black">+3H [SELECTED]</span>
+<span class="text-secondary font-bold">RESET (19:39)</span>
+</div>
+</div>
+<!-- Dynamic Live Projection Callout Box -->
+<div class="bg-surface-container p-3 rounded-2xl border border-primary/30 flex items-start gap-2.5">
+<span class="material-symbols-outlined text-primary text-lg mt-0.5" style="font-variation-settings: 'FILL' 1;">insights</span>
+<div class="text-[11px] leading-relaxed">
+<span class="font-bold text-on-surface block">At +3h projection:</span>
+<span class="text-on-surface-variant">Argon </span>
+<span class="font-extrabold text-primary">33.8% remaining</span>
+<span class="text-on-surface-variant"> · Safe reserve </span>
+<span class="font-extrabold text-tertiary">+31.2%</span>
+<span class="text-on-surface-variant"> · All agent pipelines remain </span>
+<span class="font-bold text-tertiary">GREEN</span>.
+          </div>
+</div>
+</section>
+</main>
+<!-- SHARED COMPONENT: BottomNavBar (Strict adherence to JSON spec & style keys) -->
+<!-- Active tab logic: This screen is 'Pulse' (Dashboard home) -->
+<nav class="fixed bottom-6 left-1/2 -translate-x-1/2 w-[92%] max-w-sm z-50 flex justify-around items-center px-3 py-2 bg-surface-container dark:bg-surface-container rounded-full shadow-xl">
+<!-- Item 1: Pulse (ACTIVE) -->
+<button aria-label="Pulse" class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container dark:bg-primary-container dark:text-on-primary-container rounded-full px-4 py-1.5 transition-all hover:text-primary dark:hover:text-primary active:scale-90 transition-transform duration-150">
+<span class="material-symbols-outlined text-xl" style="font-variation-settings: 'FILL' 1;">vital_signs</span>
+<span class="font-label text-xs font-semibold">Pulse</span>
+</button>
+<!-- Item 2: Burn & Pace -->
+<button aria-label="Burn &amp; Pace" class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant px-3 py-1.5 transition-all hover:text-primary dark:hover:text-primary active:scale-90 transition-transform duration-150">
+<span class="material-symbols-outlined text-xl">speed</span>
+<span class="font-label text-xs font-semibold">Burn &amp; Pace</span>
+</button>
+<!-- Item 3: Widgets & Sync -->
+<button aria-label="Widgets &amp; Sync" class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant px-3 py-1.5 transition-all hover:text-primary dark:hover:text-primary active:scale-90 transition-transform duration-150">
+<span class="material-symbols-outlined text-xl">widgets</span>
+<span class="font-label text-xs font-semibold">Widgets &amp; Sync</span>
+</button>
+<!-- Item 4: Refresh Action -->
+<button aria-label="Refresh" class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant px-3 py-1.5 transition-all hover:text-primary dark:hover:text-primary active:scale-90 transition-transform duration-150">
+<span class="material-symbols-outlined text-xl">refresh</span>
+<span class="font-label text-xs font-semibold">Refresh</span>
+</button>
+</nav>
+</div>
+<!-- Inline Vanilla Micro-Interactions -->
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // Polarity Capsule Toggle Logic
+      const toggleLeft = document.getElementById('toggle-left');
+      const toggleUsed = document.getElementById('toggle-used');
+
+      toggleLeft?.addEventListener('click', () => {
+        toggleLeft.className = "flex-1 py-1.5 rounded-full bg-primary-container text-on-primary-container font-headline text-xs font-bold tracking-wide transition-all duration-200 shadow-sm flex items-center justify-center gap-1.5";
+        toggleUsed.className = "flex-1 py-1.5 rounded-full text-on-surface-variant font-headline text-xs font-semibold tracking-wide hover:text-on-surface transition-all duration-200 flex items-center justify-center gap-1";
+      });
+
+      toggleUsed?.addEventListener('click', () => {
+        toggleUsed.className = "flex-1 py-1.5 rounded-full bg-primary-container text-on-primary-container font-headline text-xs font-bold tracking-wide transition-all duration-200 shadow-sm flex items-center justify-center gap-1.5";
+        toggleLeft.className = "flex-1 py-1.5 rounded-full text-on-surface-variant font-headline text-xs font-semibold tracking-wide hover:text-on-surface transition-all duration-200 flex items-center justify-center gap-1";
+      });
+
+      // Interactive Horizon Simulator Micro-change
+      const scrubber = document.getElementById('horizon-range');
+      scrubber?.addEventListener('input', (e) => {
+        // Subtle tactile feed simulation
+        const val = e.target.value;
+      });
+    });
+  </script>
+</body></html>

@@ -1,0 +1,41 @@
+# Android & Gradle
+.gradle/
+.kotlin/
+build/
+**/build/
+local.properties
+*.iml
+.idea/
+.cxx/
+captures/
+
+# Keystores & Signing (NEVER commit)
+*.jks
+*.keystore
+*.KeyStore
+keystore.properties
+signing.properties
+google-services.json
+
+# Secrets, Tokens, Credentials & Local Config (NEVER commit)
+.env
+.env.*
+!.env.example
+*.token
+*.key
+*.pem
+auth.json
+*.db
+*.sqlite
+*.sqlite3
+config.yaml
+config.yml
+config.json
+*.local.yaml
+*.local.yml
+*.local.json
+*.har
+
+# macOS / OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>Pixel Home Widgets &amp; Sync Hub</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;family=Public+Sans:wght@400;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CDN -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "surface": "#111415",
+            "surface-dim": "#0e1112",
+            "surface-bright": "#343a3b",
+            "surface-container-lowest": "#0b0e0f",
+            "surface-container-low": "#171d1e",
+            "surface-container": "#1c2223",
+            "surface-container-high": "#222829",
+            "surface-container-highest": "#283031",
+            "on-surface": "#e0e3e4",
+            "on-surface-variant": "#a1a9aa",
+            "outline": "#899394",
+            "outline-variant": "#3f484a",
+            
+            "primary": "#80D4DC",
+            "on-primary": "#00363a",
+            "primary-container": "#004f55",
+            "on-primary-container": "#9eeff8",
+            
+            "secondary": "#FDB813",
+            "on-secondary": "#412d00",
+            "secondary-container": "#5d4200",
+            "on-secondary-container": "#ffdf9e",
+
+            "tertiary": "#8be4af",
+            "on-tertiary": "#003820",
+            "tertiary-container": "#005232",
+            
+            "error": "#ffb4ab",
+            "surface-tint": "#80D4DC"
+          },
+          borderRadius: {
+            "DEFAULT": "1rem",
+            "squircle": "1.75rem", // 28dp Material 3 Expressive
+            "lg": "2rem",
+            "xl": "3rem",
+            "full": "9999px"
+          },
+          fontFamily: {
+            "headline": ["Public Sans", "sans-serif"],
+            "display": ["Public Sans", "sans-serif"],
+            "body": ["Plus Jakarta Sans", "sans-serif"],
+            "label": ["Public Sans", "sans-serif"]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      line-height: 1;
+      display: inline-block;
+      vertical-align: middle;
+    }
+    .material-symbols-outlined.fill {
+      font-variation-settings: 'FILL' 1;
+    }
+    /* Android 14 subtle wallpaper mesh */
+    .launcher-dot-grid {
+      background-image: radial-gradient(rgba(128, 212, 220, 0.12) 1.5px, transparent 1.5px);
+      background-size: 18px 18px;
+    }
+    /* Squircle shape standard */
+    .squircle {
+      border-radius: 28px;
+    }
+    /* Custom thin scrollbar */
+    ::-webkit-scrollbar {
+      width: 4px;
+      height: 4px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #283031;
+      border-radius: 9999px;
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface font-body antialiased min-h-screen selection:bg-primary selection:text-on-primary pb-32">
+<!-- TOP APP BAR (Shared Component Anchored) -->
+<header class="bg-surface/80 dark:bg-surface/80 backdrop-blur-md text-primary dark:text-primary docked full-width top-0 sticky z-40 bg-surface-container-low dark:bg-surface-container-low/60 shadow-sm dark:shadow-none flex justify-between items-center w-full px-4 py-3">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary active:scale-95 transition-transform duration-200">
+<span class="material-symbols-outlined" data-icon="widgets">widgets</span>
+</div>
+<div>
+<h1 class="font-headline text-base font-extrabold tracking-tight text-on-surface dark:text-on-surface leading-snug">Pixel Home Widgets &amp; Sync Hub</h1>
+<p class="text-[11px] font-label font-semibold text-primary tracking-wide uppercase">Android 14+ Jetpack Glance Engine</p>
+</div>
+</div>
+<div class="flex items-center gap-1.5">
+<button aria-label="Sync" class="w-9 h-9 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-container-high active:scale-95 transition-transform duration-200" id="refresh-sync-btn">
+<span class="material-symbols-outlined" data-icon="sync">sync</span>
+</button>
+<button class="w-9 h-9 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-container-high active:scale-95 transition-transform">
+<span class="material-symbols-outlined" data-icon="more_vert">more_vert</span>
+</button>
+</div>
+</header>
+<!-- QUICK ACTION PILL BAR -->
+<section class="max-w-md mx-auto px-4 pt-3 pb-2 flex gap-2 overflow-x-auto no-scrollbar">
+<button class="flex-shrink-0 flex items-center gap-1.5 bg-primary/15 hover:bg-primary/25 text-primary border border-primary/20 rounded-full px-4 py-2 text-xs font-label font-bold tracking-tight active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-sm" data-icon="add_to_home_screen">add_to_home_screen</span>
+      Add to Pixel Launcher
+    </button>
+<button class="flex-shrink-0 flex items-center gap-1.5 bg-surface-container-high hover:bg-surface-container-highest text-on-surface border border-outline-variant/40 rounded-full px-4 py-2 text-xs font-label font-semibold tracking-tight active:scale-95 transition-transform" id="simulate-tap-btn">
+<span class="material-symbols-outlined text-sm text-secondary" data-icon="touch_app">touch_app</span>
+      Simulate Widget Tap
+    </button>
+<div class="flex-shrink-0 flex items-center gap-1 bg-surface-container-low text-tertiary px-3 py-1.5 rounded-full text-[11px] font-label font-semibold">
+<span class="w-2 h-2 rounded-full bg-tertiary animate-pulse"></span>
+      Glance v1.1 Active
+    </div>
+</section>
+<!-- MAIN CANVAS CONTAINER -->
+<main class="max-w-md mx-auto px-4 space-y-6 pt-2">
+<!-- SECTION 1: LIVE PIXEL 8 PRO LAUNCHER PREVIEW CANVAS -->
+<section class="space-y-3">
+<!-- Section Header -->
+<div class="flex items-center justify-between px-1">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-lg" data-icon="phone_android">phone_android</span>
+<span class="font-headline font-bold text-xs tracking-wider text-on-surface-variant uppercase">Live Launcher Canvas (Pixel 8 Pro)</span>
+</div>
+<span class="px-2.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 text-[10px] font-label font-bold">Glance AppWidgetProvider</span>
+</div>
+<!-- Launcher Workspace Mockup Container -->
+<div class="launcher-dot-grid bg-surface-container-lowest/80 rounded-[32px] p-3.5 border border-outline-variant/30 shadow-2xl relative overflow-hidden">
+<!-- Ambient subtle glow behind widgets -->
+<div class="absolute -top-12 -left-12 w-48 h-48 bg-primary/10 rounded-full blur-3xl pointer-events-none"></div>
+<div class="absolute -bottom-12 -right-12 w-48 h-48 bg-secondary/10 rounded-full blur-3xl pointer-events-none"></div>
+<div class="space-y-3 relative z-10">
+<!-- 4x2 Wide Expressive Glance Widget -->
+<div class="squircle bg-surface-container p-4 border border-outline-variant/40 shadow-lg relative group transition-all duration-300 hover:border-primary/40">
+<!-- Widget Glance Header -->
+<div class="flex items-center justify-between mb-3.5">
+<div class="flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-full bg-tertiary animate-ping absolute"></span>
+<span class="w-2.5 h-2.5 rounded-full bg-tertiary"></span>
+<span class="text-[11px] font-label font-bold text-on-surface tracking-wide">Tailscale Live · 15:04</span>
+</div>
+<div class="flex items-center gap-1.5 text-on-surface-variant text-[13px]">
+<span class="material-symbols-outlined text-xs" data-icon="wifi">wifi</span>
+<span class="material-symbols-outlined text-xs" data-icon="battery_full">battery_full</span>
+<span class="text-[10px] font-mono text-primary font-bold ml-1">100%</span>
+</div>
+</div>
+<!-- Pods Cluster (3 side-by-side squircle pods) -->
+<div class="grid grid-cols-3 gap-2">
+<!-- Pod 1: AGY (Argon) -->
+<div class="bg-surface-container-low rounded-2xl p-2.5 flex flex-col items-center justify-between text-center border border-outline-variant/20 hover:bg-surface-container-high transition-colors">
+<div class="relative w-12 h-12 flex items-center justify-center my-0.5">
+<svg class="w-12 h-12 -rotate-90" viewbox="0 0 48 48">
+<circle cx="24" cy="24" fill="none" r="19" stroke="#283031" stroke-width="4.5"></circle>
+<circle cx="24" cy="24" fill="none" r="19" stroke="#80D4DC" stroke-dasharray="119.38" stroke-dashoffset="53.7" stroke-linecap="round" stroke-width="4.5"></circle>
+</svg>
+<span class="absolute text-[11px] font-headline font-black text-primary">55%</span>
+</div>
+<div>
+<div class="text-[11px] font-headline font-bold text-on-surface truncate">Argon Flash</div>
+<div class="flex items-center justify-center gap-1 mt-0.5">
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+<span class="text-[9px] font-label font-semibold text-primary">100% OK</span>
+</div>
+</div>
+</div>
+<!-- Pod 2: OPENCODE (DeepSeek) -->
+<div class="bg-surface-container-low rounded-2xl p-2.5 flex flex-col items-center justify-between text-center border border-outline-variant/20 hover:bg-surface-container-high transition-colors">
+<div class="relative w-12 h-12 flex items-center justify-center my-0.5">
+<svg class="w-12 h-12 -rotate-90" viewbox="0 0 48 48">
+<circle cx="24" cy="24" fill="none" r="19" stroke="#283031" stroke-width="4.5"></circle>
+<circle cx="24" cy="24" fill="none" r="19" stroke="#8be4af" stroke-dasharray="119.38" stroke-dashoffset="2.4" stroke-linecap="round" stroke-width="4.5"></circle>
+</svg>
+<span class="absolute text-[11px] font-headline font-black text-tertiary">98%</span>
+</div>
+<div>
+<div class="text-[11px] font-headline font-bold text-on-surface truncate">DeepSeek 4.1</div>
+<div class="flex items-center justify-center gap-1 mt-0.5">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span>
+<span class="text-[9px] font-label font-semibold text-tertiary">Active Pipe</span>
+</div>
+</div>
+</div>
+<!-- Pod 3: GROK (Primed) -->
+<div class="bg-surface-container-low rounded-2xl p-2.5 flex flex-col items-center justify-between text-center border border-outline-variant/20 hover:bg-surface-container-high transition-colors">
+<div class="relative w-12 h-12 flex items-center justify-center my-0.5">
+<svg class="w-12 h-12 -rotate-90" viewbox="0 0 48 48">
+<circle cx="24" cy="24" fill="none" r="19" stroke="#283031" stroke-width="4.5"></circle>
+<circle cx="24" cy="24" fill="none" r="19" stroke="#FDB813" stroke-dasharray="119.38" stroke-dashoffset="3.5" stroke-linecap="round" stroke-width="4.5"></circle>
+</svg>
+<span class="absolute text-[11px] font-headline font-black text-secondary">97%</span>
+</div>
+<div>
+<div class="text-[11px] font-headline font-bold text-on-surface truncate">Primed (4d)</div>
+<div class="flex items-center justify-center gap-1 mt-0.5">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+<span class="text-[9px] font-label font-semibold text-secondary">Alive</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Widget Footer / Broadcast Status -->
+<div class="mt-3 pt-2.5 border-t border-outline-variant/30 flex items-center justify-between text-[11px]">
+<div class="flex items-center gap-1.5 text-on-surface-variant font-medium">
+<span class="material-symbols-outlined text-sm text-tertiary" data-icon="sensors">sensors</span>
+<span>Broadcast pipe healthy</span>
+</div>
+<span class="bg-surface-container-highest text-on-surface px-2 py-0.5 rounded-full text-[9px] font-mono tracking-wider font-bold">2x4 Glance Adaptive</span>
+</div>
+</div>
+<!-- Bottom Row: 2x2 Squircle Widget + Pixel Info Pod -->
+<div class="grid grid-cols-2 gap-3 items-stretch">
+<!-- 2x2 Squircle Glance Widget -->
+<div class="squircle bg-surface-container p-4 border border-outline-variant/40 shadow-lg flex flex-col justify-between hover:border-secondary/40 transition-colors">
+<div class="flex items-center justify-between">
+<span class="text-[10px] font-label font-bold text-on-surface-variant uppercase tracking-wider">Dual Telemetry</span>
+<span class="material-symbols-outlined text-secondary text-sm" data-icon="electric_bolt">electric_bolt</span>
+</div>
+<!-- Concentric Dual Rings -->
+<div class="relative w-24 h-24 mx-auto my-1 flex items-center justify-center">
+<svg class="w-24 h-24 -rotate-90" viewbox="0 0 100 100">
+<!-- Outer Track & Ring (Grok 97% Amber) -->
+<circle cx="50" cy="50" fill="none" r="40" stroke="#222829" stroke-width="7"></circle>
+<circle cx="50" cy="50" fill="none" r="40" stroke="#FDB813" stroke-dasharray="251.3" stroke-dashoffset="7.5" stroke-linecap="round" stroke-width="7"></circle>
+<!-- Inner Track & Ring (Argon 55% Cyan) -->
+<circle cx="50" cy="50" fill="none" r="28" stroke="#222829" stroke-width="7"></circle>
+<circle cx="50" cy="50" fill="none" r="28" stroke="#80D4DC" stroke-dasharray="175.9" stroke-dashoffset="79.1" stroke-linecap="round" stroke-width="7"></circle>
+</svg>
+<!-- Inner Core Label -->
+<div class="absolute inset-0 flex flex-col items-center justify-center text-center">
+<span class="text-[9px] font-label font-bold text-on-surface-variant uppercase tracking-tighter">Prime</span>
+<span class="text-xs font-headline font-black text-secondary">4h 22m</span>
+</div>
+</div>
+<!-- Interactive Action Pill inside Widget -->
+<button class="w-full bg-secondary-container hover:bg-secondary/30 text-on-secondary-container rounded-full py-1.5 px-2 text-[10px] font-label font-bold tracking-tight flex items-center justify-center gap-1 active:scale-95 transition-transform" id="widget-sync-pill">
+<span class="material-symbols-outlined text-xs" data-icon="sync">sync</span>
+                Sync Glance
+              </button>
+</div>
+<!-- Glance Host Architecture Pod -->
+<div class="squircle bg-surface-container-low/70 p-4 border border-outline-variant/30 flex flex-col justify-between">
+<div>
+<div class="flex items-center gap-1.5 text-primary text-xs font-label font-bold mb-1">
+<span class="material-symbols-outlined text-sm" data-icon="developer_board">developer_board</span>
+<span>Jetpack Glance</span>
+</div>
+<h3 class="text-xs font-headline font-bold text-on-surface">RemoteViews Bridge</h3>
+<p class="text-[10px] text-on-surface-variant mt-1 leading-relaxed">
+                  Compose declarative state mapped to hardware-accelerated Pixel home process.
+                </p>
+</div>
+<div class="space-y-1.5 pt-2">
+<div class="flex items-center justify-between text-[10px]">
+<span class="text-on-surface-variant">Update Rate</span>
+<span class="font-mono text-tertiary font-bold">15m delta</span>
+</div>
+<div class="w-full bg-surface-container-highest h-1 rounded-full overflow-hidden">
+<div class="bg-primary h-full rounded-full" style="width: 78%"></div>
+</div>
+<div class="flex items-center justify-between text-[9px] text-on-surface-variant font-mono">
+<span>RAM: 4.2 MB</span>
+<span class="text-primary">OK</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- SECTION 2: DUAL-TRANSPORT BENTO CARDS -->
+<section class="space-y-3">
+<!-- Section Title -->
+<div class="flex items-center justify-between px-1">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-lg" data-icon="hub">hub</span>
+<span class="font-headline font-bold text-xs tracking-wider text-on-surface-variant uppercase">Dual-Transport Sync Mesh</span>
+</div>
+<span class="px-2.5 py-0.5 rounded-full bg-tertiary/15 text-tertiary border border-tertiary/20 text-[10px] font-label font-bold">Auto-Fallback Enabled</span>
+</div>
+<div class="space-y-3">
+<!-- Card 1: Tailscale Direct Node Card -->
+<div class="squircle bg-surface-container-low p-4 border border-outline-variant/30 hover:border-primary/40 transition-colors shadow-md relative overflow-hidden">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined" data-icon="lan">lan</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<h3 class="font-headline font-bold text-sm text-on-surface">Tailscale Direct Node</h3>
+<span class="bg-primary/20 text-primary text-[9px] font-label font-extrabold uppercase px-1.5 py-0.2 rounded">Priority 1</span>
+</div>
+<div class="flex items-center gap-1.5 mt-0.5">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary animate-pulse"></span>
+<span class="text-xs font-mono text-tertiary font-medium">mac-studio (100.82.14.9)</span>
+</div>
+</div>
+</div>
+<!-- Active Switch Toggle -->
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-primary after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-on-primary-container peer-checked:after:bg-on-primary after:border-surface-dim after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+<!-- Latency + Capabilities -->
+<div class="mt-3.5 pt-3 border-t border-outline-variant/20 space-y-2">
+<div class="flex items-center justify-between text-xs">
+<span class="text-on-surface-variant font-medium">Channel Latency</span>
+<span class="font-mono text-primary font-bold bg-primary/10 px-2 py-0.5 rounded-full">14ms latency</span>
+</div>
+<ul class="space-y-1.5 text-xs text-on-surface-variant pt-1">
+<li class="flex items-start gap-2">
+<span class="material-symbols-outlined text-primary text-sm shrink-0 mt-0.5" data-icon="check_circle">check_circle</span>
+<span>Direct HTTP daemon push with zero proxy overhead</span>
+</li>
+<li class="flex items-start gap-2">
+<span class="material-symbols-outlined text-primary text-sm shrink-0 mt-0.5" data-icon="check_circle">check_circle</span>
+<span>Instant Android Jetpack Glance widget reload broadcast</span>
+</li>
+<li class="flex items-start gap-2">
+<span class="material-symbols-outlined text-primary text-sm shrink-0 mt-0.5" data-icon="check_circle">check_circle</span>
+<span>On-demand keepalive token priming enabled</span>
+</li>
+</ul>
+</div>
+</div>
+<!-- Card 2: GitHub Gist Encrypted Relay Card -->
+<div class="squircle bg-surface-container p-4 border border-outline-variant/30 hover:border-outline-variant transition-colors shadow-md">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-2xl bg-secondary/10 flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined" data-icon="enhanced_encryption">enhanced_encryption</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<h3 class="font-headline font-bold text-sm text-on-surface">GitHub Gist Encrypted Relay</h3>
+<span class="bg-surface-container-highest text-on-surface-variant text-[9px] font-label font-bold px-1.5 py-0.2 rounded">STANDBY</span>
+</div>
+<div class="flex items-center gap-2 mt-0.5">
+<span class="text-xs font-mono text-secondary font-medium">AES-256-GCM Verified</span>
+<span class="text-[10px] text-on-surface-variant">· Synced 2m ago</span>
+</div>
+</div>
+</div>
+<div class="w-7 h-7 rounded-full bg-surface-container-high flex items-center justify-center text-on-surface-variant text-xs font-bold">
+              #2
+            </div>
+</div>
+<div class="mt-3 pt-3 border-t border-outline-variant/20">
+<p class="text-xs text-on-surface-variant leading-relaxed">
+              Zero-knowledge payload. Decryption master keys are locked in Android Keystore (StrongBox Keymaster) hardware enclave.
+            </p>
+<div class="mt-3 flex items-center gap-2">
+<button class="flex-1 bg-surface-container-high hover:bg-surface-container-highest text-on-surface border border-outline-variant/30 rounded-full py-1.5 px-3 text-xs font-label font-semibold flex items-center justify-center gap-1.5 active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-xs text-primary" data-icon="lock_open">lock_open</span>
+                Test Decrypt
+              </button>
+<button class="flex-1 bg-surface-container-high hover:bg-surface-container-highest text-on-surface border border-outline-variant/30 rounded-full py-1.5 px-3 text-xs font-label font-semibold flex items-center justify-center gap-1.5 active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-xs text-secondary" data-icon="upload_file">upload_file</span>
+                Force Push
+              </button>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- SECTION 3: SMART PRIME EXPRESSIVE SLIDER CARD -->
+<section class="space-y-3">
+<!-- Section Title -->
+<div class="flex items-center justify-between px-1">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary text-lg" data-icon="alarm">alarm</span>
+<span class="font-headline font-bold text-xs tracking-wider text-on-surface-variant uppercase">CLI Token Keepalive Automation</span>
+</div>
+<span class="px-2.5 py-0.5 rounded-full bg-secondary/15 text-secondary border border-secondary/20 text-[10px] font-label font-bold">Active Watcher</span>
+</div>
+<!-- Keepalive Policy Card -->
+<div class="squircle bg-surface-container p-4 border border-outline-variant/30 shadow-md space-y-4">
+<div class="flex items-start justify-between">
+<div>
+<h3 class="font-headline font-bold text-sm text-on-surface">Grok Smart Prime Keepalive Policy</h3>
+<p class="text-xs text-on-surface-variant mt-0.5">Permits CLI keepalive tokens only while user is awake, preventing overnight quota bleed.</p>
+</div>
+<span class="bg-secondary/15 text-secondary font-mono text-[10px] font-bold px-2 py-1 rounded-full whitespace-nowrap">
+            08:00 – 22:00 Local
+          </span>
+</div>
+<!-- 24h Timeline Scrubber Widget -->
+<div class="bg-surface-container-low p-3 rounded-2xl border border-outline-variant/20 space-y-2.5">
+<div class="flex justify-between items-center text-[10px] font-mono text-on-surface-variant">
+<span>00:00</span>
+<span class="text-secondary font-bold">08:00 (Wake)</span>
+<span class="text-primary font-bold">15:04 (Now)</span>
+<span class="text-secondary font-bold">22:00 (Sleep)</span>
+<span>24:00</span>
+</div>
+<!-- Expressive Multi-segment Progress Bar -->
+<div class="relative h-6 flex items-center">
+<!-- Full Bar Track (Night Inactive) -->
+<div class="w-full h-2.5 bg-surface-container-highest rounded-full overflow-hidden flex relative">
+<!-- 00:00 to 08:00 (33.3% Inactive Night) -->
+<div class="h-full bg-surface-container-highest" style="width: 33.3%"></div>
+<!-- 08:00 to 22:00 (58.3% Active Awake Window) -->
+<div class="h-full bg-gradient-to-r from-secondary via-primary to-secondary rounded-sm opacity-90 flex items-center justify-center" style="width: 58.3%">
+<span class="text-[8px] font-headline font-extrabold text-on-surface-lowest uppercase tracking-wider hidden sm:inline">PRIMING PERMITTED</span>
+</div>
+<!-- 22:00 to 24:00 (8.4% Inactive Night) -->
+<div class="h-full bg-surface-container-highest" style="width: 8.4%"></div>
+</div>
+<!-- Current Time Indicator (15:04 -> 62.7% position) -->
+<div class="absolute -top-1 transform -translate-x-1/2 flex flex-col items-center pointer-events-none" style="left: 62.7%">
+<div class="w-4 h-4 rounded-full bg-primary border-2 border-surface shadow-md flex items-center justify-center">
+<div class="w-1.5 h-1.5 rounded-full bg-on-primary"></div>
+</div>
+<div class="w-0.5 h-2 bg-primary"></div>
+</div>
+</div>
+<div class="flex items-center justify-between text-[11px] pt-1">
+<span class="text-tertiary flex items-center gap-1 font-semibold">
+<span class="w-2 h-2 rounded-full bg-tertiary"></span>
+              Watcher Running: Next run in 8m
+            </span>
+<span class="font-mono text-on-surface-variant text-[10px]">Quota Saved: 34%</span>
+</div>
+</div>
+<!-- Terminal Command Pill / Rule -->
+<div class="bg-surface-container-lowest p-3 rounded-2xl border border-outline-variant/30 space-y-2">
+<div class="flex items-center gap-2 text-xs font-label text-on-surface-variant">
+<span class="material-symbols-outlined text-sm text-secondary" data-icon="terminal">terminal</span>
+<span class="font-semibold text-on-surface">Rule: Token Lifetime &lt; 15m</span>
+<span class="text-[10px] text-on-surface-variant">· Automated background micro-eval</span>
+</div>
+<div class="flex items-center justify-between bg-surface-container-low px-3 py-1.5 rounded-xl border border-outline-variant/30">
+<code class="text-xs font-mono text-primary truncate">$ grok -p "reply with ok" --daemon</code>
+<button class="text-on-surface-variant hover:text-primary active:scale-95 transition-transform" title="Copy command">
+<span class="material-symbols-outlined text-sm" data-icon="content_copy">content_copy</span>
+</button>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- BOTTOM NAVIGATION BAR (Shared Component Anchored & Exact Schema) -->
+<!-- Contextual Active: 'Widgets & Sync' -->
+<nav class="fixed bottom-0 left-0 right-0 z-50 flex justify-around items-center px-4 py-2 max-w-md mx-auto floating rounded-full mb-6 mx-4 bg-surface-container/90 dark:bg-surface-container/90 backdrop-blur-xl shadow-xl dark:shadow-2xl shadow-surface-tint/10">
+<!-- Item 1: Overview -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant px-3 py-1.5 hover:bg-surface-container-highest dark:hover:bg-surface-container-highest active:scale-90 transition-transform duration-150 ease-out rounded-full" href="#overview">
+<span class="material-symbols-outlined" data-icon="speed">speed</span>
+<span class="font-label text-xs font-semibold mt-0.5">Overview</span>
+</a>
+<!-- Item 2: Widgets & Sync (ACTIVE MATCH) -->
+<a class="flex flex-col items-center justify-center bg-secondary-container dark:bg-secondary-container text-on-secondary-container dark:text-on-secondary-container rounded-full px-5 py-1.5 active:scale-90 transition-transform duration-150 ease-out shadow-sm" href="#widgets-sync">
+<span class="material-symbols-outlined fill" data-icon="dashboard" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+<span class="font-label text-xs font-semibold mt-0.5">Widgets &amp; Sync</span>
+</a>
+<!-- Item 3: Providers -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant px-3 py-1.5 hover:bg-surface-container-highest dark:hover:bg-surface-container-highest active:scale-90 transition-transform duration-150 ease-out rounded-full" href="#providers">
+<span class="material-symbols-outlined" data-icon="hub">hub</span>
+<span class="font-label text-xs font-semibold mt-0.5">Providers</span>
+</a>
+<!-- Item 4: Settings -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant px-3 py-1.5 hover:bg-surface-container-highest dark:hover:bg-surface-container-highest active:scale-90 transition-transform duration-150 ease-out rounded-full" href="#settings">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-label text-xs font-semibold mt-0.5">Settings</span>
+</a>
+</nav>
+<!-- Interactive Feedback Script -->
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const refreshBtn = document.getElementById('refresh-sync-btn');
+      const widgetSyncBtn = document.getElementById('widget-sync-pill');
+      const simulateTapBtn = document.getElementById('simulate-tap-btn');
+
+      function triggerSyncAnim(btn) {
+        if (!btn) return;
+        btn.classList.add('animate-spin');
+        setTimeout(() => {
+          btn.classList.remove('animate-spin');
+        }, 800);
+      }
+
+      if (refreshBtn) {
+        refreshBtn.addEventListener('click', () => {
+          triggerSyncAnim(refreshBtn.querySelector('.material-symbols-outlined'));
+        });
+      }
+
+      if (widgetSyncBtn) {
+        widgetSyncBtn.addEventListener('click', () => {
+          const icon = widgetSyncBtn.querySelector('.material-symbols-outlined');
+          if (icon) triggerSyncAnim(icon);
+          widgetSyncBtn.classList.add('bg-secondary/40');
+          setTimeout(() => widgetSyncBtn.classList.remove('bg-secondary/40'), 400);
+        });
+      }
+
+      if (simulateTapBtn) {
+        simulateTapBtn.addEventListener('click', () => {
+          simulateTapBtn.classList.add('scale-95', 'bg-primary/30');
+          setTimeout(() => {
+            simulateTapBtn.classList.remove('scale-95', 'bg-primary/30');
+          }, 200);
+        });
+      }
+    });
+  </script>
+</body></html>

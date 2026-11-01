@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Antigravity (agy) Detail</title>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Google Fonts: Manrope, Inter, Public Sans -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Manrope:wght@500;600;700;800&amp;family=Public+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "tertiary-fixed-dim": "#ffba4e",
+            "error": "#ffb4ab",
+            "tertiary-container": "#ffba4e",
+            "surface-container-highest": "#303637",
+            "on-tertiary": "#442b00",
+            "surface-variant": "#303637",
+            "surface-tint": "#4fd8eb",
+            "secondary": "#a1ced6",
+            "on-primary-container": "#005c66",
+            "surface-dim": "#0e1415",
+            "primary-fixed": "#96f0ff",
+            "primary": "#97f0ff",
+            "tertiary-fixed": "#ffddb2",
+            "secondary-container": "#1f4d54",
+            "on-tertiary-fixed": "#291800",
+            "background": "#0e1415",
+            "surface-container": "#1b2122",
+            "surface-container-low": "#171d1e",
+            "on-tertiary-container": "#724b00",
+            "on-primary-fixed": "#001f24",
+            "on-primary": "#00363d",
+            "on-error-container": "#ffdad6",
+            "outline-variant": "#3c494b",
+            "on-secondary-fixed-variant": "#1f4d54",
+            "inverse-surface": "#dee3e5",
+            "on-surface": "#dee3e5",
+            "on-background": "#dee3e5",
+            "on-tertiary-fixed-variant": "#624000",
+            "on-secondary-container": "#90bdc4",
+            "secondary-fixed-dim": "#a1ced6",
+            "secondary-fixed": "#bceaf3",
+            "outline": "#869395",
+            "surface": "#0e1415",
+            "inverse-on-surface": "#2b3133",
+            "primary-container": "#4fd8eb",
+            "surface-container-lowest": "#090f10",
+            "tertiary": "#ffdeb3",
+            "error-container": "#93000a",
+            "on-primary-fixed-variant": "#004f57",
+            "primary-fixed-dim": "#4fd8eb",
+            "inverse-primary": "#006874",
+            "surface-bright": "#343a3b",
+            "on-surface-variant": "#bbc9cb",
+            "on-error": "#690005",
+            "surface-container-high": "#252b2c",
+            "on-secondary": "#00363d",
+            "on-secondary-fixed": "#001f24"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "2xl": "1rem",
+            "3xl": "1.5rem",
+            "full": "9999px"
+          },
+          "fontFamily": {
+            "headline": ["Manrope", "sans-serif"],
+            "display": ["Manrope", "sans-serif"],
+            "body": ["Inter", "sans-serif"],
+            "label": ["Public Sans", "sans-serif"]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      display: inline-block;
+      vertical-align: middle;
+      line-height: 1;
+    }
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+    /* Hide scrollbar for Chrome, Safari and Opera */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    /* Hide scrollbar for IE, Edge and Firefox */
+    .no-scrollbar {
+      -ms-overflow-style: none;  /* IE and Edge */
+      scrollbar-width: none;  /* Firefox */
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-surface font-body antialiased min-h-screen flex flex-col items-center selection:bg-secondary-container selection:text-on-secondary-container">
+<!-- Mobile Container Constraint -->
+<div class="w-full max-w-md min-h-screen flex flex-col bg-background relative shadow-2xl pb-28">
+<!-- Top App Bar -->
+<header class="sticky top-0 z-40 bg-surface/90 backdrop-blur-md px-4 h-16 flex items-center justify-between transition-colors">
+<div class="flex items-center gap-2">
+<button aria-label="Go back" class="p-2 -ml-2 rounded-full text-on-surface hover:bg-surface-container-high transition-colors active:opacity-80 flex items-center justify-center">
+<span class="material-symbols-outlined text-[24px]">arrow_back</span>
+</button>
+<h1 class="font-headline text-lg font-bold tracking-tight text-on-surface truncate">
+          Antigravity (agy) Detail
+        </h1>
+</div>
+<div class="flex items-center gap-1">
+<button aria-label="Sync status" class="p-2 rounded-full text-primary-fixed-dim hover:bg-surface-container-high transition-colors active:scale-95 flex items-center justify-center" title="Synchronized 2m ago">
+<span class="material-symbols-outlined text-[20px]">sync</span>
+</button>
+<button aria-label="More options" class="p-2 -mr-2 rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors active:opacity-80 flex items-center justify-center">
+<span class="material-symbols-outlined text-[24px]">more_vert</span>
+</button>
+</div>
+</header>
+<!-- Sub-header Filter Segmented Row -->
+<section class="px-4 py-2 overflow-x-auto no-scrollbar flex items-center gap-2">
+<button class="px-3.5 py-1.5 rounded-full text-xs font-label font-medium bg-surface-container-high text-on-surface-variant hover:bg-surface-variant transition-colors whitespace-nowrap active:scale-95">
+        24 Hours
+      </button>
+<button class="px-3.5 py-1.5 rounded-full text-xs font-label font-semibold bg-secondary-container text-on-secondary-container flex items-center gap-1.5 shadow-sm whitespace-nowrap active:scale-95">
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 1;">check</span>
+        7 Days
+      </button>
+<button class="px-3.5 py-1.5 rounded-full text-xs font-label font-medium bg-surface-container-high text-on-surface-variant hover:bg-surface-variant transition-colors whitespace-nowrap active:scale-95">
+        30 Days
+      </button>
+<button class="px-3.5 py-1.5 rounded-full text-xs font-label font-medium bg-surface-container-high text-on-surface-variant hover:bg-surface-variant transition-colors whitespace-nowrap active:scale-95">
+        Custom
+      </button>
+</section>
+<!-- Main Content Canvas -->
+<main class="px-4 pt-2 flex flex-col gap-4">
+<!-- 1. Primary Bottleneck Summary Card -->
+<section class="bg-surface-container-low rounded-3xl p-5 border border-outline-variant/20 shadow-sm relative overflow-hidden">
+<!-- Glow accent in corner -->
+<div class="absolute -top-12 -right-12 w-32 h-32 bg-primary/10 rounded-full blur-2xl pointer-events-none"></div>
+<div class="flex items-start justify-between gap-2 mb-3">
+<div class="flex flex-col gap-1">
+<span class="font-label text-[10px] uppercase font-bold tracking-wider text-primary">
+              CRITICAL PACE ANCHOR
+            </span>
+<div class="flex items-center gap-1.5">
+<span class="font-headline font-semibold text-xs text-on-surface">
+                gemini-argon-wtu-weekly
+              </span>
+</div>
+</div>
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-label font-semibold bg-secondary-container/80 text-on-secondary-container border border-outline-variant/30">
+<span class="material-symbols-outlined text-[13px]" style="font-variation-settings: 'FILL' 1;">verified</span>
+            Safe Pace (-51.8%)
+          </span>
+</div>
+<!-- Prominent Metric Display -->
+<div class="mt-4 flex items-baseline justify-between">
+<div>
+<div class="flex items-baseline gap-2">
+<span class="font-headline text-5xl font-extrabold tracking-tight text-on-surface tabular-nums">
+                55<span class="text-3xl font-bold text-primary">%</span>
+</span>
+<span class="text-xs font-label font-semibold tracking-wide text-on-surface-variant uppercase">
+                Remaining Quota
+              </span>
+</div>
+<p class="text-xs text-on-surface-variant mt-1 font-label flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[15px] text-tertiary-fixed-dim">schedule</span>
+              Reset cycle in <strong class="text-on-surface tabular-nums">4h 22m</strong> (19:39 UTC)
+            </p>
+</div>
+<div class="px-2.5 py-1 rounded-lg bg-surface-container-high text-xs font-label font-medium text-on-surface-variant tabular-nums">
+            45.0% Used
+          </div>
+</div>
+<!-- Linear Dual Progress Bar -->
+<div class="mt-5">
+<div class="relative w-full h-3 bg-surface-container-highest rounded-full overflow-visible">
+<!-- Consumed bar (45%) -->
+<div class="absolute left-0 top-0 bottom-0 bg-primary rounded-full transition-all duration-500" style="width: 45%;"></div>
+<!-- Pace Elapsed Window Tick Marker (96.8%) -->
+<div class="absolute top-1/2 -translate-y-1/2 flex flex-col items-center pointer-events-none z-10" style="left: 96.8%;">
+<div class="w-1.5 h-5 bg-tertiary-fixed-dim rounded-full shadow-sm"></div>
+</div>
+</div>
+<div class="flex justify-between items-center text-[10px] font-label text-on-surface-variant mt-1.5">
+<span>0% (Week Start)</span>
+<span class="flex items-center gap-1 text-tertiary-fixed-dim">
+<span class="inline-block w-1.5 h-1.5 rounded-full bg-tertiary-fixed-dim"></span>
+              Pace Target: 96.8%
+            </span>
+<span>100%</span>
+</div>
+</div>
+<!-- 2x2 Telemetry Stat Grid -->
+<div class="grid grid-cols-2 gap-2 mt-5">
+<div class="bg-surface-container/70 rounded-2xl p-3 flex flex-col">
+<span class="text-[11px] font-label text-on-surface-variant">Elapsed Window</span>
+<div class="flex items-baseline gap-1 mt-0.5">
+<span class="font-headline text-base font-bold text-on-surface tabular-nums">96.8%</span>
+<span class="text-[11px] text-on-surface-variant font-label">of 7d</span>
+</div>
+</div>
+<div class="bg-surface-container/70 rounded-2xl p-3 flex flex-col">
+<span class="text-[11px] font-label text-on-surface-variant">Quota Used</span>
+<div class="flex items-baseline gap-1 mt-0.5">
+<span class="font-headline text-base font-bold text-on-surface tabular-nums">45.0%</span>
+<span class="text-[11px] text-on-surface-variant font-label">Burned</span>
+</div>
+</div>
+<div class="bg-surface-container/70 rounded-2xl p-3 flex flex-col">
+<span class="text-[11px] font-label text-on-surface-variant">Pace Delta</span>
+<div class="flex items-baseline gap-1 mt-0.5">
+<span class="font-headline text-base font-bold text-primary tabular-nums">-51.8%</span>
+<span class="text-[11px] text-primary/80 font-label">Safe Headroom</span>
+</div>
+</div>
+<div class="bg-surface-container/70 rounded-2xl p-3 flex flex-col">
+<span class="text-[11px] font-label text-on-surface-variant">Projected at Reset</span>
+<div class="flex items-baseline gap-1 mt-0.5">
+<span class="font-headline text-base font-bold text-secondary tabular-nums">52%</span>
+<span class="text-[11px] text-on-surface-variant font-label">Reserve</span>
+</div>
+</div>
+</div>
+</section>
+<!-- 2. 7-Day Step & Area Burn Chart Card -->
+<section class="bg-surface-container-low rounded-3xl p-5 border border-outline-variant/20 shadow-sm">
+<div class="flex flex-col gap-0.5 mb-3">
+<div class="flex items-center justify-between">
+<h2 class="font-headline text-base font-bold text-on-surface">
+              7-Day Quota Burn &amp; Pace Step
+            </h2>
+<span class="material-symbols-outlined text-[18px] text-outline">query_stats</span>
+</div>
+<p class="text-xs text-on-surface-variant font-label">
+            Stepped consumption vs. linear depletion line
+          </p>
+</div>
+<!-- Legend -->
+<div class="flex items-center gap-4 text-xs font-label py-1 mb-2">
+<div class="flex items-center gap-1.5">
+<span class="w-3 h-1 bg-primary rounded-full"></span>
+<span class="text-on-surface text-[11px]">Remaining Quota</span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="w-3 h-0 border-t border-dashed border-outline"></span>
+<span class="text-on-surface-variant text-[11px]">Linear Window Pace</span>
+</div>
+</div>
+<!-- SVG Chart -->
+<div class="w-full mt-2 relative">
+<svg class="w-full h-auto overflow-visible font-label" viewbox="0 0 340 160">
+<defs>
+<lineargradient id="cyanGradient" x1="0" x2="0" y1="0" y2="1">
+<stop offset="0%" stop-color="#4FD8EB" stop-opacity="0.32"></stop>
+<stop offset="100%" stop-color="#4FD8EB" stop-opacity="0.0"></stop>
+</lineargradient>
+</defs>
+<!-- Grid horizontal lines -->
+<line stroke="#3C494B" stroke-opacity="0.35" stroke-width="1" x1="30" x2="330" y1="20" y2="20"></line>
+<line stroke="#3C494B" stroke-opacity="0.35" stroke-width="1" x1="30" x2="330" y1="50" y2="50"></line>
+<line stroke="#3C494B" stroke-opacity="0.35" stroke-width="1" x1="30" x2="330" y1="80" y2="80"></line>
+<line stroke="#3C494B" stroke-opacity="0.35" stroke-width="1" x1="30" x2="330" y1="110" y2="110"></line>
+<line stroke="#3C494B" stroke-opacity="0.5" stroke-width="1" x1="30" x2="330" y1="140" y2="140"></line>
+<!-- Y-Axis Labels -->
+<text fill="#869395" font-size="9" text-anchor="start" x="5" y="23">100%</text>
+<text fill="#869395" font-size="9" text-anchor="start" x="10" y="53">75%</text>
+<text fill="#869395" font-size="9" text-anchor="start" x="10" y="83">50%</text>
+<text fill="#869395" font-size="9" text-anchor="start" x="10" y="113">25%</text>
+<text fill="#869395" font-size="9" text-anchor="start" x="15" y="143">0%</text>
+<!-- Linear Pace Diagonal Reference (D0 100% to D7 0%) -->
+<line opacity="0.65" stroke="#869395" stroke-dasharray="3 3" stroke-width="1.5" x1="35" x2="320" y1="20" y2="140"></line>
+<!-- Area Fill Under Step Curve -->
+<!-- Points: 
+                 Start: (35, 140)
+                 (35, 20) -> (75, 20) -> (75, 30) -> (115, 30) -> (115, 44) -> (160, 44) 
+                 -> (160, 54) -> (210, 54) -> (210, 62) -> (265, 62) -> (265, 74) -> (315, 74)
+                 Drop to (315, 140) -> Z
+            -->
+<path d="M 35 140 
+                     L 35 20 
+                     L 80 20 
+                     L 80 29.6 
+                     L 125 29.6 
+                     L 125 44 
+                     L 175 44 
+                     L 175 53.6 
+                     L 225 53.6 
+                     L 225 62 
+                     L 275 62 
+                     L 275 74 
+                     L 315 74 
+                     L 315 140 Z" fill="url(#cyanGradient)"></path>
+<!-- Stepped Quota Line -->
+<path d="M 35 20 
+                     L 80 20 
+                     L 80 29.6 
+                     L 125 29.6 
+                     L 125 44 
+                     L 175 44 
+                     L 175 53.6 
+                     L 225 53.6 
+                     L 225 62 
+                     L 275 62 
+                     L 275 74 
+                     L 315 74" fill="none" stroke="#4FD8EB" stroke-linejoin="miter" stroke-width="2.5"></path>
+<!-- Step Dots -->
+<circle cx="35" cy="20" fill="#4FD8EB" r="3"></circle>
+<circle cx="80" cy="29.6" fill="#4FD8EB" r="3"></circle>
+<circle cx="125" cy="44" fill="#4FD8EB" r="3"></circle>
+<circle cx="175" cy="53.6" fill="#4FD8EB" r="3"></circle>
+<circle cx="225" cy="62" fill="#4FD8EB" r="3"></circle>
+<circle cx="275" cy="74" fill="#4FD8EB" r="3"></circle>
+<circle cx="315" cy="74" fill="#4FD8EB" r="4.5" stroke="#171D1E" stroke-width="2"></circle>
+<!-- X-Axis Labels -->
+<text fill="#869395" font-size="9" text-anchor="middle" x="35" y="154">D1</text>
+<text fill="#869395" font-size="9" text-anchor="middle" x="80" y="154">D2</text>
+<text fill="#869395" font-size="9" text-anchor="middle" x="125" y="154">D3</text>
+<text fill="#869395" font-size="9" text-anchor="middle" x="175" y="154">D4</text>
+<text fill="#869395" font-size="9" text-anchor="middle" x="225" y="154">D5</text>
+<text fill="#869395" font-size="9" text-anchor="middle" x="275" y="154">D6</text>
+<text fill="#4FD8EB" font-size="9" font-weight="bold" text-anchor="middle" x="315" y="154">D7</text>
+</svg>
+<!-- Current Coordinate Pill Over Chart -->
+<div class="flex items-center justify-between mt-2 pt-2 border-t border-outline-variant/20">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-secondary-container/90 text-on-secondary-container text-[11px] font-label font-medium tabular-nums">
+<span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+              Current: 55% (4h 22m rem)
+            </span>
+<span class="text-[11px] font-label text-on-surface-variant tabular-nums">
+              0.27%/hr · Ceiling: 1M WTU
+            </span>
+</div>
+</div>
+</section>
+<!-- 3. All Buckets Breakdown Card -->
+<section class="bg-surface-container-low rounded-3xl p-5 border border-outline-variant/20 shadow-sm">
+<div class="flex items-center justify-between mb-3">
+<div class="flex items-center gap-2">
+<h2 class="font-headline text-base font-bold text-on-surface">
+              All Provider Buckets
+            </h2>
+<span class="text-xs font-label text-on-surface-variant">(5 Active)</span>
+</div>
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-container-high text-[10px] font-label font-medium text-primary">
+<span class="material-symbols-outlined text-[12px]" style="font-variation-settings: 'FILL' 1;">cloud_done</span>
+            Auto-Sync
+          </span>
+</div>
+<div class="flex flex-col divide-y divide-outline-variant/20">
+<!-- Bucket 1: gemini-argon-wtu-weekly -->
+<div class="py-3 flex flex-col gap-1.5">
+<div class="flex items-start justify-between">
+<div>
+<div class="flex items-center gap-1.5">
+<span class="font-headline text-xs font-bold text-on-surface">gemini-argon-wtu-weekly</span>
+<span class="text-[9px] font-label font-bold px-1.5 py-0.2 rounded bg-tertiary-container/30 text-tertiary-fixed-dim uppercase">
+                    BOTTLENECK
+                  </span>
+</div>
+<p class="text-[11px] text-on-surface-variant font-label mt-0.5">Gemini 4 Argon · Resets 19:39 UTC</p>
+</div>
+<div class="text-right">
+<span class="text-xs font-bold text-primary tabular-nums">55% Left</span>
+<p class="text-[10px] text-on-surface-variant tabular-nums font-label">45% used</p>
+</div>
+</div>
+<!-- Mini Bar -->
+<div class="w-full h-1.5 bg-surface-container-highest rounded-full overflow-hidden mt-0.5">
+<div class="h-full bg-primary rounded-full" style="width: 55%;"></div>
+</div>
+</div>
+<!-- Bucket 2: gemini-5h -->
+<div class="py-3 flex flex-col gap-1.5">
+<div class="flex items-start justify-between">
+<div>
+<span class="font-headline text-xs font-medium text-on-surface">gemini-5h</span>
+<p class="text-[11px] text-on-surface-variant font-label mt-0.5">Gemini Models · Resets 20:04 UTC</p>
+</div>
+<div class="text-right">
+<span class="text-xs font-semibold text-on-surface tabular-nums">100% Left</span>
+<p class="text-[10px] text-on-surface-variant font-label">Dormant</p>
+</div>
+</div>
+<div class="w-full h-1.5 bg-surface-container-highest rounded-full overflow-hidden mt-0.5">
+<div class="h-full bg-secondary-container rounded-full" style="width: 100%;"></div>
+</div>
+</div>
+<!-- Bucket 3: gemini-weekly -->
+<div class="py-3 flex flex-col gap-1.5">
+<div class="flex items-start justify-between">
+<div>
+<span class="font-headline text-xs font-medium text-on-surface">gemini-weekly</span>
+<p class="text-[11px] text-on-surface-variant font-label mt-0.5">Gemini Models · Resets 8 Nov</p>
+</div>
+<div class="text-right">
+<span class="text-xs font-semibold text-on-surface tabular-nums">100% Left</span>
+<p class="text-[10px] text-on-surface-variant font-label">Full capacity</p>
+</div>
+</div>
+<div class="w-full h-1.5 bg-surface-container-highest rounded-full overflow-hidden mt-0.5">
+<div class="h-full bg-secondary-container rounded-full" style="width: 100%;"></div>
+</div>
+</div>
+<!-- Bucket 4: 3p-5h -->
+<div class="py-3 flex flex-col gap-1.5">
+<div class="flex items-start justify-between">
+<div>
+<span class="font-headline text-xs font-medium text-on-surface">3p-5h</span>
+<p class="text-[11px] text-on-surface-variant font-label mt-0.5">Claude &amp; GPT · Resets 20:04 UTC</p>
+</div>
+<div class="text-right">
+<span class="text-xs font-semibold text-on-surface tabular-nums">100% Left</span>
+<p class="text-[10px] text-on-surface-variant font-label">Ready</p>
+</div>
+</div>
+<div class="w-full h-1.5 bg-surface-container-highest rounded-full overflow-hidden mt-0.5">
+<div class="h-full bg-secondary-container rounded-full" style="width: 100%;"></div>
+</div>
+</div>
+<!-- Bucket 5: 3p-weekly -->
+<div class="py-3 flex flex-col gap-1.5">
+<div class="flex items-start justify-between">
+<div>
+<span class="font-headline text-xs font-medium text-on-surface">3p-weekly</span>
+<p class="text-[11px] text-on-surface-variant font-label mt-0.5">Claude &amp; GPT · Resets 8 Nov</p>
+</div>
+<div class="text-right">
+<span class="text-xs font-semibold text-on-surface tabular-nums">100% Left</span>
+<p class="text-[10px] text-on-surface-variant font-label">Unallocated</p>
+</div>
+</div>
+<div class="w-full h-1.5 bg-surface-container-highest rounded-full overflow-hidden mt-0.5">
+<div class="h-full bg-secondary-container rounded-full" style="width: 100%;"></div>
+</div>
+</div>
+</div>
+</section>
+<!-- 4. Recent Orchestration Stage Log -->
+<section class="bg-surface-container-low rounded-3xl p-5 border border-outline-variant/20 shadow-sm">
+<div class="flex items-center justify-between mb-4">
+<h2 class="font-headline text-base font-bold text-on-surface">
+            Recent Stage Checkpoints
+          </h2>
+<span class="px-2 py-0.5 rounded-full bg-surface-container-high text-[10px] font-label text-on-surface-variant">
+            Orchestrator v2.4
+          </span>
+</div>
+<div class="relative pl-5 border-l-2 border-outline-variant/40 space-y-4 font-label">
+<!-- Event 1 -->
+<div class="relative">
+<span class="absolute -left-[27px] top-1 w-3 h-3 rounded-full bg-primary border-2 border-background"></span>
+<div class="flex items-center justify-between">
+<span class="text-xs font-bold text-on-surface">15:04 UTC — Pre-flight check</span>
+<span class="text-[10px] font-semibold text-primary px-1.5 py-0.5 rounded bg-surface-container tabular-nums">-2% Argon</span>
+</div>
+<p class="text-[11px] text-on-surface-variant mt-1 leading-relaxed">
+              Verified quota budget for autonomous planning sub-routine. Latency 112ms.
+            </p>
+</div>
+<!-- Event 2 -->
+<div class="relative">
+<span class="absolute -left-[27px] top-1 w-3 h-3 rounded-full bg-secondary border-2 border-background"></span>
+<div class="flex items-center justify-between">
+<span class="text-xs font-bold text-on-surface">12:15 UTC — Planning turn</span>
+<span class="text-[10px] font-semibold text-primary px-1.5 py-0.5 rounded bg-surface-container tabular-nums">-8% Argon</span>
+</div>
+<p class="text-[11px] text-on-surface-variant mt-1 leading-relaxed">
+              Multi-file tree ingestion and context assembly dispatched to Gemini 4 Argon.
+            </p>
+</div>
+<!-- Event 3 -->
+<div class="relative">
+<span class="absolute -left-[27px] top-1 w-3 h-3 rounded-full bg-outline border-2 border-background"></span>
+<div class="flex items-center justify-between">
+<span class="text-xs font-bold text-on-surface">08:30 UTC — Routine sync</span>
+<span class="text-[10px] font-medium text-on-surface-variant px-1.5 py-0.5 rounded bg-surface-container tabular-nums">0% delta</span>
+</div>
+<p class="text-[11px] text-on-surface-variant mt-1 leading-relaxed">
+              Heartbeat polling synchronized with upstream API quota registry.
+            </p>
+</div>
+</div>
+</section>
+<!-- Bottom Action Control Buttons -->
+<section class="flex items-center gap-3 pt-1 pb-4">
+<button class="flex-1 py-3 px-4 rounded-full border border-outline/40 text-on-surface font-label text-xs font-semibold hover:bg-surface-container-high transition-colors active:scale-95 flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[18px]">download</span>
+          Export Metrics
+        </button>
+<button class="flex-1 py-3 px-4 rounded-full bg-primary-container text-on-primary-container font-label text-xs font-bold hover:opacity-90 transition-opacity active:scale-95 flex items-center justify-center gap-2 shadow-sm">
+<span class="material-symbols-outlined text-[18px]">tune</span>
+          Adjust Throttling
+        </button>
+</section>
+</main>
+<!-- Bottom Navigation Bar (Mandated via Shared Components JSON & Destination Filtering) -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center h-20 px-2 max-w-md mx-auto pb-safe bg-surface-container dark:bg-surface-container shadow-lg">
+<!-- Destination 1: Dashboard -->
+<a class="flex flex-col items-center justify-center gap-1 text-on-surface-variant dark:text-on-surface-variant px-5 py-1.5 hover:bg-surface-container-highest transition-colors active:scale-95" href="#dashboard">
+<span class="material-symbols-outlined text-[24px]">speed</span>
+<span class="font-label text-xs tracking-wide">Dashboard</span>
+</a>
+<!-- Destination 2: Limits / Quota Pace (Active Destination based on screen content) -->
+<a class="flex flex-col items-center justify-center gap-1 bg-secondary-container dark:bg-secondary-container text-on-secondary-container dark:text-on-secondary-container rounded-full px-5 py-1.5 font-medium hover:bg-surface-container-highest transition-colors active:scale-95" href="#limits">
+<span class="material-symbols-outlined text-[24px]" style="font-variation-settings: 'FILL' 1;">data_usage</span>
+<span class="font-label text-xs tracking-wide">Limits</span>
+</a>
+<!-- Destination 3: Settings -->
+<a class="flex flex-col items-center justify-center gap-1 text-on-surface-variant dark:text-on-surface-variant px-5 py-1.5 hover:bg-surface-container-highest transition-colors active:scale-95" href="#settings">
+<span class="material-symbols-outlined text-[24px]">tune</span>
+<span class="font-label text-xs tracking-wide">Settings</span>
+</a>
+</nav>
+</div>
+</body></html>

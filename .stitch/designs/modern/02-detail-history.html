@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>Material 3 Expressive Telemetry</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;family=Public+Sans:wght@500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            background: "#0E1415",
+            surface: "#111A1B",
+            "surface-container": "#172123",
+            "surface-container-high": "#1D2A2C",
+            "surface-container-highest": "#243437",
+            primary: "#80D4DC",
+            "on-primary": "#00363D",
+            "primary-container": "#004F58",
+            "on-primary-container": "#9EEFF8",
+            secondary: "#FFB77B",
+            "on-secondary": "#4D2600",
+            "secondary-container": "#6D3900",
+            "on-secondary-container": "#FFDCC1",
+            tertiary: "#82DAB8",
+            "on-tertiary": "#003827",
+            "tertiary-container": "#00513B",
+            "on-tertiary-container": "#9EF7D3",
+            "on-surface": "#DEE3E5",
+            "on-surface-variant": "#BFC8CA",
+            outline: "#899294",
+            "outline-variant": "#3F484A"
+          },
+          borderRadius: {
+            "DEFAULT": "1rem",
+            "lg": "2rem",
+            "xl": "3rem",
+            "full": "9999px"
+          },
+          fontFamily: {
+            headline: ["Public Sans", "sans-serif"],
+            display: ["Public Sans", "sans-serif"],
+            body: ["Plus Jakarta Sans", "sans-serif"],
+            label: ["Public Sans", "sans-serif"]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      display: inline-block;
+      vertical-align: middle;
+      line-height: 1;
+    }
+    /* Hide scrollbar for clean chip rail */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-surface font-body antialiased min-h-screen selection:bg-primary selection:text-on-primary">
+<!-- Mobile Screen Wrapper (Pixel 8 Pro Container) -->
+<div class="max-w-md mx-auto min-h-screen flex flex-col relative pb-32 overflow-x-hidden">
+<!-- Native Android Pixel 8 Pro Status Bar -->
+<header class="flex justify-between items-center px-7 pt-3.5 pb-1 text-xs font-semibold text-on-surface select-none tracking-tight">
+<span class="font-headline font-bold text-sm tracking-normal">9:41</span>
+<div class="flex items-center space-x-2">
+<span class="material-symbols-outlined text-[16px] leading-none" data-icon="signal_cellular_alt">signal_cellular_alt</span>
+<span class="material-symbols-outlined text-[16px] leading-none" data-icon="wifi">wifi</span>
+<div class="flex items-center space-x-1 pl-0.5">
+<span class="text-[11px] font-mono">94%</span>
+<span class="material-symbols-outlined text-[18px] leading-none rotate-90" data-icon="battery_full">battery_full</span>
+</div>
+</div>
+</header>
+<!-- Shared TopAppBar -->
+<div class="flex justify-between items-center w-full px-6 py-4 max-w-md mx-auto bg-transparent">
+<div class="flex items-center space-x-3">
+<button aria-label="Navigate Back" class="w-10 h-10 rounded-full flex items-center justify-center text-primary hover:bg-surface-container-high/50 transition-colors duration-200 active:scale-95 transition-transform duration-150">
+<span class="material-symbols-outlined text-2xl" data-icon="arrow_back">arrow_back</span>
+</button>
+<div>
+<h1 class="font-headline text-lg font-bold text-on-surface tracking-tight leading-tight">Burn Velocity &amp; Pace</h1>
+<p class="font-label text-[10px] tracking-widest uppercase font-bold text-primary opacity-90">LIVE TELEMETRY</p>
+</div>
+</div>
+<div class="flex items-center space-x-1">
+<button aria-label="Tune Telemetry" class="w-10 h-10 rounded-full flex items-center justify-center text-primary hover:bg-surface-container-high/50 transition-colors duration-200 active:scale-95 transition-transform duration-150">
+<span class="material-symbols-outlined text-xl" data-icon="tune">tune</span>
+</button>
+<button aria-label="More Options" class="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high/50 transition-colors duration-200 active:scale-95 transition-transform duration-150">
+<span class="material-symbols-outlined text-xl" data-icon="more_vert">more_vert</span>
+</button>
+</div>
+</div>
+<!-- Main Content Canvas -->
+<main class="px-5 space-y-5 flex-1">
+<!-- Filter Chips Rail 1: Target Providers -->
+<section aria-label="Provider Selection">
+<div class="flex items-center space-x-2 overflow-x-auto no-scrollbar py-0.5">
+<button class="flex items-center space-x-1.5 px-4 py-2 rounded-full bg-primary text-on-primary font-headline text-xs font-bold shadow-md shadow-primary/10 shrink-0 active:scale-95 transition-all">
+<span class="w-2 h-2 rounded-full bg-on-primary animate-pulse"></span>
+<span>Antigravity (agy)</span>
+</button>
+<button class="px-4 py-2 rounded-full bg-surface-container text-on-surface-variant hover:text-on-surface font-headline text-xs font-semibold shrink-0 active:scale-95 transition-all">
+            OpenCode Go
+          </button>
+<button class="px-4 py-2 rounded-full bg-surface-container text-on-surface-variant hover:text-on-surface font-headline text-xs font-semibold shrink-0 active:scale-95 transition-all">
+            Grok 4.7 Build
+          </button>
+</div>
+</section>
+<!-- Filter Chips Rail 2: Horizons -->
+<section aria-label="Time Horizon Selection">
+<div class="flex items-center space-x-1.5 overflow-x-auto no-scrollbar">
+<button class="px-3.5 py-1.5 rounded-full bg-surface-container-high/50 text-on-surface-variant text-[11px] font-headline font-medium shrink-0 active:scale-95 transition-all">
+            5h Rolling
+          </button>
+<button class="flex items-center space-x-1 px-3.5 py-1.5 rounded-full bg-secondary-container text-on-secondary-container text-[11px] font-headline font-bold shrink-0 shadow-sm active:scale-95 transition-all">
+<span class="material-symbols-outlined text-xs" data-icon="check">check</span>
+<span>7 Days (Active)</span>
+</button>
+<button class="px-3.5 py-1.5 rounded-full bg-surface-container-high/50 text-on-surface-variant text-[11px] font-headline font-medium shrink-0 active:scale-95 transition-all">
+            30d Monthly
+          </button>
+<button class="px-3.5 py-1.5 rounded-full bg-surface-container-high/50 text-on-surface-variant text-[11px] font-headline font-medium shrink-0 active:scale-95 transition-all">
+            Custom
+          </button>
+</div>
+</section>
+<!-- Hero Bezier Sparkline Telemetry Card -->
+<section class="bg-surface-container rounded-lg p-5 relative overflow-hidden border border-outline-variant/30 shadow-xl shadow-background/50">
+<!-- Top Info Header -->
+<div class="flex items-start justify-between gap-2 mb-3">
+<div>
+<div class="flex items-center space-x-2">
+<span class="px-2.5 py-1 rounded-full bg-surface-container-high text-primary font-mono text-[10px] font-bold tracking-tight">GEMINI-ARGON-WTU-WEEKLY</span>
+<span class="text-xs font-semibold text-on-surface-variant">Gemini 4 Argon</span>
+</div>
+<div class="mt-3 flex items-baseline space-x-2">
+<span class="font-headline text-5xl font-extrabold tracking-tight text-primary">55%</span>
+<div class="flex flex-col">
+<span class="font-headline text-xs font-bold text-on-surface uppercase tracking-wide">Quota Left</span>
+<span class="text-[11px] text-on-surface-variant">45% Burned across 6d 19h</span>
+</div>
+</div>
+</div>
+<div class="flex items-center space-x-1 px-2.5 py-1.5 rounded-full bg-tertiary-container/80 text-on-tertiary-container text-[11px] font-headline font-bold">
+<span class="material-symbols-outlined text-xs" data-icon="trending_down">trending_down</span>
+<span>-51.8% Under Linear Pace</span>
+</div>
+</div>
+<p class="text-[11px] text-tertiary font-mono font-medium mb-2">Slope: 0.28%/h • Linear Cap: 0.59%/h</p>
+<!-- SVG Expressive Bezier Canvas -->
+<div class="relative w-full h-48 my-1">
+<svg class="w-full h-full overflow-visible" preserveaspectratio="none" viewbox="0 0 380 180">
+<defs>
+<!-- Luminous Area Gradient -->
+<lineargradient id="primaryAreaGrad" x1="0%" x2="0%" y1="0%" y2="100%">
+<stop offset="0%" stop-color="#80D4DC" stop-opacity="0.38"></stop>
+<stop offset="50%" stop-color="#80D4DC" stop-opacity="0.12"></stop>
+<stop offset="100%" stop-color="#80D4DC" stop-opacity="0.0"></stop>
+</lineargradient>
+<lineargradient id="burnCurveGrad" x1="0%" x2="100%" y1="0%" y2="0%">
+<stop offset="0%" stop-color="#82DAB8"></stop>
+<stop offset="60%" stop-color="#80D4DC"></stop>
+<stop offset="100%" stop-color="#80D4DC"></stop>
+</lineargradient>
+</defs>
+<!-- Horizontal Grid Guides -->
+<line stroke="#243437" stroke-dasharray="3 3" stroke-width="1" x1="0" x2="380" y1="20" y2="20"></line>
+<line stroke="#243437" stroke-dasharray="3 3" stroke-width="1" x1="0" x2="380" y1="75" y2="75"></line>
+<line stroke="#243437" stroke-dasharray="3 3" stroke-width="1" x1="0" x2="380" y1="130" y2="130"></line>
+<!-- Benchmark: 100% Linear Window Pace (Depletes straight to 0% at reset) -->
+<line opacity="0.65" stroke="#FFB77B" stroke-dasharray="4 4" stroke-width="1.5" x1="10" x2="360" y1="20" y2="155"></line>
+<text fill="#FFB77B" font-family="Public Sans" font-size="9" font-weight="600" opacity="0.8" x="14" y="32">-- 100% Linear Window Pace</text>
+<!-- Historical Bezier Area Fill (Day 1 to Now at ~55%) -->
+<!-- D1(10, 20) -> D2(60, 26) -> D3(115, 38) -> D4(175, 48) -> D5(230, 64) -> D6(285, 74) -> Now(315, 82) -->
+<path d="M 10 20 
+                     C 45 22, 80 32, 115 38
+                     C 150 44, 200 52, 230 64
+                     C 260 76, 290 76, 315 82
+                     L 315 155 L 10 155 Z" fill="url(#primaryAreaGrad)"></path>
+<!-- Historical Fluid Bezier Curve -->
+<path d="M 10 20 
+                     C 45 22, 80 32, 115 38
+                     C 150 44, 200 52, 230 64
+                     C 260 76, 290 76, 315 82" fill="none" stroke="url(#burnCurveGrad)" stroke-linecap="round" stroke-width="3"></path>
+<!-- Projected Forecast Trajectory (Dotted forward from Now(315, 82) to Reset(360, 87) [52% level]) -->
+<path d="M 315 82 C 330 84, 345 86, 360 87" fill="none" stroke="#80D4DC" stroke-dasharray="3 3" stroke-width="2.5"></path>
+<!-- Current Telemetry Head Pin Marker (Now: 55%) -->
+<circle cx="315" cy="82" fill="#80D4DC" r="5" stroke="#172123" stroke-width="2"></circle>
+<circle cx="315" cy="82" fill="#80D4DC" opacity="0.25" r="9"></circle>
+<!-- Projected Landing Coordinate Point (Target 52% reserve at reset) -->
+<circle cx="360" cy="87" fill="#82DAB8" r="4.5"></circle>
+<circle cx="360" cy="87" fill="#82DAB8" opacity="0.25" r="8"></circle>
+</svg>
+<!-- Floating Tooltip / Target Pin -->
+<div class="absolute right-1 top-10 flex items-center space-x-1 px-2.5 py-1 rounded-full bg-surface-container-highest/95 border border-primary/40 shadow-lg backdrop-blur">
+<span class="material-symbols-outlined text-[13px] text-tertiary" data-icon="check_circle">check_circle</span>
+<span class="font-headline text-[10px] font-bold text-on-surface">52% Reserve at Reset (19:39 UTC)</span>
+</div>
+</div>
+<!-- X-Axis Timeline Markers -->
+<div class="flex justify-between items-center text-[10px] font-mono text-on-surface-variant/80 pt-1 border-t border-surface-container-high">
+<span>D1</span>
+<span>D2</span>
+<span>D3</span>
+<span>D4</span>
+<span>D5</span>
+<span>D6</span>
+<span class="text-primary font-bold">Now (4h 22m rem)</span>
+<span class="text-tertiary font-bold">Reset</span>
+</div>
+</section>
+<!-- 2x2 Expressive Telemetry Metric Bento Grid -->
+<section aria-label="Key Telemetry Metrics">
+<div class="grid grid-cols-2 gap-3">
+<!-- Bento Tile 1: Burn Rate -->
+<div class="bg-surface-container rounded-lg p-4 flex flex-col justify-between border border-outline-variant/20 hover:border-primary/40 transition-colors">
+<div class="flex items-center justify-between">
+<span class="text-xs font-semibold text-on-surface-variant font-label">Current Burn Rate</span>
+<span class="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-sm" data-icon="speed">speed</span>
+</span>
+</div>
+<div class="mt-2">
+<span class="font-headline text-2xl font-extrabold text-on-surface">0.28%</span>
+<span class="text-xs font-medium text-on-surface-variant font-mono">/ hr</span>
+</div>
+<div class="mt-2.5 flex items-center space-x-1 text-[11px] font-bold text-tertiary">
+<span class="material-symbols-outlined text-xs" data-icon="arrow_downward">arrow_downward</span>
+<span>Below 0.59%/hr cap</span>
+</div>
+</div>
+<!-- Bento Tile 2: Window Elapsed -->
+<div class="bg-surface-container rounded-lg p-4 flex flex-col justify-between border border-outline-variant/20 hover:border-primary/40 transition-colors">
+<div class="flex items-center justify-between">
+<span class="text-xs font-semibold text-on-surface-variant font-label">Window Elapsed</span>
+<span class="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-sm" data-icon="schedule">schedule</span>
+</span>
+</div>
+<div class="mt-2">
+<span class="font-headline text-2xl font-extrabold text-on-surface">96.8%</span>
+</div>
+<div class="mt-2.5 text-[11px] font-medium text-on-surface-variant flex items-center space-x-1">
+<span class="material-symbols-outlined text-xs text-secondary" data-icon="timelapse">timelapse</span>
+<span>6d 19h of 7d cycle</span>
+</div>
+</div>
+<!-- Bento Tile 3: Exhaustion Forecast -->
+<div class="bg-surface-container rounded-lg p-4 flex flex-col justify-between border border-outline-variant/20 hover:border-tertiary/40 transition-colors">
+<div class="flex items-center justify-between">
+<span class="text-xs font-semibold text-on-surface-variant font-label">Exhaustion Forecast</span>
+<span class="w-8 h-8 rounded-full bg-tertiary-container flex items-center justify-center text-tertiary">
+<span class="material-symbols-outlined text-sm" data-icon="shield">shield</span>
+</span>
+</div>
+<div class="mt-2">
+<span class="font-headline text-2xl font-extrabold text-tertiary">Never</span>
+</div>
+<div class="mt-2.5">
+<span class="px-2 py-0.5 rounded-full bg-tertiary-container text-on-tertiary-container text-[10px] font-headline font-bold">
+                SAFE HEADROOM
+              </span>
+<p class="text-[10px] text-tertiary font-medium mt-1">+51.8% surplus margin</p>
+</div>
+</div>
+<!-- Bento Tile 4: Next Window Reset -->
+<div class="bg-surface-container rounded-lg p-4 flex flex-col justify-between border border-outline-variant/20 hover:border-primary/40 transition-colors">
+<div class="flex items-center justify-between">
+<span class="text-xs font-semibold text-on-surface-variant font-label">Next Reset</span>
+<span class="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-sm" data-icon="update">update</span>
+</span>
+</div>
+<div class="mt-2">
+<span class="font-headline text-2xl font-extrabold text-on-surface">19:39</span>
+<span class="text-xs font-semibold text-on-surface-variant font-mono">UTC</span>
+</div>
+<div class="mt-2.5 flex items-center space-x-1 text-[11px] font-semibold text-primary">
+<span class="material-symbols-outlined text-xs" data-icon="hourglass_bottom">hourglass_bottom</span>
+<span>In 4h 22m (12:39 LCL)</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Multi-Horizon Bucket Comparison Cards -->
+<section aria-label="Quota Buckets Comparison" class="space-y-3 pt-1">
+<div class="flex items-center justify-between px-1">
+<div class="flex items-center space-x-2">
+<h2 class="font-headline text-xs font-bold uppercase tracking-wider text-on-surface-variant">Quota Buckets &amp; Multi-Horizon Pace</h2>
+</div>
+<div class="flex items-center space-x-1.5">
+<span class="w-2 h-2 rounded-full bg-tertiary animate-ping"></span>
+<span class="text-[10px] font-mono text-tertiary font-bold uppercase">Sync OK</span>
+</div>
+</div>
+<!-- Bucket Card 1: 5-Hour Rolling Window -->
+<article class="bg-surface-container rounded-lg p-4 border border-outline-variant/20 transition-all hover:bg-surface-container-high/40">
+<div class="flex justify-between items-start mb-2">
+<div>
+<div class="flex items-center space-x-2">
+<span class="font-headline text-sm font-bold text-on-surface">gemini-3.8-flash</span>
+<span class="px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant text-[10px] font-semibold">5h Rolling</span>
+</div>
+<p class="text-[11px] text-tertiary font-medium mt-0.5">Dormant / Standby Ready</p>
+</div>
+<span class="font-mono text-xs font-bold text-primary">100% Avail</span>
+</div>
+<!-- Progress Capsule -->
+<div class="w-full bg-surface-container-highest h-3 rounded-full overflow-hidden p-0.5">
+<div class="bg-primary h-full rounded-full transition-all duration-500 w-full shadow-sm shadow-primary"></div>
+</div>
+<div class="flex justify-between items-center mt-2.5 text-[11px] text-on-surface-variant font-mono">
+<span>0% Consumed</span>
+<span>Reset in 19m 40s • RPM Limit: 2,000</span>
+</div>
+</article>
+<!-- Bucket Card 2: 7-Day Weekly Window (Active focus) -->
+<article class="bg-surface-container rounded-lg p-4 border border-primary/30 shadow-md shadow-background relative overflow-hidden">
+<div class="flex justify-between items-start mb-2">
+<div>
+<div class="flex items-center space-x-2">
+<span class="font-headline text-sm font-bold text-on-surface">gemini-argon-wtu-weekly</span>
+<span class="px-2 py-0.5 rounded-full bg-tertiary-container text-on-tertiary-container text-[10px] font-bold">Optimal Pace</span>
+</div>
+<p class="text-[11px] text-on-surface-variant mt-0.5">Weekly Multi-Agent Orchestration</p>
+</div>
+<div class="text-right">
+<span class="font-mono text-sm font-extrabold text-primary">55% Avail</span>
+<p class="text-[10px] text-on-surface-variant">45% Consumed</p>
+</div>
+</div>
+<!-- Segmented Progress Capsule with Elapsed Notch -->
+<div class="relative w-full my-2">
+<div class="w-full bg-surface-container-highest h-3.5 rounded-full overflow-hidden p-0.5 relative">
+<!-- Available Quota Bar -->
+<div class="bg-gradient-to-r from-tertiary to-primary h-full rounded-full transition-all duration-500" style="width: 55%;"></div>
+</div>
+<!-- Elapsed Target Marker (96.8% time position) -->
+<div class="absolute -top-1 bottom-0 flex flex-col items-center" style="left: 96.8%; transform: translateX(-50%);">
+<div class="w-1.5 h-5 bg-secondary rounded-full shadow-sm"></div>
+</div>
+</div>
+<div class="flex justify-between items-center text-[10px] font-mono text-on-surface-variant mt-1.5">
+<span class="text-tertiary font-bold">Burn Velocity: 0.28%/hr</span>
+<span class="text-secondary font-semibold">Cycle 96.8% (Reset 4h 22m)</span>
+</div>
+</article>
+<!-- Bucket Card 3: 30-Day Project Allocation -->
+<article class="bg-surface-container rounded-lg p-4 border border-outline-variant/20 transition-all hover:bg-surface-container-high/40">
+<div class="flex justify-between items-start mb-2">
+<div>
+<div class="flex items-center space-x-2">
+<span class="font-headline text-sm font-bold text-on-surface">antigravity-cluster-global</span>
+<span class="px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant text-[10px] font-semibold">30d Monthly</span>
+</div>
+<p class="text-[11px] text-on-surface-variant mt-0.5">Enterprise Global Reserve</p>
+</div>
+<span class="font-mono text-xs font-bold text-on-surface">99% Headroom</span>
+</div>
+<div class="w-full bg-surface-container-highest h-3 rounded-full overflow-hidden p-0.5">
+<div class="bg-tertiary h-full rounded-full transition-all duration-500" style="width: 99%;"></div>
+</div>
+<div class="flex justify-between items-center mt-2.5 text-[11px] text-on-surface-variant font-mono">
+<span>1% Consumed</span>
+<span>23 Days Remaining in Cycle</span>
+</div>
+</article>
+</section>
+<!-- Autonomous Throttling Insight Banner -->
+<section class="bg-surface-container rounded-lg p-4 border border-primary/20 bg-gradient-to-r from-surface-container via-surface-container to-primary-container/20">
+<div class="flex items-start space-x-3">
+<div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-lg" data-icon="auto_awesome">auto_awesome</span>
+</div>
+<div class="space-y-1">
+<h3 class="font-headline text-xs font-bold text-on-surface">Autonomous Optimization Active</h3>
+<p class="text-xs text-on-surface-variant leading-relaxed">
+              Traffic throttling thresholds dynamically relaxed because consumption pace is <strong class="text-tertiary">51.8% below</strong> maximum linear depletion. Token dispatch rates operate unconstrained.
+            </p>
+</div>
+</div>
+</section>
+</main>
+<!-- Shared BottomNavBar (M3 Expressive Floating Navigation Pill) -->
+<!-- The active state logic maps to 'Burn' since current screen is Burn Velocity & Pace -->
+<nav aria-label="Bottom Navigation" class="fixed bottom-0 left-0 right-0 z-50 flex justify-around items-center px-4 py-2.5 max-w-md mx-auto bg-surface-container/90 dark:bg-surface-container/90 backdrop-blur-xl floating rounded-full mx-6 mb-6 shadow-lg shadow-surface-tint/5 select-none">
+<!-- Tab 1: Burn (Active Target Destination) -->
+<a aria-current="page" class="flex flex-col items-center justify-center bg-secondary-container dark:bg-secondary-container text-on-secondary-container dark:text-on-secondary-container rounded-full px-4 py-1.5 font-bold transition-all duration-300 active:scale-90" href="#burn">
+<span class="material-symbols-outlined text-lg" data-icon="speed">speed</span>
+<span class="font-label text-xs font-semibold">Burn</span>
+</a>
+<!-- Tab 2: Metrics -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant px-3 py-1.5 transition-colors duration-200 hover:text-primary active:scale-90" href="#metrics">
+<span class="material-symbols-outlined text-lg" data-icon="grid_view">grid_view</span>
+<span class="font-label text-xs font-semibold">Metrics</span>
+</a>
+<!-- Tab 3: Buckets -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant px-3 py-1.5 transition-colors duration-200 hover:text-primary active:scale-90" href="#buckets">
+<span class="material-symbols-outlined text-lg" data-icon="layers">layers</span>
+<span class="font-label text-xs font-semibold">Buckets</span>
+</a>
+<!-- Tab 4: Forecast -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant px-3 py-1.5 transition-colors duration-200 hover:text-primary active:scale-90" href="#forecast">
+<span class="material-symbols-outlined text-lg" data-icon="timeline">timeline</span>
+<span class="font-label text-xs font-semibold">Forecast</span>
+</a>
+</nav>
+<!-- Android Gesture Bar Spacer (Pixel Ergonomics) -->
+<div class="fixed bottom-1 left-1/2 -translate-x-1/2 w-32 h-1 bg-on-surface-variant/40 rounded-full z-50 pointer-events-none"></div>
+</div>
+</body></html>

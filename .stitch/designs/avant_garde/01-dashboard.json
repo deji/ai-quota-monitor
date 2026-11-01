@@ -1,0 +1,13 @@
+{
+  "slug": "01-dashboard",
+  "title": "Avant-Garde \u2014 Chronos Orbital Kinetic HUD",
+  "set": "avant_garde",
+  "designSystem": "assets/5766478320191827137",
+  "screenId": "81a24b183795410cbcc0ab8c92031d74",
+  "screenName": "projects/8157070654946262217/screens/81a24b183795410cbcc0ab8c92031d74",
+  "screenshotPath": ".stitch/designs/avant_garde/01-dashboard.png",
+  "htmlPath": ".stitch/designs/avant_garde/01-dashboard.html",
+  "aiNotes": [
+    "I have crafted the **Chronos // Orbital Kinetic HUD** screen (Chronos // Orbital Kinetic HUD), an avant-garde native Android Compose Canvas telemetry experience adhering to the **Set 3: Chronos Orbital Kinetic HUD** design language.\n\n### Key Architectural & Visual Decisions:\n\n1. **Orca Stage Matrix & Status Header**:\n   - High-density monospace status header displaying real-time orchestrator sync status and latency.\n   - Three dedicated Orca pipeline stage readiness cards: **Planner** (*Gemini 4 Argon \u00b7 55% Active*), **Builder** (*Flash 100% / OpenCode 98% Ready*), and **Reviewer** (*Grok 4.7 Primed Standby*).\n\n2. **Concentric Orbital Chronometer (Compose Canvas Hero)**:\n   - Deep obsidian radar surface featuring coordinate reticles (`000\u00b0`, `090\u00b0`, `180\u00b0`, `270\u00b0`) and hairline orbital tracks.\n   - **Inner Ring**: 5-Hour rolling horizon (100% Flash buffer).\n   - **Middle Ring**: 7-Day tactical horizon with an electric phosphor arc tracking Gemini 4 Argon's 55% reserve, complete with the orange pace anchor tick vector at 96.8% elapsed.\n   - **Outer Ring**: 30-Day strategic horizon representing OpenCode monthly allocation.\n   - Centered oversized tabular readout (`55%`) with real-time pace delta (`-51% UNDER PACE \u00b7 RESETS 19:39 UTC`).\n\n3. **Hairline Monospace Telemetry Strip**:\n   - Zero standard rounded cards; structured with crisp hairline-divided rows (`border-outline-variant`) for maximum data density.\n   - Live stream metrics highlighting burn rate (`0.28%/hr` vs `0.59%/hr` cap pace), token TTL, RPM ceilings, and unmetered pipes across Argon, Flash, OpenCode, and Grok.\n\n4. **Tactile Time-Travel Horizon Scrubber**:\n   - Interactive projection slider mapping `NOW [0h] \u2192 +1h \u2192 +4h [SCRUB] \u2192 RESET (19:39 UTC)`.\n   - Real-time simulation readout computing dynamic quota impact at current burn rate: `53.9% Remaining (-1.1% burn delta, +50.2% headroom)`.\n   - Quick action triggers for `INSPECT VECTOR LOG` and `ADJUST THROTTLE MESH`."
+  ]
+}
