@@ -32,13 +32,13 @@ auto_connect_wireless_adb() {
     return 1
   fi
   echo "==> Discovering paired Wireless ADB service over mDNS (_adb-tls-connect._tcp)..."
-  local endpoint
-  endpoint="$(python3 - <<'PY'
+  local endpoints
+  endpoints="$(python3 - <<'PY'
 import re
 import subprocess
 import sys
 
-def run_dnssd(args, timeout=2.0):
+def run_cmd(args, timeout=2.0):
     p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     try:
         out, _ = p.communicate(timeout=timeout)
@@ -47,7 +47,7 @@ def run_dnssd(args, timeout=2.0):
         out, _ = p.communicate()
     return out
 
-browse = run_dnssd(["dns-sd", "-B", "_adb-tls-connect._tcp", "local."], timeout=2.0)
+browse = run_cmd(["dns-sd", "-B", "_adb-tls-connect._tcp", "local."], timeout=2.0)
 instances = []
 for line in browse.splitlines():
     if "Add" in line and "_adb-tls-connect._tcp." in line:
@@ -57,22 +57,47 @@ for line in browse.splitlines():
             if inst and inst not in instances:
                 instances.append(inst)
 
+ts_ip = None
+for ts_bin in ("/Applications/Tailscale.app/Contents/MacOS/Tailscale", "tailscale"):
+    try:
+        ts_out = subprocess.check_output([ts_bin, "status"], text=True, stderr=subprocess.DEVNULL)
+        for line in ts_out.splitlines():
+            if "pixel-8-pro" in line.lower() or "android" in line.lower():
+                m_ip = re.search(r"\b(100\.\d{1,3}\.\d{1,3}\.\d{1,3})\b", line)
+                if m_ip:
+                    ts_ip = m_ip.group(1)
+                    break
+        if ts_ip:
+            break
+    except Exception:
+        pass
+
 for inst in instances:
-    lookup = run_dnssd(["dns-sd", "-L", inst, "_adb-tls-connect._tcp", "local."], timeout=2.0)
+    lookup = run_cmd(["dns-sd", "-L", inst, "_adb-tls-connect._tcp", "local."], timeout=2.0)
     m = re.search(r"can be reached at\s+([^\s:]+):(\d+)", lookup)
     if not m:
         continue
     host, port = m.group(1), m.group(2)
-    addr_out = run_dnssd(["dns-sd", "-G", "v4", host], timeout=2.0)
+    addr_out = run_cmd(["dns-sd", "-G", "v4", host], timeout=2.0)
     ip_match = re.search(r"\b(\d{1,3}(?:\.\d{1,3}){3})\b", addr_out)
-    ip = ip_match.group(1) if ip_match else host
-    print(f"{ip}:{port}")
+    lan_ip = ip_match.group(1) if ip_match else host
+    candidates = []
+    if lan_ip:
+        candidates.append(f"{lan_ip}:{port}")
+    if ts_ip:
+        candidates.append(f"{ts_ip}:{port}")
+    print(" ".join(candidates))
     sys.exit(0)
 PY
 )"
-  if [[ -n "$endpoint" ]]; then
-    echo "==> Connecting to discovered Wireless ADB endpoint ($endpoint)..."
-    adb connect "$endpoint" >/dev/null 2>&1 || true
+  if [[ -n "$endpoints" ]]; then
+    for ep in $endpoints; do
+      echo "==> Connecting to discovered Wireless ADB endpoint ($ep)..."
+      adb connect "$ep" >/dev/null 2>&1 || true
+      if adb devices | grep -qE '[[:space:]]device$'; then
+        break
+      fi
+    done
   fi
 }
 
