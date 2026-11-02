@@ -267,26 +267,34 @@ fun BurnVelocityChart(
                                     lastX = x
                                 }
 
-                                fillPath.lineTo(lastX, chartH)
-                                fillPath.lineTo(firstX, chartH)
-                                fillPath.close()
-
-                                // Draw subtle stream area
-                                drawPath(
-                                    path = fillPath,
-                                    brush = Brush.verticalGradient(
-                                        colors = listOf(stream.color.copy(alpha = 0.15f), Color.Transparent),
-                                        startY = 0f,
-                                        endY = chartH
+                                if (dataPoints.size == 1) {
+                                    drawCircle(
+                                        color = stream.color,
+                                        radius = 3.dp.toPx(),
+                                        center = Offset(prevX, prevY)
                                     )
-                                )
+                                } else {
+                                    fillPath.lineTo(lastX, chartH)
+                                    fillPath.lineTo(firstX, chartH)
+                                    fillPath.close()
 
-                                // Draw smooth curve stroke
-                                drawPath(
-                                    path = path,
-                                    color = stream.color,
-                                    style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round)
-                                )
+                                    // Draw subtle stream area
+                                    drawPath(
+                                        path = fillPath,
+                                        brush = Brush.verticalGradient(
+                                            colors = listOf(stream.color.copy(alpha = 0.15f), Color.Transparent),
+                                            startY = 0f,
+                                            endY = chartH
+                                        )
+                                    )
+
+                                    // Draw smooth curve stroke
+                                    drawPath(
+                                        path = path,
+                                        color = stream.color,
+                                        style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round)
+                                    )
+                                }
                             }
                         }
                     }

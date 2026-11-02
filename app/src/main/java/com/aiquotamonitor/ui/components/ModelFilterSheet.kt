@@ -62,6 +62,18 @@ val ORCA_CORE_VISIBLE_IDS: Set<String> = setOf(
     "grok-weekly-credits"
 )
 
+val KNOWN_ALL_BUCKET_IDS: Set<String> = setOf(
+    "gemini-argon-wtu-weekly",
+    "gemini-5h",
+    "gemini-weekly",
+    "3p-5h",
+    "3p-weekly",
+    "opencode-rolling",
+    "opencode-weekly",
+    "opencode-monthly",
+    "grok-weekly-credits"
+)
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ModelFilterSheet(
@@ -153,7 +165,7 @@ fun ModelFilterSheet(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                val allBucketIds = snapshot.providers.flatMap { it.buckets }.map { it.id }.toSet()
+                val allBucketIds = snapshot.providers.flatMap { it.buckets }.map { it.id }.toSet() + KNOWN_ALL_BUCKET_IDS
                 val orcaCoreHidden = allBucketIds.filterNot { it in ORCA_CORE_VISIBLE_IDS }.toSet()
 
                 val isHideClaudeActive = hiddenBucketIds == PreferencesStore.DEFAULT_HIDDEN_BUCKET_IDS

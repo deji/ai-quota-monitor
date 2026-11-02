@@ -355,13 +355,13 @@ class QuotaRepositoryImpl(
 
     override suspend fun setPinnedBucket(bucketId: String?) = withContext(Dispatchers.IO) {
         settingsMutex.withLock {
-            preferencesStore.savePinnedBucketId(bucketId)
             if (bucketId != null) {
                 val currentHidden = preferencesStore.getHiddenBucketIds()
                 if (currentHidden.contains(bucketId)) {
                     preferencesStore.saveHiddenBucketIds(currentHidden - bucketId)
                 }
             }
+            preferencesStore.savePinnedBucketId(bucketId)
         }
         triggerWidgetUpdates()
     }
