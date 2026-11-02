@@ -37,23 +37,32 @@ Every bug or feature follows the **GitHub Issue-First Workflow** enforced by [`s
 # 0. Create the GitHub Issue FIRST (scrubbed for secret/PII hygiene automatically)
 ./scripts/gh-issue-workflow.sh create "<title>" "<problem-and-scope>" "enhancement"
 
-# 1. Post the Plan comment (## [PLAN]) on the GitHub Issue
-./scripts/gh-issue-workflow.sh comment <issue-number> plan "<plan-markdown-or-@file>"
-
-# 2. Confirm runtime & create/bind the orchestration run
+# 1. Confirm runtime & create/bind the orchestration run
 orca status --json
 orca orchestration run-create --objective "AI Quota Monitor - Issue #<issue-number>" --json
+
+# 2. Gate 1 — Dispatch a supervised Grok 4.7 Medium reviewer worker for Plan Review BEFORE implementation
+# (Ensure the target worktree is marked trusted = true in ~/.grok/trusted_folders.toml first)
+orca orchestration worker-start \
+  --task-title "Issue #<issue-number>: Gate 1 Plan Review (grok-4.7 medium)" \
+  --spec "<read-only Gate 1 plan review prompt>" \
+  --worktree "<worktreeSelector>" \
+  --agent grok \
+  --json
+./scripts/gh-issue-workflow.sh comment <issue-number> plan "<plan-and-gate1-review-markdown-or-@file>"
 
 # 3. Dispatch an Implementer & Tester worker (agy with Gemini 3.8 Flash High)
 orca orchestration worker-start \
   --task-title "Issue #<issue-number>: <concise-task-title>" \
   --spec "$(cat <path-to-spec.md>)" \
-  --worktree new-child \
-  --name "<branch-slug>" \
+  --worktree "<worktreeSelector>" \
   --agent antigravity \
   --model gemini-3.8-flash-high \
   --effort high \
   --json
+
+# (Optional) Send follow-up instructions to a running worker terminal (--type dispatch)
+# orca orchestration send --to "<terminalId>" --type dispatch --summary "<summary>" --body "<instructions>" --json
 
 # 4. Wait for worker completion, questions, or escalations
 orca orchestration check --wait --types "worker_done,escalation,question" --timeout-ms 900000 --json

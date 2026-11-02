@@ -119,10 +119,14 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s collector/tests -v
 
 #### Install & Launch the App
 
-Once `adb devices -l` shows your Pixel 8 Pro, run:
+Once your Pixel 8 Pro has Wireless Debugging enabled (and is paired with this Mac) or is connected via USB-C, run:
 
 ```bash
+# Auto-discovers paired Wireless ADB over Bonjour (_adb-tls-connect._tcp) if not yet connected, installs, and launches:
 ./scripts/deploy-pixel8pro.sh
+
+# Or build and install the signed Release APK:
+./scripts/deploy-pixel8pro.sh --release
 ```
 
 Or manually via `adb`:

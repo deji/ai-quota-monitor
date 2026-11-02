@@ -25,13 +25,13 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Run Unit Tests & Assemble Release APK
+      - name: Run Lint, Unit Tests & Assemble Debug + Release APKs
         env:
           SIGNING_STORE_FILE: ${{ secrets.SIGNING_STORE_FILE }}
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
           SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
-        run: ./gradlew testDebugUnitTest assembleRelease --stacktrace
+        run: ./gradlew lintDebug testDebugUnitTest assembleDebug assembleRelease --stacktrace
 
       - name: Attach APK to GitHub Release
         uses: softprops/action-gh-release@v2

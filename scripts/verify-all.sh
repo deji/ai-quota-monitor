@@ -36,6 +36,7 @@ REQUIRED_DOCS=(
   ".agents/skills/orca-quota-engineering/SKILL.md"
   "scripts/gh-issue-workflow.sh"
   "scripts/review-plan-and-code.sh"
+  "scripts/deploy-pixel8pro.sh"
 )
 for doc in "${REQUIRED_DOCS[@]}"; do
   if [[ ! -s "$doc" ]]; then
@@ -43,8 +44,15 @@ for doc in "${REQUIRED_DOCS[@]}"; do
     exit 1
   fi
 done
-if [[ ! -x "scripts/gh-issue-workflow.sh" ]]; then
-  echo "ERROR: scripts/gh-issue-workflow.sh must be executable" >&2
+for script in "scripts/gh-issue-workflow.sh" "scripts/review-plan-and-code.sh" "scripts/deploy-pixel8pro.sh"; do
+  if [[ ! -x "$script" ]]; then
+    echo "ERROR: $script must be executable" >&2
+    exit 1
+  fi
+done
+AGENTS_LINES="$(wc -l < AGENTS.md | tr -d ' ')"
+if [[ "$AGENTS_LINES" -gt 120 ]]; then
+  echo "ERROR: AGENTS.md must stay concise (<= 120 lines, found $AGENTS_LINES). Move detailed learnings to docs/lessons.md." >&2
   exit 1
 fi
 

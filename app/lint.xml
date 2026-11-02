@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<lint>
+    <!-- Enforce APP-UX2 SharedPreferences StringSet immutability & editor commit hygiene -->
+    <issue id="MutatingSharedPrefs" severity="error" />
+    <issue id="CommitPrefEdits" severity="error" />
+
+    <!-- Enforce Android & WebView security invariants (APP-H1, Zero-WebView rule) -->
+    <issue id="SetJavaScriptEnabled" severity="error" />
+    <issue id="JavascriptInterface" severity="error" />
+    <issue id="HardcodedDebugMode" severity="error" />
+
+    <!-- Enforce Jetpack Compose state & saver correctness -->
+    <issue id="MutableCollectionMutableState" severity="error" />
+    <issue id="RememberSaveableSaverParameter" severity="error" />
+</lint>
