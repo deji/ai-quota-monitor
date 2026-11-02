@@ -32,10 +32,13 @@ import com.aiquotamonitor.ui.theme.QuotaEmerald
 @Composable
 fun GlancePreviewCard(
     snapshot: QuotaSnapshot,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    hiddenBucketIds: Set<String> = emptySet(),
+    pinnedBucketId: String? = null
 ) {
-    val bottleneck = snapshot.bottleneckBucket
-    val argonPercent = bottleneck?.remainingPercent ?: 35.0
+    val hero = snapshot.heroBucket(hiddenBucketIds, pinnedBucketId)
+    val heroPercent = hero?.remainingPercent ?: 35.0
+    val heroLabel = hero?.label ?: "Gemini 4 Argon"
 
     Box(
         modifier = modifier
@@ -99,31 +102,49 @@ fun GlancePreviewCard(
                         )
                     }
 
-                    Column {
-                        Text(
-                            text = "${argonPercent.toInt()}%",
-                            style = MaterialTheme.typography.displaySmall,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Color(0xFFE2E8F0),
-                            fontSize = 32.sp
-                        )
-                        Text(
-                            text = "Gemini 4 Argon Left",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFF94A3B8),
-                            fontSize = 10.sp
+                    if (hero == null) {
+                        Column {
+                            Text(
+                                text = "--",
+                                style = MaterialTheme.typography.displaySmall,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Color(0xFFE2E8F0),
+                                fontSize = 32.sp
+                            )
+                            Text(
+                                text = "All models hidden",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFF94A3B8),
+                                fontSize = 10.sp
+                            )
+                        }
+                    } else {
+                        Column {
+                            Text(
+                                text = "${heroPercent.toInt()}%",
+                                style = MaterialTheme.typography.displaySmall,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Color(0xFFE2E8F0),
+                                fontSize = 32.sp
+                            )
+                            Text(
+                                text = "$heroLabel Left",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFF94A3B8),
+                                fontSize = 10.sp
+                            )
+                        }
+
+                        LinearProgressIndicator(
+                            progress = { (heroPercent / 100f).toFloat().coerceIn(0f, 1f) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(4.dp)
+                                .clip(RoundedCornerShape(2.dp)),
+                            color = QuotaCyan,
+                            trackColor = Color(0xFF263238)
                         )
                     }
-
-                    LinearProgressIndicator(
-                        progress = { (argonPercent / 100f).toFloat().coerceIn(0f, 1f) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(4.dp)
-                            .clip(RoundedCornerShape(2.dp)),
-                        color = QuotaCyan,
-                        trackColor = Color(0xFF263238)
-                    )
                 }
             }
 

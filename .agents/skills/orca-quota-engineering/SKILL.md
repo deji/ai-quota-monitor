@@ -68,6 +68,12 @@ All non-trivial work in this repository uses three distinct agent roles and **th
    - Key `ConnectionSettingsForm` draft state on individual credential strings (never on the whole `SyncSettings` object, which also carries `activeHoursStart`/`End`), and serialize all settings mutations in `QuotaRepositoryImpl` under `settingsMutex`.
    - Use `SyncSettings.hasUsableTransport` (`tailscaleUrl.isNotBlank() || (gistId.isNotBlank() && gistAesKey.isNotBlank())`) everywhere transport readiness is checked.
    - Never persist `SeedData` to `cached_snapshot`; ensure `testConnection` probes non-destructively (preserving stored secrets and restoring prior `ConnectionState` on failure); and keep collector port `8741` consistent across code, placeholders, and docs.
+7. **Persisted Model Visibility, Hero Spotlight Pinning & Chart Telemetry (`APP-UX2`)**:
+   - `PreferencesStore` must distinguish an unset key (`!prefs.contains(KEY_HIDDEN_BUCKETS)`) from an empty set (`"Show All"`). Never remove the key to represent Show All, and always store and return defensive copies (`HashSet(it)`) to prevent mutable reference corruption.
+   - `QuotaRepositoryImpl` must serialize all hidden-bucket and pinning updates under `settingsMutex`, automatically unhiding a bucket when pinned and clearing `pinnedBucketId` when hidden, followed by `QuotaCompactWidget().updateAll(ctx)` and `QuotaWideWidget().updateAll(ctx)`.
+   - `QuotaSnapshot.heroBucket(hidden, pinned)` returns `null` when all visible buckets are hidden and no usable pin exists (omitting `HeroBottleneckCard` rather than falling back to a hidden bottleneck), and tie-breaks equal remaining percentages by bucket ID ascending.
+   - `BurnVelocityChart` must never substitute `100.0` for missing history keys—it only plots streams with at least one recorded data point and distinguishes "All models hidden" from "No history recorded yet" in empty states.
+   - Stacked bottom sheets (`BucketDetailSheet`, `SyncHubSheet`, `ModelFilterSheet`) must prioritize the topmost layer's `BackHandler`.
 
 ---
 

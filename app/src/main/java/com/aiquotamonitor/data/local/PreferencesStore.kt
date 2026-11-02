@@ -21,6 +21,12 @@ class PreferencesStore(
     private val _settingsFlow = MutableStateFlow(readSettings())
     val settingsFlow: StateFlow<SyncSettings> = _settingsFlow.asStateFlow()
 
+    private val _hiddenBucketIdsFlow = MutableStateFlow(getHiddenBucketIds())
+    val hiddenBucketIdsFlow: StateFlow<Set<String>> = _hiddenBucketIdsFlow.asStateFlow()
+
+    private val _pinnedBucketIdFlow = MutableStateFlow(getPinnedBucketId())
+    val pinnedBucketIdFlow: StateFlow<String?> = _pinnedBucketIdFlow.asStateFlow()
+
     private fun readSettings(): SyncSettings {
         val encryptedToken = prefs.getString(KEY_TAILSCALE_TOKEN, "") ?: ""
         val encryptedGistKey = prefs.getString(KEY_GIST_KEY, "") ?: ""
@@ -75,7 +81,36 @@ class PreferencesStore(
         }
     }
 
+    fun getHiddenBucketIds(): Set<String> {
+        return if (prefs.contains(KEY_HIDDEN_BUCKETS)) {
+            HashSet(prefs.getStringSet(KEY_HIDDEN_BUCKETS, emptySet()) ?: emptySet())
+        } else {
+            HashSet(DEFAULT_HIDDEN_BUCKET_IDS)
+        }
+    }
+
+    fun saveHiddenBucketIds(hiddenBucketIds: Set<String>) {
+        val copy = HashSet(hiddenBucketIds)
+        prefs.edit().putStringSet(KEY_HIDDEN_BUCKETS, copy).apply()
+        _hiddenBucketIdsFlow.value = copy
+    }
+
+    fun getPinnedBucketId(): String? {
+        return prefs.getString(KEY_PINNED_BUCKET, null)
+    }
+
+    fun savePinnedBucketId(bucketId: String?) {
+        if (bucketId != null) {
+            prefs.edit().putString(KEY_PINNED_BUCKET, bucketId).apply()
+        } else {
+            prefs.edit().remove(KEY_PINNED_BUCKET).apply()
+        }
+        _pinnedBucketIdFlow.value = bucketId
+    }
+
     companion object {
+        val DEFAULT_HIDDEN_BUCKET_IDS: Set<String> = setOf("3p-5h", "3p-weekly")
+
         private const val KEY_TAILSCALE_URL = "tailscale_url"
         private const val KEY_TAILSCALE_TOKEN = "tailscale_token"
         private const val KEY_GIST_ID = "gist_id"
@@ -85,6 +120,8 @@ class PreferencesStore(
         private const val KEY_HOURS_END = "hours_end"
         private const val KEY_CACHED_SNAPSHOT = "cached_snapshot"
         private const val KEY_POLARITY = "quota_polarity"
+        private const val KEY_HIDDEN_BUCKETS = "hidden_bucket_ids"
+        private const val KEY_PINNED_BUCKET = "pinned_bucket_id"
     }
 }
 
@@ -103,7 +140,8 @@ class InMemorySharedPreferences : SharedPreferences {
 
     override fun getStringSet(key: String?, defValues: Set<String>?): Set<String>? {
         @Suppress("UNCHECKED_CAST")
-        return (key?.let { data[it] } as? Set<String>) ?: defValues
+        val stored = key?.let { data[it] } as? Set<String>
+        return stored?.let { HashSet(it) } ?: defValues?.let { HashSet(it) }
     }
 
     override fun getInt(key: String?, defValue: Int): Int = (key?.let { data[it] } as? Int) ?: defValue
@@ -135,7 +173,7 @@ class InMemorySharedPreferences : SharedPreferences {
 
         override fun putStringSet(key: String?, values: Set<String>?): SharedPreferences.Editor {
             if (key != null) {
-                if (values != null) temp[key] = values else temp[key] = null
+                if (values != null) temp[key] = HashSet(values) else temp[key] = null
             }
             return this
         }

@@ -20,7 +20,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -42,10 +45,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aiquotamonitor.data.repository.ConnectionState
 import com.aiquotamonitor.domain.model.QuotaBucket
+import com.aiquotamonitor.domain.model.QuotaSnapshot
 import com.aiquotamonitor.ui.components.AntigravityBucketsCard
 import com.aiquotamonitor.ui.components.BucketDetailSheet
 import com.aiquotamonitor.ui.components.ConnectCollectorCard
 import com.aiquotamonitor.ui.components.HeroBottleneckCard
+import com.aiquotamonitor.ui.components.ModelFilterSheet
 import com.aiquotamonitor.ui.components.OrcaRoleReadinessStrip
 import com.aiquotamonitor.ui.components.ProviderBentoRow
 import com.aiquotamonitor.ui.components.QuotaPolarityToggle
@@ -72,31 +77,37 @@ fun DashboardScreen(
     val isPriming by viewModel.isPriming.collectAsState()
     val isSyncError by viewModel.isSyncError.collectAsState()
     val isStale by viewModel.isStale.collectAsState()
+    val hiddenBucketIds by viewModel.hiddenBucketIds.collectAsState()
+    val pinnedBucketId by viewModel.pinnedBucketId.collectAsState()
 
     var selectedBucket by remember { mutableStateOf<QuotaBucket?>(null) }
     var showSyncHub by remember { mutableStateOf(false) }
+    var showFilterSheet by remember { mutableStateOf(false) }
 
-    // Intercept back gesture to close modal bottom sheets first
+    // Intercept back gesture to close modal bottom sheets in topmost z-order
     if (selectedBucket != null) {
         BackHandler { selectedBucket = null }
-    }
-    if (showSyncHub) {
+    } else if (showSyncHub) {
         BackHandler { showSyncHub = false }
+    } else if (showFilterSheet) {
+        BackHandler { showFilterSheet = false }
     }
 
-    val bottleneckBucket = snapshot.bottleneckBucket
+    val heroBucket = snapshot.heroBucket(hiddenBucketIds, pinnedBucketId)
+    val isHeroPinned = pinnedBucketId != null && heroBucket?.id == pinnedBucketId
     val agyProvider = snapshot.providers.firstOrNull { it.id == "agy" }
     val openCodeProvider = snapshot.providers.firstOrNull { it.id == "opencode_go" }
     val grokProvider = snapshot.providers.firstOrNull { it.id == "grok" }
 
-    val historyValues = snapshot.history.mapNotNull { it.bucketRemaining["gemini-argon-wtu-weekly"] }
+    val historyValues = heroBucket?.let { b ->
+        snapshot.history.mapNotNull { it.bucketRemaining[b.id] }
+    } ?: emptyList()
 
-    // Nearest reset hours across all buckets for quick RESET preset
-    val nearestResetHours = snapshot.providers
-        .flatMap { it.buckets }
+    // Nearest reset hours across visible buckets for quick RESET preset
+    val nearestResetHours = snapshot.visibleBuckets(hiddenBucketIds)
         .mapNotNull { it.hoursUntilReset }
         .filter { it > 0.0 }
-        .minOrNull() ?: 3.4
+        .minOrNull() ?: QuotaSnapshot.DEFAULT_NEAREST_RESET_HOURS
 
     Box(modifier = modifier.fillMaxSize()) {
         Column(
@@ -176,6 +187,34 @@ fun DashboardScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    BadgedBox(
+                        badge = {
+                            if (hiddenBucketIds.isNotEmpty() || pinnedBucketId != null) {
+                                Badge(
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary
+                                ) {
+                                    Text(
+                                        text = if (pinnedBucketId != null) "★" else "${hiddenBucketIds.size}",
+                                        fontSize = 9.sp
+                                    )
+                                }
+                            }
+                        }
+                    ) {
+                        IconButton(
+                            onClick = { showFilterSheet = true },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Tune,
+                                contentDescription = "Model Filters",
+                                tint = if (hiddenBucketIds.isNotEmpty() || pinnedBucketId != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+
                     IconButton(
                         onClick = { viewModel.refresh(forceTailscale = false, isManual = true) },
                         modifier = Modifier.size(36.dp)
@@ -209,13 +248,14 @@ fun DashboardScreen(
                 )
             }
 
-            if (bottleneckBucket != null) {
+            if (heroBucket != null) {
                 HeroBottleneckCard(
-                    bucket = bottleneckBucket,
+                    bucket = heroBucket,
                     polarity = polarity,
                     historyPoints = historyValues,
+                    isPinned = isHeroPinned,
                     isScrubbing = isScrubbing,
-                    onClick = { selectedBucket = bottleneckBucket }
+                    onClick = { selectedBucket = heroBucket }
                 )
             }
 
@@ -238,6 +278,8 @@ fun DashboardScreen(
             AntigravityBucketsCard(
                 agyProvider = agyProvider,
                 polarity = polarity,
+                hiddenBucketIds = hiddenBucketIds,
+                heroBucketId = heroBucket?.id,
                 onBucketClick = { selectedBucket = it }
             )
 
@@ -266,6 +308,19 @@ fun DashboardScreen(
         SyncHubSheet(
             viewModel = viewModel,
             onDismiss = { showSyncHub = false }
+        )
+    }
+
+    if (showFilterSheet) {
+        ModelFilterSheet(
+            snapshot = snapshot,
+            hiddenBucketIds = hiddenBucketIds,
+            pinnedBucketId = pinnedBucketId,
+            polarity = polarity,
+            onToggleVisibility = { viewModel.toggleBucketVisibility(it) },
+            onSetHiddenBuckets = { viewModel.setHiddenBuckets(it) },
+            onSetPinnedBucket = { viewModel.setPinnedBucket(it) },
+            onDismiss = { showFilterSheet = false }
         )
     }
 }

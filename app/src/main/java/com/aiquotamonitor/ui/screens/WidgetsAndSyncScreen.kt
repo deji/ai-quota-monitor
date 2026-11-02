@@ -34,6 +34,8 @@ fun WidgetsAndSyncScreen(
     val snapshot by viewModel.activeSnapshot.collectAsState()
     val savedSettings by viewModel.settings.collectAsState()
     val connectionState by viewModel.connectionState.collectAsState()
+    val hiddenBucketIds by viewModel.hiddenBucketIds.collectAsState()
+    val pinnedBucketId by viewModel.pinnedBucketId.collectAsState()
 
     val startHour = try {
         savedSettings.activeHoursStart.split(":").first().toInt()
@@ -85,7 +87,11 @@ fun WidgetsAndSyncScreen(
 
         ConnectionSettingsForm(viewModel = viewModel)
 
-        GlancePreviewCard(snapshot = snapshot)
+        GlancePreviewCard(
+            snapshot = snapshot,
+            hiddenBucketIds = hiddenBucketIds,
+            pinnedBucketId = pinnedBucketId
+        )
 
         ActiveHoursSlider(
             startHour = currentStartHour,

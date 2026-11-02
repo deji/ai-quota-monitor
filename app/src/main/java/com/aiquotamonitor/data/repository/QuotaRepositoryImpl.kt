@@ -42,6 +42,8 @@ class QuotaRepositoryImpl(
     override val syncErrorFlow: StateFlow<String?> = _syncErrorFlow.asStateFlow()
 
     override val settingsFlow: StateFlow<SyncSettings> = preferencesStore.settingsFlow
+    override val hiddenBucketIdsFlow: StateFlow<Set<String>> = preferencesStore.hiddenBucketIdsFlow
+    override val pinnedBucketIdFlow: StateFlow<String?> = preferencesStore.pinnedBucketIdFlow
 
     init {
         // Attempt to load cached snapshot from preferences or fallback to rich SeedData
@@ -324,6 +326,46 @@ class QuotaRepositoryImpl(
         }
     }
 
+    override suspend fun setHiddenBuckets(hiddenIds: Set<String>) = withContext(Dispatchers.IO) {
+        settingsMutex.withLock {
+            preferencesStore.saveHiddenBucketIds(hiddenIds)
+            val pinned = preferencesStore.getPinnedBucketId()
+            if (pinned != null && hiddenIds.contains(pinned)) {
+                preferencesStore.savePinnedBucketId(null)
+            }
+        }
+        triggerWidgetUpdates()
+    }
+
+    override suspend fun toggleBucketVisibility(bucketId: String) = withContext(Dispatchers.IO) {
+        settingsMutex.withLock {
+            val current = preferencesStore.getHiddenBucketIds()
+            val updated = if (current.contains(bucketId)) {
+                current - bucketId
+            } else {
+                current + bucketId
+            }
+            preferencesStore.saveHiddenBucketIds(updated)
+            if (updated.contains(bucketId) && preferencesStore.getPinnedBucketId() == bucketId) {
+                preferencesStore.savePinnedBucketId(null)
+            }
+        }
+        triggerWidgetUpdates()
+    }
+
+    override suspend fun setPinnedBucket(bucketId: String?) = withContext(Dispatchers.IO) {
+        settingsMutex.withLock {
+            preferencesStore.savePinnedBucketId(bucketId)
+            if (bucketId != null) {
+                val currentHidden = preferencesStore.getHiddenBucketIds()
+                if (currentHidden.contains(bucketId)) {
+                    preferencesStore.saveHiddenBucketIds(currentHidden - bucketId)
+                }
+            }
+        }
+        triggerWidgetUpdates()
+    }
+
     override fun setSnapshotForSimulation(simulated: QuotaSnapshot) {
         _snapshotFlow.value = simulated
     }
@@ -352,7 +394,10 @@ class QuotaRepositoryImpl(
             } catch (_: Exception) {}
         }
 
-        // Trigger Glance AppWidgets update
+        triggerWidgetUpdates()
+    }
+
+    private fun triggerWidgetUpdates() {
         context?.let { ctx ->
             try {
                 kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {

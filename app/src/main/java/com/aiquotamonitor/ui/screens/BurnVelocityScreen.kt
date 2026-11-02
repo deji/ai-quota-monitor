@@ -1,7 +1,9 @@
 package com.aiquotamonitor.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,11 +18,22 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -30,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aiquotamonitor.domain.model.QuotaBucket
 import com.aiquotamonitor.ui.components.BurnVelocityChart
+import com.aiquotamonitor.ui.components.ModelFilterSheet
 import com.aiquotamonitor.ui.components.QuotaPolarityToggle
 import com.aiquotamonitor.ui.theme.QuotaAmber
 import com.aiquotamonitor.ui.theme.QuotaCoral
@@ -37,6 +51,7 @@ import com.aiquotamonitor.ui.theme.QuotaCyan
 import com.aiquotamonitor.ui.theme.QuotaEmerald
 import com.aiquotamonitor.ui.viewmodel.QuotaViewModel
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BurnVelocityScreen(
     viewModel: QuotaViewModel,
@@ -44,8 +59,17 @@ fun BurnVelocityScreen(
 ) {
     val snapshot by viewModel.activeSnapshot.collectAsState()
     val polarity by viewModel.polarity.collectAsState()
+    val hiddenBucketIds by viewModel.hiddenBucketIds.collectAsState()
+    val pinnedBucketId by viewModel.pinnedBucketId.collectAsState()
+
+    var showFilterSheet by remember { mutableStateOf(false) }
+
+    if (showFilterSheet) {
+        BackHandler { showFilterSheet = false }
+    }
 
     val allBuckets = snapshot.providers.flatMap { it.buckets }
+    val visibleBuckets = snapshot.visibleBuckets(hiddenBucketIds)
 
     Column(
         modifier = modifier
@@ -54,7 +78,7 @@ fun BurnVelocityScreen(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Screen Header + Polarity Toggle
+        // Screen Header + Actions (Filter button + Polarity Toggle)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -77,16 +101,67 @@ fun BurnVelocityScreen(
                 )
             }
 
-            QuotaPolarityToggle(
-                polarity = polarity,
-                onToggle = { viewModel.setPolarity(it) }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                IconButton(
+                    onClick = { showFilterSheet = true },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Tune,
+                        contentDescription = "Filter Models",
+                        tint = if (hiddenBucketIds.isNotEmpty() || pinnedBucketId != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                QuotaPolarityToggle(
+                    polarity = polarity,
+                    onToggle = { viewModel.setPolarity(it) }
+                )
+            }
+        }
+
+        // Interactive Model Series Filter Chips
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            AssistChip(
+                onClick = { showFilterSheet = true },
+                label = { Text("Filters") },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Tune,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
             )
+            allBuckets.forEach { bucket ->
+                val isVisible = bucket.id !in hiddenBucketIds
+                FilterChip(
+                    selected = isVisible,
+                    onClick = { viewModel.toggleBucketVisibility(bucket.id) },
+                    label = { Text(bucket.label, fontSize = 11.sp) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                )
+            }
         }
 
         // Multi-Stream Horizon Velocity Bezier Chart
         BurnVelocityChart(
             history = snapshot.history,
-            polarity = polarity
+            polarity = polarity,
+            hiddenBucketIds = hiddenBucketIds
         )
 
         // 2x2 Metric Squircles
@@ -140,21 +215,42 @@ fun BurnVelocityScreen(
                 .padding(16.dp)
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = "ALL-BUCKET PACE TELEMETRY",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 10.sp,
-                    letterSpacing = 0.8.sp
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "ALL-BUCKET PACE TELEMETRY",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 10.sp,
+                        letterSpacing = 0.8.sp
+                    )
+                    Text(
+                        text = "${visibleBuckets.size} of ${allBuckets.size} active",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 10.sp
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                allBuckets.forEachIndexed { index, bucket ->
-                    BucketPaceRow(bucket = bucket, polarity = polarity)
-                    if (index < allBuckets.lastIndex) {
-                        Spacer(modifier = Modifier.height(10.dp))
+                if (visibleBuckets.isEmpty()) {
+                    Text(
+                        text = "All model buckets are currently hidden.\nTap filter chips above to show telemetry.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(vertical = 12.dp)
+                    )
+                } else {
+                    visibleBuckets.forEachIndexed { index, bucket ->
+                        BucketPaceRow(bucket = bucket, polarity = polarity)
+                        if (index < visibleBuckets.lastIndex) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                        }
                     }
                 }
             }
@@ -205,6 +301,19 @@ fun BurnVelocityScreen(
         }
 
         Spacer(modifier = Modifier.height(16.dp))
+    }
+
+    if (showFilterSheet) {
+        ModelFilterSheet(
+            snapshot = snapshot,
+            hiddenBucketIds = hiddenBucketIds,
+            pinnedBucketId = pinnedBucketId,
+            polarity = polarity,
+            onToggleVisibility = { viewModel.toggleBucketVisibility(it) },
+            onSetHiddenBuckets = { viewModel.setHiddenBuckets(it) },
+            onSetPinnedBucket = { viewModel.setPinnedBucket(it) },
+            onDismiss = { showFilterSheet = false }
+        )
     }
 }
 

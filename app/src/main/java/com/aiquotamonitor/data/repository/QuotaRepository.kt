@@ -9,6 +9,8 @@ interface QuotaRepository {
     val connectionStateFlow: StateFlow<ConnectionState>
     val settingsFlow: StateFlow<SyncSettings>
     val syncErrorFlow: StateFlow<String?>
+    val hiddenBucketIdsFlow: StateFlow<Set<String>>
+    val pinnedBucketIdFlow: StateFlow<String?>
 
     suspend fun refresh(forceTailscale: Boolean = false, isManual: Boolean = false): Result<QuotaSnapshot>
     suspend fun primeGrok(): Result<SmartPrimeStatus>
@@ -16,6 +18,9 @@ interface QuotaRepository {
     suspend fun updateSettings(settings: SyncSettings)
     suspend fun saveSettings(settings: SyncSettings): Result<QuotaSnapshot>
     suspend fun testConnection(overrideSettings: SyncSettings? = null): Result<QuotaSnapshot>
+    suspend fun setHiddenBuckets(hiddenIds: Set<String>)
+    suspend fun toggleBucketVisibility(bucketId: String)
+    suspend fun setPinnedBucket(bucketId: String?)
     fun setSnapshotForSimulation(simulated: QuotaSnapshot)
     fun resetSimulation()
 }

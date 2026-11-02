@@ -30,10 +30,39 @@ data class QuotaSnapshot(
     }
 
     /**
-     * The primary bottleneck bucket (lowest remaining %)
+     * Buckets across all providers excluding hidden ones.
+     */
+    fun visibleBuckets(hiddenBucketIds: Set<String> = emptySet()): List<QuotaBucket> {
+        return providers.flatMap { it.buckets }.filterNot { it.id in hiddenBucketIds }
+    }
+
+    /**
+     * The spotlight bucket for the hero card:
+     * Pinned bucket if specified, present, and not hidden;
+     * otherwise the lowest remaining % bucket among visible buckets (tie-broken by bucket id).
+     * If all visible buckets are hidden and no usable pin exists, returns null.
+     */
+    fun heroBucket(hiddenBucketIds: Set<String> = emptySet(), pinnedBucketId: String? = null): QuotaBucket? {
+        if (pinnedBucketId != null && pinnedBucketId !in hiddenBucketIds) {
+            val pinned = findBucket(pinnedBucketId)
+            if (pinned != null) return pinned
+        }
+        return visibleBuckets(hiddenBucketIds).minWithOrNull(
+            compareBy<QuotaBucket> { it.remainingPercent }.thenBy { it.id }
+        )
+    }
+
+    /**
+     * The primary bottleneck bucket (lowest remaining %, tie-broken by bucket id)
      */
     val bottleneckBucket: QuotaBucket?
-        get() = providers.flatMap { it.buckets }.minByOrNull { it.remainingPercent }
+        get() = providers.flatMap { it.buckets }.minWithOrNull(
+            compareBy<QuotaBucket> { it.remainingPercent }.thenBy { it.id }
+        )
+
+    companion object {
+        const val DEFAULT_NEAREST_RESET_HOURS = 3.4
+    }
 }
 
 @Serializable
