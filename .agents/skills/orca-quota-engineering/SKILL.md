@@ -24,11 +24,16 @@ All non-trivial work in this repository uses three distinct agent roles and **th
    ./scripts/gh-issue-workflow.sh create "<title>" "<description>" "enhancement"
    ./scripts/gh-issue-workflow.sh comment <issue-number> plan "<plan-markdown>"
    ```
-1. **Gate 1 — Plan Review (Pre-Implementation)**:
-   Before dispatching implementation workers for a new feature or architectural change, run `grok` against `docs/plan.md` and `docs/providers.md`:
+1. **Gate 1 — Plan Review (Pre-Implementation, Mandatory on Every Feature/UX Issue)**:
+   Before dispatching implementation workers for a new feature, UX change, or architectural change, run a supervised `grok-4.7` (`--effort medium`) Plan Review against the task spec and `docs/plan.md` + `docs/providers.md`, and post the review to `## [PLAN]`:
    ```bash
-   ./scripts/review-plan-and-code.sh plan --issue <issue-number>
+   # Via supervised Orca worker (after pre-trusting the worktree in ~/.grok/trusted_folders.toml):
+   orca orchestration worker-start --task-title "Issue #<n>: Gate 1 Plan Review" --spec "<prompt>" --worktree "<worktreeSelector>" --agent grok --json
+   # Or via helper script (auto-trusts target worktree and posts ## [PLAN] when --issue is given):
+   ./scripts/review-plan-and-code.sh plan "<worktree-path>" --spec "<spec-file>" --issue <issue-number>
    ```
+   - **Grok Orca Worker Rule**: `orca orchestration worker-start --agent grok` reads `default = "grok-4.7"` and `default_reasoning_effort = "medium"` from `~/.grok/config.toml` (it does **not** accept `--model` or `--effort` CLI flags) and requires `[folders."<worktreePath>"]\ntrusted = true` in `~/.grok/trusted_folders.toml` so newly created worktrees never block on interactive TUI folder trust (`agent-trust-workspace`).
+   - **Follow-Up Worker Dispatch Rule**: When sending Gate 1 review findings or follow-up instructions to a running worker terminal via `orca orchestration send`, always pass `--type dispatch` (valid types: `status, dispatch, worker_done, merge_ready, escalation, handoff, decision_gate, question, heartbeat`; `--type steer` is invalid).
 2. **Gate 2 — Worktree Implementation, Testing & Review Comments**:
    Every commit must reference `#<issue-number>` (enforced by `.githooks/commit-msg`). After an `antigravity` (`gemini-3.8-flash-high`) worker finishes and passes unit/hygiene tests, post the `## [IMPLEMENTATION]` and `## [TESTING]` comments, release its worker terminal, and run `grok` against its worktree with `--issue <issue-number>` to post `## [REVIEW]`:
    ```bash
@@ -72,6 +77,19 @@ All non-trivial work in this repository uses three distinct agent roles and **th
    - Adaptive icons must adhere to the 108dp outer canvas / 66dp diameter safe area circle (center `(54, 54)`, $R \le 33\text{dp}$; maximum foreground extent is the amber pace pip at 29.8dp, alongside the arc stroke at 29.25dp) to prevent clipping under arbitrary OEM launcher masks (Circle, Squircle, Rounded Square, Teardrop).
    - Android 13+ (API 33+) Material You dynamic theming requires a dedicated `<monochrome>` layer in `ic_launcher.xml` and `ic_launcher_round.xml`. It must use `#FFFFFF` fills/strokes with differentiated alpha (e.g. 30% alpha for background tracks). Crucially, because VectorDrawable uses source-over blending, stacking a `#00000000` path does not create cutouts; true knockouts must be subpaths using `android:fillType="evenOdd"`.
    - Always back adaptive vector drawables with hermetic unit tests (`AdaptiveIconResourceTest`) asserting geometry and attribute invariants.
+8. **Persisted Model Visibility, Hero Spotlight Pinning & Chart Telemetry (`APP-UX2`)**:
+   - `PreferencesStore` must distinguish an unset key (`!prefs.contains(KEY_HIDDEN_BUCKETS)`) from an empty set (`"Show All"`). Never remove the key to represent Show All, and always store and return defensive copies (`HashSet(it)`) to prevent mutable reference corruption.
+   - `QuotaRepositoryImpl` must serialize all hidden-bucket and pinning updates under `settingsMutex`, automatically unhiding a bucket when pinned and clearing `pinnedBucketId` when hidden, followed by `QuotaCompactWidget().updateAll(ctx)` and `QuotaWideWidget().updateAll(ctx)`. In UI callers (`ModelFilterSheet`), invoke only `onSetPinnedBucket`—never call `toggleBucketVisibility` before pinning.
+   - All dashboard surfaces, including `ProviderBentoRow`, must respect `hiddenBucketIds`. When all buckets for a provider are hidden, omit its card; when partially hidden, drive radial gauges from visible buckets and select the active visible bucket on click.
+   - In-app widget previews (`GlancePreviewCard`) must faithfully reflect the same configuration options (such as `QuotaPolarity`) across both the 2x2 tile and the 4x2 Orca Stage Deck as the home-screen AppWidgets (`QuotaCompactWidget` and `QuotaWideWidget`). Sub-metric pills (OpenCode 5h rolling) must retain explicit click modifiers targeting their own bucket.
+   - `QuotaSnapshot.heroBucket(hidden, pinned)` returns `null` when all visible buckets are hidden and no usable pin exists (omitting `HeroBottleneckCard` rather than falling back to a hidden bottleneck), and tie-breaks equal remaining percentages by bucket ID ascending.
+   - `BurnVelocityChart` must never substitute `100.0` for missing history keys—it only plots streams with at least one recorded data point and distinguishes "All models hidden" from "No history recorded yet" in empty states.
+   - Stacked bottom sheets (`BucketDetailSheet`, `SyncHubSheet`, `ModelFilterSheet`) must prioritize the topmost layer's `BackHandler`.
+9. **Release Workflow Dual-APK Invariant, Wireless ADB Bonjour Discovery & Linting Rules (`app/lint.xml` + `AQM-LINT-001..008`)**:
+   - `.github/workflows/release.yml` must execute `./gradlew lintDebug testDebugUnitTest assembleDebug assembleRelease` so both `app-debug.apk` and `app-release.apk` are verified and built before `softprops/action-gh-release@v2` attaches release assets (`AQM-LINT-007`).
+   - `./scripts/deploy-pixel8pro.sh` supports `--release` and `--debug` flags and uses macOS Bonjour (`dns-sd -B _adb-tls-connect._tcp local.` → `dns-sd -L` → `dns-sd -G v4`) to automatically discover and `adb connect` to paired Android 14–16 Wireless Debugging endpoints when `adb devices` is empty. **Never** log or commit the discovered `_adb-tls-connect._tcp` service instance name, as Android embeds the device serial number in the mDNS instance name.
+   - `app/lint.xml` (wired via `lintConfig = file("lint.xml")` with `abortOnError = true` in `app/build.gradle.kts`) enforces `MutatingSharedPrefs`, `CommitPrefEdits`, `SetJavaScriptEnabled`, `JavascriptInterface`, `HardcodedDebugMode`, `MutableCollectionMutableState`, and `RememberSaveableSaverParameter` at `severity="error"`.
+   - `collector/tests/test_repo_hygiene.py` (`test_architectural_and_code_lint_rules`) enforces `AQM-LINT-001` (Zero WebViews), `AQM-LINT-002` (`app/lint.xml` error rules), `AQM-LINT-003` (`prefs.contains(KEY_HIDDEN_BUCKETS)` + `HashSet` defensive copies), `AQM-LINT-004` (no `remember(settings)` on composite `SyncSettings`), `AQM-LINT-005` (no `saveCachedSnapshot(SeedData...)`), `AQM-LINT-006` (no `?: 100.0` in `BurnVelocityChart.kt`), `AQM-LINT-007` (`release.yml` builds both debug and release APKs), and `AQM-LINT-008` (no `onToggleBucket` before `onSetPinnedBucket` in `ModelFilterSheet.kt`).
 
 ---
 

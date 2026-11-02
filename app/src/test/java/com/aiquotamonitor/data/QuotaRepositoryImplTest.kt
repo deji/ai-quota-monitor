@@ -10,6 +10,9 @@ import com.aiquotamonitor.data.repository.SyncSettings
 import com.aiquotamonitor.domain.model.QuotaSnapshot
 import com.aiquotamonitor.domain.model.SmartPrimeStatus
 import java.io.IOException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -607,5 +610,272 @@ class QuotaRepositoryImplTest {
         assertEquals("token1", current.tailscaleToken)
         assertEquals("gist1", current.gistId)
         assertEquals("key1", current.gistAesKey)
+    }
+
+    @Test
+    fun testDefaultHiddenBucketIdsContainsClaudeAndGpt3P() = runTest {
+        val repository = QuotaRepositoryImpl(
+            preferencesStore = preferencesStore,
+            tailscaleClient = FakeTailscaleClient(),
+            gistClient = FakeGistClient()
+        )
+
+        val hidden = repository.hiddenBucketIdsFlow.value
+        assertEquals(PreferencesStore.DEFAULT_HIDDEN_BUCKET_IDS, hidden)
+        assertTrue(hidden.contains("3p-5h"))
+        assertTrue(hidden.contains("3p-weekly"))
+    }
+
+    @Test
+    fun testShowAllEmptySetPersistsAcrossRestarts() = runTest {
+        val sharedPrefs = com.aiquotamonitor.data.local.InMemorySharedPreferences()
+        val store1 = PreferencesStore(sharedPreferences = sharedPrefs)
+        val repository = QuotaRepositoryImpl(
+            preferencesStore = store1,
+            tailscaleClient = FakeTailscaleClient(),
+            gistClient = FakeGistClient()
+        )
+
+        // Default before saving
+        assertEquals(PreferencesStore.DEFAULT_HIDDEN_BUCKET_IDS, repository.hiddenBucketIdsFlow.value)
+
+        // User selects "Show All"
+        repository.setHiddenBuckets(emptySet())
+        assertTrue(repository.hiddenBucketIdsFlow.value.isEmpty())
+
+        // Simulate app restart with a fresh PreferencesStore over the same SharedPreferences
+        val store2 = PreferencesStore(sharedPreferences = sharedPrefs)
+        assertTrue("User selected emptySet must not be clobbered back to default on restart", store2.getHiddenBucketIds().isEmpty())
+        assertTrue(store2.hiddenBucketIdsFlow.value.isEmpty())
+    }
+
+    @Test
+    fun testToggleBucketVisibility() = runTest {
+        val repository = QuotaRepositoryImpl(
+            preferencesStore = preferencesStore,
+            tailscaleClient = FakeTailscaleClient(),
+            gistClient = FakeGistClient()
+        )
+
+        // Initially hidden: 3p-5h, 3p-weekly
+        assertTrue(repository.hiddenBucketIdsFlow.value.contains("3p-5h"))
+
+        // Unhide 3p-5h
+        repository.toggleBucketVisibility("3p-5h")
+        assertFalse(repository.hiddenBucketIdsFlow.value.contains("3p-5h"))
+        assertTrue(repository.hiddenBucketIdsFlow.value.contains("3p-weekly"))
+
+        // Hide gemini-5h
+        repository.toggleBucketVisibility("gemini-5h")
+        assertTrue(repository.hiddenBucketIdsFlow.value.contains("gemini-5h"))
+        assertTrue(repository.hiddenBucketIdsFlow.value.contains("3p-weekly"))
+    }
+
+    @Test
+    fun testPinnedBucketPersistenceAndClear() = runTest {
+        val sharedPrefs = com.aiquotamonitor.data.local.InMemorySharedPreferences()
+        val store1 = PreferencesStore(sharedPreferences = sharedPrefs)
+        val repository = QuotaRepositoryImpl(
+            preferencesStore = store1,
+            tailscaleClient = FakeTailscaleClient(),
+            gistClient = FakeGistClient()
+        )
+
+        assertNull(repository.pinnedBucketIdFlow.value)
+
+        repository.setPinnedBucket("gemini-5h")
+        assertEquals("gemini-5h", repository.pinnedBucketIdFlow.value)
+
+        val store2 = PreferencesStore(sharedPreferences = sharedPrefs)
+        assertEquals("gemini-5h", store2.getPinnedBucketId())
+
+        repository.setPinnedBucket(null)
+        assertNull(repository.pinnedBucketIdFlow.value)
+        assertNull(store2.getPinnedBucketId())
+    }
+
+    @Test
+    fun testHeroBucketAndVisibleBucketsResolution() {
+        val snapshot = SeedData.createSeedSnapshot()
+        val defaultHidden = PreferencesStore.DEFAULT_HIDDEN_BUCKET_IDS
+
+        // 1. Visible buckets exclude default 3P buckets
+        val visible = snapshot.visibleBuckets(defaultHidden)
+        assertTrue(visible.none { it.id == "3p-5h" || it.id == "3p-weekly" })
+        assertTrue(visible.any { it.id == "gemini-argon-wtu-weekly" })
+        assertTrue(visible.any { it.id == "gemini-5h" })
+
+        // 2. Default hero bucket is primary bottleneck among visible buckets
+        val hero = snapshot.heroBucket(defaultHidden, pinnedBucketId = null)
+        assertNotNull(hero)
+        assertEquals("gemini-argon-wtu-weekly", hero?.id)
+
+        // 3. Pinned bucket spotlights requested bucket when visible
+        val pinnedHero = snapshot.heroBucket(defaultHidden, pinnedBucketId = "gemini-5h")
+        assertNotNull(pinnedHero)
+        assertEquals("gemini-5h", pinnedHero?.id)
+
+        // 4. Pinned bucket falls back to visible bottleneck if pinned bucket is hidden
+        val hiddenPinnedHero = snapshot.heroBucket(defaultHidden, pinnedBucketId = "3p-5h")
+        assertNotNull(hiddenPinnedHero)
+        assertEquals("gemini-argon-wtu-weekly", hiddenPinnedHero?.id)
+
+        // 5. Returns null when all buckets hidden (omits hero card)
+        val allBucketIds = snapshot.providers.flatMap { it.buckets }.map { it.id }.toSet()
+        val allHiddenHero = snapshot.heroBucket(allBucketIds, pinnedBucketId = null)
+        assertNull(allHiddenHero)
+    }
+
+    @Test
+    fun testDefaultHideKeeps3POffHeroWhen3PIsLowestRemaining() {
+        val baseSnapshot = SeedData.createSeedSnapshot()
+        // Create snapshot where 3p-weekly is at 10% (lower than Argon at 35%)
+        val modifiedProviders = baseSnapshot.providers.map { provider ->
+            if (provider.id == "agy") {
+                provider.copy(
+                    buckets = provider.buckets.map { bucket ->
+                        if (bucket.id == "3p-weekly") bucket.copy(remainingPercent = 10.0) else bucket
+                    }
+                )
+            } else provider
+        }
+        val snapshot = baseSnapshot.copy(providers = modifiedProviders)
+
+        // With default hidden buckets, 3p-weekly (10%) is ignored and Argon (35%) is hero
+        val defaultHero = snapshot.heroBucket(PreferencesStore.DEFAULT_HIDDEN_BUCKET_IDS)
+        assertNotNull(defaultHero)
+        assertEquals("gemini-argon-wtu-weekly", defaultHero?.id)
+
+        // With empty hidden set ("Show All"), 3p-weekly (10%) becomes the hero
+        val showAllHero = snapshot.heroBucket(emptySet())
+        assertNotNull(showAllHero)
+        assertEquals("3p-weekly", showAllHero?.id)
+    }
+
+    @Test
+    fun testTieBreakingOrderForEqualRemainingPercent() {
+        val baseSnapshot = SeedData.createSeedSnapshot()
+        // Set two buckets to exactly 20.0% remaining: "gemini-5h" and "gemini-argon-wtu-weekly"
+        val modifiedProviders = baseSnapshot.providers.map { provider ->
+            if (provider.id == "agy") {
+                provider.copy(
+                    buckets = provider.buckets.map { bucket ->
+                        if (bucket.id == "gemini-5h" || bucket.id == "gemini-argon-wtu-weekly") {
+                            bucket.copy(remainingPercent = 20.0)
+                        } else bucket
+                    }
+                )
+            } else provider
+        }
+        val snapshot = baseSnapshot.copy(providers = modifiedProviders)
+
+        // "gemini-5h" < "gemini-argon-wtu-weekly" alphabetically
+        val hero = snapshot.heroBucket(emptySet())
+        assertNotNull(hero)
+        assertEquals("gemini-5h", hero?.id)
+    }
+
+    @Test
+    fun testMutatingCallerSetDoesNotMutateStoredSet() {
+        val sharedPrefs = com.aiquotamonitor.data.local.InMemorySharedPreferences()
+        val store = PreferencesStore(sharedPreferences = sharedPrefs)
+
+        val mutableSet = mutableSetOf("bucket-1", "bucket-2")
+        store.saveHiddenBucketIds(mutableSet)
+
+        // Mutate caller's set
+        mutableSet.add("bucket-3")
+
+        val stored = store.getHiddenBucketIds()
+        assertEquals(setOf("bucket-1", "bucket-2"), stored)
+        assertFalse(stored.contains("bucket-3"))
+    }
+
+    @Test
+    fun testMutatingPreferencesStoreFlowValueDoesNotMutateStoredSet() {
+        val sharedPrefs = com.aiquotamonitor.data.local.InMemorySharedPreferences()
+        val store = PreferencesStore(sharedPreferences = sharedPrefs)
+
+        store.saveHiddenBucketIds(setOf("bucket-1", "bucket-2"))
+        val flowValue = store.hiddenBucketIdsFlow.value
+        val mutable = flowValue as? MutableSet<String>
+        mutable?.add("injected-bucket")
+
+        val stored = store.getHiddenBucketIds()
+        assertEquals(setOf("bucket-1", "bucket-2"), stored)
+        assertFalse(stored.contains("injected-bucket"))
+    }
+
+    @Test
+    fun testPinningHiddenBucketUnhidesItAndHidingPinnedBucketClearsPin() = runTest {
+        val repository = QuotaRepositoryImpl(
+            preferencesStore = preferencesStore,
+            tailscaleClient = FakeTailscaleClient(),
+            gistClient = FakeGistClient()
+        )
+
+        // 3p-5h starts hidden
+        assertTrue(repository.hiddenBucketIdsFlow.value.contains("3p-5h"))
+
+        // Pinning 3p-5h must remove it from hidden in the same transaction
+        repository.setPinnedBucket("3p-5h")
+        assertEquals("3p-5h", repository.pinnedBucketIdFlow.value)
+        assertFalse(repository.hiddenBucketIdsFlow.value.contains("3p-5h"))
+
+        // Hiding 3p-5h must clear the pinnedBucketId in the same transaction
+        repository.toggleBucketVisibility("3p-5h")
+        assertTrue(repository.hiddenBucketIdsFlow.value.contains("3p-5h"))
+        assertNull(repository.pinnedBucketIdFlow.value)
+    }
+
+    @Test
+    fun testToggleWhileUnsetPersistsDefaultPlusOrMinusId() = runTest {
+        val sharedPrefs = com.aiquotamonitor.data.local.InMemorySharedPreferences()
+        val store = PreferencesStore(sharedPreferences = sharedPrefs)
+        val repository = QuotaRepositoryImpl(
+            preferencesStore = store,
+            tailscaleClient = FakeTailscaleClient(),
+            gistClient = FakeGistClient()
+        )
+
+        // While unset, toggle 3p-5h (which is in default)
+        repository.toggleBucketVisibility("3p-5h")
+        // Stored set is now only {"3p-weekly"}
+        assertEquals(setOf("3p-weekly"), repository.hiddenBucketIdsFlow.value)
+        assertEquals(setOf("3p-weekly"), store.getHiddenBucketIds())
+
+        // Toggle gemini-5h (which was not in default)
+        repository.toggleBucketVisibility("gemini-5h")
+        assertEquals(setOf("3p-weekly", "gemini-5h"), repository.hiddenBucketIdsFlow.value)
+        assertEquals(setOf("3p-weekly", "gemini-5h"), store.getHiddenBucketIds())
+    }
+
+    @Test
+    fun testConcurrentPinningAndUnhidingKeepsBucketPinnedAndVisible() = runTest {
+        val sharedPrefs = com.aiquotamonitor.data.local.InMemorySharedPreferences()
+        val store = PreferencesStore(sharedPreferences = sharedPrefs)
+        val repository = QuotaRepositoryImpl(
+            preferencesStore = store,
+            tailscaleClient = FakeTailscaleClient(),
+            gistClient = FakeGistClient()
+        )
+
+        // Verify initial state: 3p-5h is hidden
+        assertTrue(repository.hiddenBucketIdsFlow.value.contains("3p-5h"))
+
+        // Run setPinnedBucket and unhide concurrently across background dispatchers inside coroutineScope
+        coroutineScope {
+            val pinJob = async(Dispatchers.Default) {
+                repository.setPinnedBucket("3p-5h")
+            }
+            val unhideJob = async(Dispatchers.Default) {
+                repository.setHiddenBuckets(PreferencesStore.DEFAULT_HIDDEN_BUCKET_IDS - "3p-5h")
+            }
+            pinJob.await()
+            unhideJob.await()
+        }
+
+        assertEquals("3p-5h", repository.pinnedBucketIdFlow.value)
+        assertFalse(repository.hiddenBucketIdsFlow.value.contains("3p-5h"))
     }
 }

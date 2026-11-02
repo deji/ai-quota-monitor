@@ -11,6 +11,7 @@ A high-craft, **100% native Android application** (Kotlin + Jetpack Compose, Mat
   - **Custom `Canvas` Radial Gauges & Burn-Rate Sparklines**: `240°` `QuotaRadialArcGauge` with an outer-rim **Target Pace Notch** comparing actual consumption against linear window elapsed time, plus `24h / 7d` `BurnVelocityChart` and `MiniSparkline` curves.
   - **Time-Travel Horizon Scrubber Dock**: Persistent bottom scrubber (`NOW → +1H → +4H → RESET`) projecting remaining quota across every bucket at current burn rates.
   - **Interactive Detail & Sync Modal Sheets**: Tap any bucket card to open `BucketDetailSheet` or tap the connection status badge to open `SyncHubSheet`.
+  - **Model Quota Filtering & Hero Spotlight Pinning (`ModelFilterSheet`)**: Filter out unwanted secondary model quotas (Claude & GPT 3P hidden by default), apply one-tap presets (`Hide Claude/3P`, `Orca Core Only`, `Show All`), pin any active model to lock it into the primary Hero Spotlight gauge, and declutter secondary pools via progressive disclosure collapsible cards.
   - **Grok Lease Bar & Smart Prime Controls**: Live countdown for the `~/.grok/auth.json` OAuth token, manual **Prime Pulse** button, and configurable **Active-Hours Wake Slider (`08:00–22:00`)** synced to the Mac collector.
   - **Native Jetpack Glance Home-Screen Widgets**: `2x2` Compact (`QuotaCompactWidget`) and `4x2` Wide Orca Stage Deck (`QuotaWideWidget`).
 - **Dual-Path Transport (Tailscale Live Daemon + AES-256-GCM Encrypted Gist Relay)**:
@@ -118,10 +119,14 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s collector/tests -v
 
 #### Install & Launch the App
 
-Once `adb devices -l` shows your Pixel 8 Pro, run:
+Once your Pixel 8 Pro has Wireless Debugging enabled (and is paired with this Mac) or is connected via USB-C, run:
 
 ```bash
+# Auto-discovers paired Wireless ADB over Bonjour (_adb-tls-connect._tcp) if not yet connected, installs, and launches:
 ./scripts/deploy-pixel8pro.sh
+
+# Or build and install the signed Release APK:
+./scripts/deploy-pixel8pro.sh --release
 ```
 
 Or manually via `adb`:

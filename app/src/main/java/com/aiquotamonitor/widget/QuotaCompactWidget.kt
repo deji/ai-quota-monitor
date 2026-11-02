@@ -57,10 +57,12 @@ class QuotaCompactWidget : GlanceAppWidget() {
             SeedData.createSeedSnapshot()
         }
 
-        val bottleneck = snapshot.bottleneckBucket
-        val percent = bottleneck?.displayPercent(polarity) ?: 35.0
-        val label = bottleneck?.label ?: "Gemini 4 Argon"
-        val pace = bottleneck?.paceDeltaPercent ?: -33.1
+        val hiddenBucketIds = prefs.getHiddenBucketIds()
+        val pinnedBucketId = prefs.getPinnedBucketId()
+        val hero = snapshot.heroBucket(hiddenBucketIds, pinnedBucketId)
+        val percent = hero?.displayPercent(polarity)
+        val label = hero?.label
+        val pace = hero?.paceDeltaPercent ?: 0.0
         val polarityTag = if (polarity == QuotaPolarity.REMAINING) "REM" else "USED"
         val headerText = if (isDemo) "AI QUOTA • $polarityTag • DEMO" else "AI QUOTA • $polarityTag"
         val dotColor = if (isDemo) Color(0xFFFFB951) else Color(0xFF5CE196)
@@ -105,44 +107,81 @@ class QuotaCompactWidget : GlanceAppWidget() {
 
                         Spacer(modifier = GlanceModifier.height(10.dp))
 
-                        // Large percentage
-                        Text(
-                            text = "${percent.toInt()}%",
-                            style = TextStyle(
-                                color = ColorProvider(Color(0xFFE2E8F0)),
-                                fontSize = 36.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        )
-
-                        Text(
-                            text = label,
-                            maxLines = 1,
-                            style = TextStyle(
-                                color = ColorProvider(Color(0xFF94A3B8)),
-                                fontSize = 11.sp
-                            )
-                        )
-
-                        Spacer(modifier = GlanceModifier.defaultWeight())
-
-                        // Bottom Pace Status
-                        Row(
-                            modifier = GlanceModifier
-                                .fillMaxWidth()
-                                .cornerRadius(8.dp)
-                                .background(ColorProvider(Color(0xFF1E252B)))
-                                .padding(horizontal = 6.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
+                        if (hero == null) {
                             Text(
-                                text = if (pace <= 0) "Ahead: ${pace}%" else "Burn: +${pace}%",
+                                text = "--",
                                 style = TextStyle(
-                                    color = ColorProvider(if (pace <= 0) Color(0xFF5CE196) else Color(0xFFFFB951)),
-                                    fontSize = 9.sp,
+                                    color = ColorProvider(Color(0xFF94A3B8)),
+                                    fontSize = 36.sp,
                                     fontWeight = FontWeight.Bold
                                 )
                             )
+                            Text(
+                                text = "All models hidden",
+                                maxLines = 1,
+                                style = TextStyle(
+                                    color = ColorProvider(Color(0xFF94A3B8)),
+                                    fontSize = 11.sp
+                                )
+                            )
+                            Spacer(modifier = GlanceModifier.defaultWeight())
+                            Row(
+                                modifier = GlanceModifier
+                                    .fillMaxWidth()
+                                    .cornerRadius(8.dp)
+                                    .background(ColorProvider(Color(0xFF1E252B)))
+                                    .padding(horizontal = 6.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Tap to configure",
+                                    style = TextStyle(
+                                        color = ColorProvider(Color(0xFF80D4DC)),
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                )
+                            }
+                        } else {
+                            // Large percentage
+                            Text(
+                                text = "${percent?.toInt() ?: 0}%",
+                                style = TextStyle(
+                                    color = ColorProvider(Color(0xFFE2E8F0)),
+                                    fontSize = 36.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            )
+
+                            Text(
+                                text = label ?: "",
+                                maxLines = 1,
+                                style = TextStyle(
+                                    color = ColorProvider(Color(0xFF94A3B8)),
+                                    fontSize = 11.sp
+                                )
+                            )
+
+                            Spacer(modifier = GlanceModifier.defaultWeight())
+
+                            // Bottom Pace Status
+                            Row(
+                                modifier = GlanceModifier
+                                    .fillMaxWidth()
+                                    .cornerRadius(8.dp)
+                                    .background(ColorProvider(Color(0xFF1E252B)))
+                                    .padding(horizontal = 6.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = if (pace <= 0) "Ahead: ${pace}%" else "Burn: +${pace}%",
+                                    style = TextStyle(
+                                        color = ColorProvider(if (pace <= 0) Color(0xFF5CE196) else Color(0xFFFFB951)),
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                )
+                            }
                         }
                     }
                 }

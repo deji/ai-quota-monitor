@@ -89,6 +89,21 @@ object SeedData {
                     burnRatePerHour = 0.0,
                     projectedRemainingAtReset = 100.0,
                     status = "healthy"
+                ),
+                QuotaBucket(
+                    id = "3p-weekly",
+                    group = "Claude and GPT models",
+                    label = "Claude & GPT Weekly",
+                    windowType = "weekly",
+                    windowDurationHours = 168,
+                    remainingPercent = 41.7,
+                    usedPercent = 58.3,
+                    resetsAt = geminiWeeklyReset,
+                    elapsedPercent = 28.5,
+                    paceDeltaPercent = 29.8,
+                    burnRatePerHour = 0.35,
+                    projectedRemainingAtReset = 0.0,
+                    status = "warning"
                 )
             )
         )
@@ -204,6 +219,7 @@ object SeedData {
             val gemini5hVal = 100.0 - (fraction * 1.0)
             val openCodeWeeklyVal = 100.0 - (fraction * 2.0)
             val grokVal = 100.0 - (fraction * 3.0)
+            val threePWeeklyVal = 65.0 - (fraction * 23.3)
 
             HistoryPoint(
                 capturedAt = pointTime,
@@ -214,7 +230,9 @@ object SeedData {
                     "opencode-rolling" to 100.0,
                     "opencode-weekly" to openCodeWeeklyVal,
                     "opencode-monthly" to 99.0,
-                    "grok-weekly-credits" to grokVal
+                    "grok-weekly-credits" to grokVal,
+                    "3p-5h" to 100.0,
+                    "3p-weekly" to threePWeeklyVal
                 )
             )
         }

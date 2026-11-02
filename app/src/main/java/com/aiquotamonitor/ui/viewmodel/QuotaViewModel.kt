@@ -33,6 +33,8 @@ class QuotaViewModel(
     val connectionState: StateFlow<ConnectionState> = repository.connectionStateFlow
     val settings: StateFlow<SyncSettings> = repository.settingsFlow
     val syncError: StateFlow<String?> = repository.syncErrorFlow
+    val hiddenBucketIds: StateFlow<Set<String>> = repository.hiddenBucketIdsFlow
+    val pinnedBucketId: StateFlow<String?> = repository.pinnedBucketIdFlow
 
     val isSyncError: StateFlow<Boolean> = repository.syncErrorFlow
         .map { !it.isNullOrBlank() }
@@ -177,6 +179,27 @@ class QuotaViewModel(
     fun updateActiveHours(start: String, end: String) {
         viewModelScope.launch {
             repository.updateActiveHours(start, end)
+            triggerWidgetUpdate()
+        }
+    }
+
+    fun setHiddenBuckets(hiddenIds: Set<String>) {
+        viewModelScope.launch {
+            repository.setHiddenBuckets(hiddenIds)
+            triggerWidgetUpdate()
+        }
+    }
+
+    fun toggleBucketVisibility(bucketId: String) {
+        viewModelScope.launch {
+            repository.toggleBucketVisibility(bucketId)
+            triggerWidgetUpdate()
+        }
+    }
+
+    fun setPinnedBucket(bucketId: String?) {
+        viewModelScope.launch {
+            repository.setPinnedBucket(bucketId)
             triggerWidgetUpdate()
         }
     }

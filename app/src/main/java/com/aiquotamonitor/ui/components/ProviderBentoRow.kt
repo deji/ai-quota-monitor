@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aiquotamonitor.domain.model.ProviderQuota
+import com.aiquotamonitor.domain.model.QuotaBucket
 import com.aiquotamonitor.domain.model.QuotaPolarity
 import com.aiquotamonitor.domain.model.SmartPrimeStatus
 import com.aiquotamonitor.ui.theme.QuotaAmber
@@ -54,56 +55,71 @@ fun ProviderBentoRow(
     onPrimePulse: () -> Unit,
     isPriming: Boolean,
     modifier: Modifier = Modifier,
+    hiddenBucketIds: Set<String> = emptySet(),
     isScrubbing: Boolean = false,
-    onOpenCodeClick: (() -> Unit)? = null,
-    onGrokClick: (() -> Unit)? = null
+    onBucketClick: ((QuotaBucket) -> Unit)? = null
 ) {
+    val visibleOpenCodeBuckets = openCodeProvider?.buckets?.filterNot { it.id in hiddenBucketIds } ?: emptyList()
+    val visibleGrokBuckets = grokProvider?.buckets?.filterNot { it.id in hiddenBucketIds } ?: emptyList()
+
+    val showOpenCode = visibleOpenCodeBuckets.isNotEmpty()
+    val showGrok = visibleGrokBuckets.isNotEmpty()
+
+    if (!showOpenCode && !showGrok) {
+        return
+    }
+
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // OpenCode Go Bento Card
-        OpenCodeBentoCard(
-            provider = openCodeProvider,
-            polarity = polarity,
-            isScrubbing = isScrubbing,
-            onClick = onOpenCodeClick,
-            modifier = Modifier.weight(1f)
-        )
+        if (showOpenCode) {
+            OpenCodeBentoCard(
+                provider = openCodeProvider,
+                visibleBuckets = visibleOpenCodeBuckets,
+                polarity = polarity,
+                isScrubbing = isScrubbing,
+                onBucketClick = onBucketClick,
+                modifier = if (showGrok) Modifier.weight(1f) else Modifier.fillMaxWidth()
+            )
+        }
 
-        // Grok Build Bento Card
-        GrokBentoCard(
-            provider = grokProvider,
-            smartPrime = smartPrime,
-            polarity = polarity,
-            onPrimePulse = onPrimePulse,
-            isPriming = isPriming,
-            isScrubbing = isScrubbing,
-            onClick = onGrokClick,
-            modifier = Modifier.weight(1f)
-        )
+        if (showGrok) {
+            GrokBentoCard(
+                provider = grokProvider,
+                visibleBuckets = visibleGrokBuckets,
+                smartPrime = smartPrime,
+                polarity = polarity,
+                onPrimePulse = onPrimePulse,
+                isPriming = isPriming,
+                isScrubbing = isScrubbing,
+                onBucketClick = onBucketClick,
+                modifier = if (showOpenCode) Modifier.weight(1f) else Modifier.fillMaxWidth()
+            )
+        }
     }
 }
 
 @Composable
 private fun OpenCodeBentoCard(
     provider: ProviderQuota?,
+    visibleBuckets: List<QuotaBucket>,
     polarity: QuotaPolarity,
     isScrubbing: Boolean,
-    onClick: (() -> Unit)?,
+    onBucketClick: ((QuotaBucket) -> Unit)?,
     modifier: Modifier = Modifier
 ) {
-    val weeklyBucket = provider?.buckets?.firstOrNull { it.id == "opencode-weekly" }
-        ?: provider?.buckets?.firstOrNull()
-    val rollingBucket = provider?.buckets?.firstOrNull { it.id == "opencode-rolling" }
+    val primaryBucket = visibleBuckets.firstOrNull { it.id == "opencode-weekly" }
+        ?: visibleBuckets.firstOrNull()
+    val secondaryBucket = visibleBuckets.firstOrNull { it.id != primaryBucket?.id }
 
-    val displayPercent = weeklyBucket?.displayPercent(polarity) ?: 98.0
+    val displayPercent = primaryBucket?.displayPercent(polarity) ?: 98.0
 
-    val boxModifier = if (onClick != null) {
+    val boxModifier = if (onBucketClick != null && primaryBucket != null) {
         modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(24.dp))
-            .clickable { onClick() }
+            .clickable { onBucketClick(primaryBucket) }
             .background(MaterialTheme.colorScheme.surfaceContainer)
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), RoundedCornerShape(24.dp))
             .padding(16.dp)
@@ -162,8 +178,14 @@ private fun OpenCodeBentoCard(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
+                    val ringLabel = when (primaryBucket?.id) {
+                        "opencode-weekly" -> "WEEKLY"
+                        "opencode-rolling" -> "5H ROLLING"
+                        "opencode-monthly" -> "MONTHLY"
+                        else -> primaryBucket?.label?.uppercase() ?: "QUOTA"
+                    }
                     Text(
-                        text = "WEEKLY",
+                        text = ringLabel,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 8.sp,
@@ -172,31 +194,44 @@ private fun OpenCodeBentoCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            // Secondary visible metric pill if available
+            if (secondaryBucket != null) {
+                Spacer(modifier = Modifier.height(10.dp))
 
-            // 5h Rolling sub-metric pill
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "5h Rolling",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 10.sp
-                )
-                Text(
-                    text = "${rollingBucket?.displayPercent(polarity)?.toInt() ?: 100}%",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = QuotaEmerald,
-                    fontSize = 10.sp
-                )
+                val pillModifier = if (onBucketClick != null) {
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable { onBucketClick(secondaryBucket) }
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                        .padding(horizontal = 8.dp, vertical = 6.dp)
+                } else {
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                        .padding(horizontal = 8.dp, vertical = 6.dp)
+                }
+
+                Row(
+                    modifier = pillModifier,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = secondaryBucket.label,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 10.sp
+                    )
+                    Text(
+                        text = "${secondaryBucket.displayPercent(polarity).toInt()}%",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = QuotaEmerald,
+                        fontSize = 10.sp
+                    )
+                }
             }
         }
     }
@@ -205,15 +240,16 @@ private fun OpenCodeBentoCard(
 @Composable
 private fun GrokBentoCard(
     provider: ProviderQuota?,
+    visibleBuckets: List<QuotaBucket>,
     smartPrime: SmartPrimeStatus,
     polarity: QuotaPolarity,
     onPrimePulse: () -> Unit,
     isPriming: Boolean,
     isScrubbing: Boolean,
-    onClick: (() -> Unit)?,
+    onBucketClick: ((QuotaBucket) -> Unit)?,
     modifier: Modifier = Modifier
 ) {
-    val creditBucket = provider?.buckets?.firstOrNull()
+    val creditBucket = visibleBuckets.firstOrNull()
     val displayPercent = creditBucket?.displayPercent(polarity) ?: 97.0
 
     // Grok token lease scaling: dynamically normalize against max lease so leaseSec > 5400 doesn't distort/overflow
@@ -222,11 +258,11 @@ private fun GrokBentoCard(
     val leaseFraction = if (maxLeaseSec > 0f) (leaseSec.toFloat() / maxLeaseSec).coerceIn(0f, 1f) else 1f
     val leaseMinutes = (leaseSec / 60).coerceAtLeast(0)
 
-    val boxModifier = if (onClick != null) {
+    val boxModifier = if (onBucketClick != null && creditBucket != null) {
         modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(24.dp))
-            .clickable { onClick() }
+            .clickable { onBucketClick(creditBucket) }
             .background(MaterialTheme.colorScheme.surfaceContainer)
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), RoundedCornerShape(24.dp))
             .padding(16.dp)

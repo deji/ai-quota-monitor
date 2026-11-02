@@ -48,6 +48,12 @@ class QuotaViewModelTest {
         private val _syncErrorFlow = MutableStateFlow<String?>(null)
         override val syncErrorFlow: StateFlow<String?> = _syncErrorFlow.asStateFlow()
 
+        private val _hiddenBucketIdsFlow = MutableStateFlow(PreferencesStore.DEFAULT_HIDDEN_BUCKET_IDS)
+        override val hiddenBucketIdsFlow: StateFlow<Set<String>> = _hiddenBucketIdsFlow.asStateFlow()
+
+        private val _pinnedBucketIdFlow = MutableStateFlow<String?>(null)
+        override val pinnedBucketIdFlow: StateFlow<String?> = _pinnedBucketIdFlow.asStateFlow()
+
         var refreshCalled = false
         var testConnectionCalled = false
         var lastForceTailscale: Boolean = false
@@ -151,6 +157,33 @@ class QuotaViewModelTest {
             }
             _syncErrorFlow.value = null
             return Result.success(_snapshotFlow.value)
+        }
+
+        override suspend fun setHiddenBuckets(hiddenIds: Set<String>) {
+            _hiddenBucketIdsFlow.value = hiddenIds
+            val pinned = _pinnedBucketIdFlow.value
+            if (pinned != null && hiddenIds.contains(pinned)) {
+                _pinnedBucketIdFlow.value = null
+            }
+        }
+
+        override suspend fun toggleBucketVisibility(bucketId: String) {
+            val current = _hiddenBucketIdsFlow.value
+            val updated = if (current.contains(bucketId)) current - bucketId else current + bucketId
+            _hiddenBucketIdsFlow.value = updated
+            if (updated.contains(bucketId) && _pinnedBucketIdFlow.value == bucketId) {
+                _pinnedBucketIdFlow.value = null
+            }
+        }
+
+        override suspend fun setPinnedBucket(bucketId: String?) {
+            _pinnedBucketIdFlow.value = bucketId
+            if (bucketId != null) {
+                val current = _hiddenBucketIdsFlow.value
+                if (current.contains(bucketId)) {
+                    _hiddenBucketIdsFlow.value = current - bucketId
+                }
+            }
         }
 
         override fun setSnapshotForSimulation(simulated: QuotaSnapshot) {
@@ -367,5 +400,56 @@ class QuotaViewModelTest {
 
         fakeRepo.setConnectionState(ConnectionState.OFFLINE)
         assertEquals(ConnectionState.OFFLINE, viewModel.connectionState.value)
+    }
+
+    @Test
+    fun testHiddenBucketsFlowAndSetHiddenBuckets() = runTest(testDispatcher) {
+        val fakeRepo = FakeQuotaRepository()
+        val viewModel = QuotaViewModel(fakeRepo, preferencesStore)
+        backgroundScope.launch(testDispatcher) { viewModel.hiddenBucketIds.collect {} }
+
+        assertEquals(PreferencesStore.DEFAULT_HIDDEN_BUCKET_IDS, viewModel.hiddenBucketIds.value)
+
+        viewModel.setHiddenBuckets(emptySet())
+        advanceUntilIdle()
+        assertTrue(viewModel.hiddenBucketIds.value.isEmpty())
+
+        viewModel.setHiddenBuckets(setOf("gemini-5h"))
+        advanceUntilIdle()
+        assertEquals(setOf("gemini-5h"), viewModel.hiddenBucketIds.value)
+    }
+
+    @Test
+    fun testToggleBucketVisibility() = runTest(testDispatcher) {
+        val fakeRepo = FakeQuotaRepository()
+        val viewModel = QuotaViewModel(fakeRepo, preferencesStore)
+        backgroundScope.launch(testDispatcher) { viewModel.hiddenBucketIds.collect {} }
+
+        assertTrue(viewModel.hiddenBucketIds.value.contains("3p-5h"))
+
+        viewModel.toggleBucketVisibility("3p-5h")
+        advanceUntilIdle()
+        assertFalse(viewModel.hiddenBucketIds.value.contains("3p-5h"))
+
+        viewModel.toggleBucketVisibility("gemini-argon-wtu-weekly")
+        advanceUntilIdle()
+        assertTrue(viewModel.hiddenBucketIds.value.contains("gemini-argon-wtu-weekly"))
+    }
+
+    @Test
+    fun testPinnedBucketFlowAndSetPinnedBucket() = runTest(testDispatcher) {
+        val fakeRepo = FakeQuotaRepository()
+        val viewModel = QuotaViewModel(fakeRepo, preferencesStore)
+        backgroundScope.launch(testDispatcher) { viewModel.pinnedBucketId.collect {} }
+
+        assertEquals(null, viewModel.pinnedBucketId.value)
+
+        viewModel.setPinnedBucket("grok-weekly-credits")
+        advanceUntilIdle()
+        assertEquals("grok-weekly-credits", viewModel.pinnedBucketId.value)
+
+        viewModel.setPinnedBucket(null)
+        advanceUntilIdle()
+        assertEquals(null, viewModel.pinnedBucketId.value)
     }
 }

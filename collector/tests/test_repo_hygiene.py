@@ -361,8 +361,9 @@ class TestRepoFreeOfSecretsAndPersonalIdentifiers(unittest.TestCase):
             self.assertTrue(os.path.isfile(path), f"Missing required doc/skill/script file: {rel}")
             self.assertGreater(os.path.getsize(path), 0, f"Required file is empty: {rel}")
 
-        gh_workflow_script = os.path.join(self.repo_root, "scripts/gh-issue-workflow.sh")
-        self.assertTrue(os.access(gh_workflow_script, os.X_OK), "scripts/gh-issue-workflow.sh must be executable")
+        for rel_script in ("scripts/gh-issue-workflow.sh", "scripts/review-plan-and-code.sh", "scripts/deploy-pixel8pro.sh"):
+            script_path = os.path.join(self.repo_root, rel_script)
+            self.assertTrue(os.access(script_path, os.X_OK), f"{rel_script} must be executable")
 
         bugs_path = os.path.join(self.repo_root, "docs/bugs/index.md")
         lessons_path = os.path.join(self.repo_root, "docs/lessons.md")
@@ -378,6 +379,124 @@ class TestRepoFreeOfSecretsAndPersonalIdentifiers(unittest.TestCase):
             missing,
             [],
             f"Defect IDs in docs/bugs/index.md missing from docs/lessons.md: {missing}",
+        )
+
+    def test_architectural_and_code_lint_rules(self):
+        """Enforce project-specific static lint rules (AQM-LINT-001 through AQM-LINT-007)."""
+        # AQM-LINT-001: Zero WebViews allowed in app/src/main
+        app_main = os.path.join(self.repo_root, "app", "src", "main")
+        for root, _, files in os.walk(app_main):
+            for f in files:
+                if not f.endswith((".kt", ".xml")):
+                    continue
+                full_path = os.path.join(root, f)
+                with open(full_path, "r", encoding="utf-8") as fh:
+                    text = fh.read()
+                self.assertNotIn("android.webkit.WebView", text, f"AQM-LINT-001: WebView forbidden in {f}")
+                self.assertNotIn("<WebView", text, f"AQM-LINT-001: <WebView> forbidden in {f}")
+
+        # AQM-LINT-002: Android Lint config (app/lint.xml) must enforce MutatingSharedPrefs & CommitPrefEdits as error
+        lint_xml_path = os.path.join(self.repo_root, "app", "lint.xml")
+        self.assertTrue(os.path.isfile(lint_xml_path), "AQM-LINT-002: Missing app/lint.xml")
+        with open(lint_xml_path, "r", encoding="utf-8") as fh:
+            lint_xml = fh.read()
+        self.assertIn('id="MutatingSharedPrefs" severity="error"', lint_xml)
+        self.assertIn('id="CommitPrefEdits" severity="error"', lint_xml)
+
+        # AQM-LINT-003: PreferencesStore.kt must check prefs.contains(KEY_HIDDEN_BUCKETS) and return defensive HashSet copies
+        prefs_kt_path = os.path.join(
+            self.repo_root, "app", "src", "main", "java", "com", "aiquotamonitor", "data", "local", "PreferencesStore.kt"
+        )
+        with open(prefs_kt_path, "r", encoding="utf-8") as fh:
+            prefs_kt = fh.read()
+        self.assertIn("prefs.contains(KEY_HIDDEN_BUCKETS)", prefs_kt, "AQM-LINT-003: Must distinguish unset vs emptySet()")
+        self.assertIn("HashSet(", prefs_kt, "AQM-LINT-003: Must use defensive HashSet copies for StringSet preferences")
+
+        # AQM-LINT-004: ConnectionSettingsForm.kt must never key remember(...) on the whole composite `settings` object
+        form_kt_path = os.path.join(
+            self.repo_root,
+            "app",
+            "src",
+            "main",
+            "java",
+            "com",
+            "aiquotamonitor",
+            "ui",
+            "components",
+            "ConnectionSettingsForm.kt",
+        )
+        with open(form_kt_path, "r", encoding="utf-8") as fh:
+            form_kt = fh.read()
+        self.assertIsNone(
+            re.search(r"\bremember\s*\(\s*settings\s*\)", form_kt),
+            "AQM-LINT-004: Do not key remember(settings) on the whole SyncSettings object in ConnectionSettingsForm.kt",
+        )
+
+        # AQM-LINT-005: QuotaRepositoryImpl.kt must never persist SeedData.sampleSnapshot into saveCachedSnapshot
+        repo_kt_path = os.path.join(
+            self.repo_root,
+            "app",
+            "src",
+            "main",
+            "java",
+            "com",
+            "aiquotamonitor",
+            "data",
+            "repository",
+            "QuotaRepositoryImpl.kt",
+        )
+        with open(repo_kt_path, "r", encoding="utf-8") as fh:
+            repo_kt = fh.read()
+        self.assertIsNone(
+            re.search(r"saveCachedSnapshot\s*\(\s*SeedData", repo_kt),
+            "AQM-LINT-005: Never persist SeedData to cached_snapshot preferences",
+        )
+
+        # AQM-LINT-006: BurnVelocityChart.kt must never substitute 100.0 for missing bucket history points
+        chart_kt_path = os.path.join(
+            self.repo_root,
+            "app",
+            "src",
+            "main",
+            "java",
+            "com",
+            "aiquotamonitor",
+            "ui",
+            "components",
+            "BurnVelocityChart.kt",
+        )
+        with open(chart_kt_path, "r", encoding="utf-8") as fh:
+            chart_kt = fh.read()
+        self.assertIsNone(
+            re.search(r"\?:\s*100\.0", chart_kt),
+            "AQM-LINT-006: Never default missing history points to 100.0 in BurnVelocityChart.kt",
+        )
+
+        # AQM-LINT-007: .github/workflows/release.yml must build both assembleDebug and assembleRelease
+        release_yml_path = os.path.join(self.repo_root, ".github", "workflows", "release.yml")
+        with open(release_yml_path, "r", encoding="utf-8") as fh:
+            release_yml = fh.read()
+        self.assertIn("assembleDebug", release_yml, "AQM-LINT-007: release.yml must run assembleDebug")
+        self.assertIn("assembleRelease", release_yml, "AQM-LINT-007: release.yml must run assembleRelease")
+
+        # AQM-LINT-008: ModelFilterSheet.kt must not call onToggleBucket inside the pin action before onSetPinnedBucket
+        filter_sheet_path = os.path.join(
+            self.repo_root,
+            "app",
+            "src",
+            "main",
+            "java",
+            "com",
+            "aiquotamonitor",
+            "ui",
+            "components",
+            "ModelFilterSheet.kt",
+        )
+        with open(filter_sheet_path, "r", encoding="utf-8") as fh:
+            filter_sheet_kt = fh.read()
+        self.assertIsNone(
+            re.search(r"onToggleBucket\s*\([^)]+\)\s*\n\s*onSetPinnedBucket", filter_sheet_kt),
+            "AQM-LINT-008: Never call onToggleBucket before onSetPinnedBucket (setPinnedBucket unhides atomically under settingsMutex)",
         )
 
 
