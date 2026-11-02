@@ -65,18 +65,26 @@ orca orchestration check --wait --types "worker_done,escalation,question" --time
 
 ### Dispatching the Read-Only Reviewer (`grok` with `grok-4.7` Medium) & Posting `## [REVIEW]`
 
-Once an implementation worker settles with green tests, run the `grok` (`grok-4.7` medium effort) reviewer in headless read-only mode and automatically post its `## [REVIEW]` comment to the GitHub Issue:
+For **Gate 1 (Plan Review)** and **Gate 2 (Worktree Review)**, dispatch `grok` as a supervised Orca orchestration worker (`--agent grok`, which launches with `default = "grok-4.7"` and `default_reasoning_effort = "medium"` from `~/.grok/config.toml` once the target worktree path is marked `trusted = true` in `~/.grok/trusted_folders.toml`), and post its `## [REVIEW]` verdict to the GitHub Issue:
 
 ```bash
-# Runs Grok 4.7 Medium review and posts ## [REVIEW] comment to Issue #<issue-number>
+# 1. Dispatch a supervised Grok 4.7 Medium reviewer worker via Orca Orchestration
+orca orchestration worker-start \
+  --task-title "Issue #<issue-number>: Gate Review (grok-4.7 medium)" \
+  --spec "<read-only review prompt>" \
+  --worktree "<worktreeSelector>" \
+  --agent grok \
+  --json
+
+# 2. Or run the helper script (which also posts ## [REVIEW] to Issue #<issue-number>)
 ./scripts/review-plan-and-code.sh worktree "<worktreePath>" --issue <issue-number>
 
-# Verify all 4 stages ([PLAN], [IMPLEMENTATION], [TESTING], [REVIEW]) exist and close the issue after merge
+# 3. Verify all 4 stages ([PLAN], [IMPLEMENTATION], [TESTING], [REVIEW]) exist and close the issue after merge
 ./scripts/gh-issue-workflow.sh verify <issue-number>
 ./scripts/gh-issue-workflow.sh close <issue-number>
 ```
 
-Note: In Orca `worker-start`, `--agent grok` does not accept `--model` or `--effort` flags and blocks on interactive folder trust (`agent-trust-workspace`) for newly created worktrees, so headless `grok -m grok-4.7 --effort medium --always-approve --cwd <worktreePath> -p ...` is the verified review invocation.
+Note: In Orca `worker-start`, `--agent grok` reads its model (`grok-4.7`) and effort (`medium`) from `~/.grok/config.toml` rather than CLI flags, and requires `[folders."<worktreePath>"]\ntrusted = true` in `~/.grok/trusted_folders.toml` so newly created worktrees do not block on interactive TUI folder trust (`agent-trust-workspace`).
 
 ---
 

@@ -15,7 +15,7 @@ This document captures the hard-won architectural, security, wire-protocol, UI/U
 
 ### 1.2 Orca CLI & `grok` Invocation Quirks
 - **Antigravity worker alias**: In `orca orchestration worker-start`, use `--agent antigravity --model gemini-3.8-flash-high --effort high` (not `--agent agy`).
-- **Grok reviewer invocation**: In `orca orchestration worker-start`, `--agent grok` rejects `--model` and `--effort` flags and blocks on interactive TUI folder trust (`agent-trust-workspace`) in newly created worktrees. Always invoke `grok` for reviews in headless single-turn mode with `--always-approve` (while instructing it strictly not to modify files):
+- **Grok reviewer invocation**: In `orca orchestration worker-start`, `--agent grok` reads its model (`default = "grok-4.7"`) and reasoning effort (`default_reasoning_effort = "medium"`) from `~/.grok/config.toml` (rejecting `--model` / `--effort` flags) and checks `~/.grok/trusted_folders.toml` on startup. Always pre-register newly created child worktrees (`[folders."<worktreePath>"]\ntrusted = true`) in `~/.grok/trusted_folders.toml` before calling `orca orchestration worker-start --agent grok` so supervised Grok reviewer workers never block on interactive TUI folder trust (`agent-trust-workspace`). For scripted CI/issue-comment posting (`scripts/review-plan-and-code.sh`), headless single-turn mode is also supported:
   ```bash
   grok -m grok-4.7 --effort medium --always-approve --cwd "<worktree-or-repo-path>" -p "<read-only review prompt>"
   ```
