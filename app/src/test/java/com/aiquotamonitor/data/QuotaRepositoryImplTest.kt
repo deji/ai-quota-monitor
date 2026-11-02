@@ -792,6 +792,21 @@ class QuotaRepositoryImplTest {
     }
 
     @Test
+    fun testMutatingPreferencesStoreFlowValueDoesNotMutateStoredSet() {
+        val sharedPrefs = com.aiquotamonitor.data.local.InMemorySharedPreferences()
+        val store = PreferencesStore(sharedPreferences = sharedPrefs)
+
+        store.saveHiddenBucketIds(setOf("bucket-1", "bucket-2"))
+        val flowValue = store.hiddenBucketIdsFlow.value
+        val mutable = flowValue as? MutableSet<String>
+        mutable?.add("injected-bucket")
+
+        val stored = store.getHiddenBucketIds()
+        assertEquals(setOf("bucket-1", "bucket-2"), stored)
+        assertFalse(stored.contains("injected-bucket"))
+    }
+
+    @Test
     fun testPinningHiddenBucketUnhidesItAndHidingPinnedBucketClearsPin() = runTest {
         val repository = QuotaRepositoryImpl(
             preferencesStore = preferencesStore,

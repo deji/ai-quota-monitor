@@ -92,7 +92,7 @@ class PreferencesStore(
     fun saveHiddenBucketIds(hiddenBucketIds: Set<String>) {
         val copy = HashSet(hiddenBucketIds)
         prefs.edit().putStringSet(KEY_HIDDEN_BUCKETS, copy).apply()
-        _hiddenBucketIdsFlow.value = copy
+        _hiddenBucketIdsFlow.value = HashSet(copy)
     }
 
     fun getPinnedBucketId(): String? {

@@ -198,12 +198,23 @@ private fun OpenCodeBentoCard(
             if (secondaryBucket != null) {
                 Spacer(modifier = Modifier.height(10.dp))
 
-                Row(
-                    modifier = Modifier
+                val pillModifier = if (onBucketClick != null) {
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable { onBucketClick(secondaryBucket) }
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                        .padding(horizontal = 8.dp, vertical = 6.dp)
+                } else {
+                    Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(10.dp))
                         .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                        .padding(horizontal = 8.dp, vertical = 6.dp)
+                }
+
+                Row(
+                    modifier = pillModifier,
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {

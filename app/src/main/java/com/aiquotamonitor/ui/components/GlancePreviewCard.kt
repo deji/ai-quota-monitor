@@ -179,7 +179,7 @@ fun GlancePreviewCard(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "ORCA STAGE DECK",
+                            text = "ORCA STAGE DECK • $polarityTag",
                             style = MaterialTheme.typography.labelSmall,
                             color = QuotaCyan,
                             fontSize = 10.sp,
@@ -201,6 +201,13 @@ fun GlancePreviewCard(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         snapshot.orcaRoles.forEach { role ->
+                            val rolePercent = role.displayPercent(polarity)
+                            val percentColor = when {
+                                rolePercent <= 20.0 -> Color(0xFFFFB4AB)
+                                rolePercent <= 40.0 -> Color(0xFFFFB951)
+                                else -> Color(0xFF5CE196)
+                            }
+
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
@@ -217,10 +224,10 @@ fun GlancePreviewCard(
                                         color = Color(0xFF94A3B8)
                                     )
                                     Text(
-                                        text = "${role.remainingPercent.toInt()}%",
+                                        text = "${rolePercent.toInt()}%",
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold,
-                                        color = if (role.remainingPercent <= 20) Color(0xFFFFB4AB) else QuotaCyan
+                                        color = percentColor
                                     )
                                     Text(
                                         text = role.label,
