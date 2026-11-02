@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Adaptive Icon Exploration - Material 3 Expressive Showcase</title>
+<!-- Typography: Public Sans & Plus Jakarta Sans -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;family=Public+Sans:wght@500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS CDN -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Configuration matching Modern: Material 3 Expressive Telemetry -->
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            surface: "#0e1415",
+            "surface-dim": "#0a0f10",
+            "surface-container-lowest": "#080c0d",
+            "surface-container-low": "#111819",
+            "surface-container": "#151e20",
+            "surface-container-high": "#1c2628",
+            "surface-container-highest": "#222f32",
+            "on-surface": "#e0eae9",
+            "on-surface-variant": "#879899",
+            outline: "#3c4d4f",
+            "outline-variant": "#223133",
+            primary: "#4fd8eb",
+            "primary-container": "#004f57",
+            "on-primary": "#00363c",
+            "on-primary-container": "#9bf0fd",
+            secondary: "#b1cbcd",
+            "secondary-container": "#324b4c",
+            tertiary: "#ffb77c",
+            "tertiary-container": "#633c00",
+            "on-tertiary-container": "#ffdcc2",
+            error: "#ffb4ab"
+          },
+          borderRadius: {
+            "DEFAULT": "1rem",
+            "lg": "2rem",
+            "xl": "3rem",
+            "full": "9999px"
+          },
+          fontFamily: {
+            headline: ["Public Sans", "sans-serif"],
+            display: ["Public Sans", "sans-serif"],
+            body: ["Plus Jakarta Sans", "sans-serif"],
+            label: ["Public Sans", "sans-serif"]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      line-height: 1;
+      display: inline-block;
+      vertical-align: middle;
+    }
+    .custom-squircle {
+      border-radius: 34%;
+    }
+    .launcher-rounded-square {
+      border-radius: 22%;
+    }
+    /* Ambient backdrop grid glow */
+    .telemetry-grid-bg {
+      background-size: 24px 24px;
+      background-image: 
+        linear-gradient(to right, rgba(79, 216, 235, 0.04) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(79, 216, 235, 0.04) 1px, transparent 1px);
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface font-body min-h-screen telemetry-grid-bg antialiased pb-28 selection:bg-primary-container selection:text-on-primary-container">
+<!-- Mobile Top Device Telemetry Header (Android Status Bar) -->
+<header class="w-full max-w-5xl mx-auto px-4 pt-2.5 pb-1 flex justify-between items-center text-xs text-on-surface-variant font-label tracking-tight select-none">
+<div class="flex items-center gap-1.5 font-semibold text-on-surface">
+<span>9:41</span>
+<span class="inline-block w-1.5 h-1.5 rounded-full bg-primary/70 animate-pulse"></span>
+</div>
+<div class="flex items-center gap-2 text-xs">
+<span class="font-medium tracking-wider">5G</span>
+<span class="material-symbols-outlined text-sm" data-icon="signal_cellular_alt">signal_cellular_alt</span>
+<span class="material-symbols-outlined text-sm" data-icon="wifi">wifi</span>
+<div class="flex items-center gap-1">
+<span class="font-semibold text-[11px]">94%</span>
+<span class="material-symbols-outlined text-base" data-icon="battery_full">battery_full</span>
+</div>
+</div>
+</header>
+<!-- TopAppBar Component (from Shared JSON Anchors) -->
+<nav class="bg-surface dark:bg-surface text-primary dark:text-primary docked full-width top-0 bg-surface-container/60 dark:bg-surface-container/60 backdrop-blur-md sticky top-0 z-40">
+<div class="flex justify-between items-center w-full px-4 py-3 max-w-5xl mx-auto">
+<div class="flex items-center gap-3">
+<button aria-label="Navigate back" class="w-9 h-9 rounded-full flex items-center justify-center text-on-surface hover:bg-surface-container-high dark:hover:bg-surface-container-high active:scale-95 transition-transform duration-150">
+<span class="material-symbols-outlined" data-icon="arrow_back">arrow_back</span>
+</button>
+<div>
+<h1 class="font-headline font-semibold text-lg leading-tight text-on-surface dark:text-on-surface">Adaptive Icon Exploration</h1>
+<p class="font-label text-xs text-on-surface-variant dark:text-on-surface-variant">Material 3 Expressive &amp; Material You Matrix</p>
+</div>
+</div>
+<div class="flex items-center gap-1">
+<button aria-label="Search Matrix" class="w-9 h-9 rounded-full flex items-center justify-center text-on-surface hover:bg-surface-container-high dark:hover:bg-surface-container-high active:scale-95 transition-transform duration-150">
+<span class="material-symbols-outlined" data-icon="search">search</span>
+</button>
+<button aria-label="More options" class="w-9 h-9 rounded-full flex items-center justify-center text-on-surface hover:bg-surface-container-high dark:hover:bg-surface-container-high active:scale-95 transition-transform duration-150">
+<span class="material-symbols-outlined" data-icon="more_vert">more_vert</span>
+</button>
+</div>
+</div>
+</nav>
+<main class="max-w-5xl mx-auto px-4 pt-3 space-y-5">
+<!-- Interactive Segmented Filter Pills & Hardware Glance Pill -->
+<section class="space-y-2.5">
+<div class="flex flex-wrap items-center justify-between gap-2.5">
+<!-- Segmented Filter Group -->
+<div class="inline-flex p-1 bg-surface-container rounded-full border border-outline-variant/60 shadow-inner">
+<button class="px-4 py-1.5 rounded-full text-xs font-label font-semibold bg-primary text-on-primary shadow-sm transition-all duration-150 active:scale-95">
+            All Concepts
+          </button>
+<button class="px-3.5 py-1.5 rounded-full text-xs font-label text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all duration-150 active:scale-95">
+            Standard Color
+          </button>
+<button class="px-3.5 py-1.5 rounded-full text-xs font-label text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all duration-150 active:scale-95">
+            Themed Monochrome
+          </button>
+</div>
+<!-- Telemetry chip indicator -->
+<div class="inline-flex items-center gap-2 px-3 py-1.5 bg-surface-container-low rounded-full border border-outline-variant/80 text-[11px] font-label text-on-surface-variant">
+<span class="w-2 h-2 rounded-full bg-primary animate-ping"></span>
+<span class="font-medium text-on-surface">Target API 34+</span>
+<span class="text-outline">|</span>
+<span>Pixel 8 Pro Native Glance &amp; Adaptive Vectors</span>
+</div>
+</div>
+</section>
+<!-- Bento Grid Section: 4 Adaptive Icon Concepts -->
+<section class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<!-- ================= CARD 1: Concept A ================= -->
+<article class="bg-surface-container rounded-lg p-5 border border-outline-variant/50 relative overflow-hidden flex flex-col justify-between hover:border-primary/40 transition-colors duration-200">
+<div class="absolute -top-16 -right-16 w-36 h-36 bg-primary/10 rounded-full blur-3xl pointer-events-none"></div>
+<div>
+<!-- Header -->
+<div class="flex items-start justify-between mb-4">
+<div>
+<div class="flex items-center gap-2">
+<span class="font-label text-xs tracking-wider uppercase text-primary font-bold">Concept A</span>
+<span class="px-2 py-0.5 rounded-full text-[10px] font-label font-medium bg-primary-container text-on-primary-container border border-primary/30">Prime Candidate</span>
+</div>
+<h2 class="font-headline font-bold text-base text-on-surface mt-0.5">Chronos Radial Arc</h2>
+</div>
+<span class="text-[11px] font-label px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant border border-outline-variant">
+              1.2 KB SVG
+            </span>
+</div>
+<!-- Hero Adaptive Icon (108dp base canvas in 128px relative box) -->
+<div class="flex flex-col items-center justify-center py-3">
+<div class="relative w-32 h-32 rounded-full bg-surface-container-highest/90 border border-primary/30 flex items-center justify-center shadow-lg shadow-black/40 group cursor-pointer transition-transform duration-200 hover:scale-105">
+<!-- Background Ambient Radar Ring -->
+<div class="absolute inset-1 rounded-full border border-dashed border-primary/20 pointer-events-none"></div>
+<!-- Luminous 270-degree Radial Arc Gauge Canvas Simulated SVG -->
+<svg class="w-24 h-24 -rotate-90 transform" viewbox="0 0 100 100">
+<!-- Base Track -->
+<circle cx="50" cy="50" fill="none" r="38" stroke="rgba(79, 216, 235, 0.15)" stroke-dasharray="238.7" stroke-dashoffset="59.6" stroke-linecap="round" stroke-width="7"></circle>
+<!-- Cyan Active Arc (270 deg / 75% fill) -->
+<circle class="drop-shadow-[0_0_8px_rgba(79,216,235,0.7)]" cx="50" cy="50" fill="none" r="38" stroke="#4FD8EB" stroke-dasharray="238.7" stroke-dashoffset="95" stroke-linecap="round" stroke-width="7.5"></circle>
+<!-- Target Pace Notch (Orange/Amber) -->
+<circle class="drop-shadow-[0_0_6px_rgba(255,183,124,0.9)]" cx="50" cy="12" fill="#FFB77C" r="3.5"></circle>
+</svg>
+<!-- Central Quota Telemetry Glyph & Pulse -->
+<div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+<span class="material-symbols-outlined text-primary text-xl" data-icon="timelapse">timelapse</span>
+<span class="w-1.5 h-1.5 mt-0.5 rounded-full bg-tertiary shadow-[0_0_6px_#ffb77c]"></span>
+</div>
+<!-- 66dp Safe Area Perimeter Guide (Ghosted) -->
+<div class="absolute w-[78px] h-[78px] rounded-full border border-primary/20 border-dotted pointer-events-none"></div>
+</div>
+<span class="mt-2 text-[11px] font-label text-on-surface-variant font-medium">Hero Layer (Interactive 108dp)</span>
+</div>
+<!-- Launcher Mask Previews (4 Shapes) -->
+<div class="mt-3 pt-3 border-t border-outline-variant/40">
+<div class="flex items-center justify-between mb-2">
+<span class="text-[11px] font-label font-semibold text-on-surface-variant">Launcher Mask Previews</span>
+<span class="text-[10px] font-label text-primary">Pixel • Samsung • HyperOS • Themed</span>
+</div>
+<div class="grid grid-cols-4 gap-2 text-center">
+<!-- Pixel Circle -->
+<div class="flex flex-col items-center gap-1.5">
+<div class="w-12 h-12 rounded-full bg-surface-container-high border border-outline-variant flex items-center justify-center p-1.5 shadow-sm">
+<svg class="w-full h-full -rotate-90" viewbox="0 0 100 100">
+<circle cx="50" cy="50" fill="none" r="36" stroke="#4FD8EB" stroke-dasharray="226" stroke-dashoffset="65" stroke-linecap="round" stroke-width="9"></circle>
+<circle cx="50" cy="50" fill="#4FD8EB" r="10"></circle>
+</svg>
+</div>
+<span class="text-[10px] font-label text-on-surface-variant">Circle (Pixel)</span>
+</div>
+<!-- Samsung Squircle -->
+<div class="flex flex-col items-center gap-1.5">
+<div class="w-12 h-12 custom-squircle bg-surface-container-high border border-outline-variant flex items-center justify-center p-1.5 shadow-sm">
+<svg class="w-full h-full -rotate-90" viewbox="0 0 100 100">
+<circle cx="50" cy="50" fill="none" r="36" stroke="#4FD8EB" stroke-dasharray="226" stroke-dashoffset="65" stroke-linecap="round" stroke-width="9"></circle>
+<circle cx="50" cy="50" fill="#4FD8EB" r="10"></circle>
+</svg>
+</div>
+<span class="text-[10px] font-label text-on-surface-variant">Squircle (OneUI)</span>
+</div>
+<!-- Xiaomi Rounded Square -->
+<div class="flex flex-col items-center gap-1.5">
+<div class="w-12 h-12 launcher-rounded-square bg-surface-container-high border border-outline-variant flex items-center justify-center p-1.5 shadow-sm">
+<svg class="w-full h-full -rotate-90" viewbox="0 0 100 100">
+<circle cx="50" cy="50" fill="none" r="36" stroke="#4FD8EB" stroke-dasharray="226" stroke-dashoffset="65" stroke-linecap="round" stroke-width="9"></circle>
+<circle cx="50" cy="50" fill="#4FD8EB" r="10"></circle>
+</svg>
+</div>
+<span class="text-[10px] font-label text-on-surface-variant">Square (HyperOS)</span>
+</div>
+<!-- Material You Themed Monochrome -->
+<div class="flex flex-col items-center gap-1.5">
+<div class="w-12 h-12 rounded-full bg-secondary-container/80 border border-secondary/40 flex items-center justify-center p-1.5 shadow-sm">
+<svg class="w-full h-full -rotate-90" viewbox="0 0 100 100">
+<circle cx="50" cy="50" fill="none" r="36" stroke="#B1CBCD" stroke-dasharray="226" stroke-dashoffset="65" stroke-linecap="round" stroke-width="9"></circle>
+<circle cx="50" cy="50" fill="#B1CBCD" r="10"></circle>
+</svg>
+</div>
+<span class="text-[10px] font-label text-on-surface-variant">Themed (Mono)</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Technical Specs Bar -->
+<div class="mt-4 pt-2.5 border-t border-outline-variant/30 flex items-center justify-between text-[11px] font-label text-on-surface-variant">
+<span class="flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+            108dp Canvas • 66dp Safe Area (No Clipped Geometry)
+          </span>
+<span class="text-primary font-medium">18dp Parallax</span>
+</div>
+</article>
+<!-- ================= CARD 2: Concept B ================= -->
+<article class="bg-surface-container rounded-lg p-5 border border-outline-variant/50 relative overflow-hidden flex flex-col justify-between hover:border-primary/40 transition-colors duration-200">
+<div class="absolute -top-16 -right-16 w-36 h-36 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+<div>
+<!-- Header -->
+<div class="flex items-start justify-between mb-4">
+<div>
+<div class="flex items-center gap-2">
+<span class="font-label text-xs tracking-wider uppercase text-emerald-400 font-bold">Concept B</span>
+<span class="px-2 py-0.5 rounded-full text-[10px] font-label font-medium bg-surface-container-high text-on-surface-variant border border-outline-variant">Kinetic Horizon</span>
+</div>
+<h2 class="font-headline font-bold text-base text-on-surface mt-0.5">Concentric Horizon Orbits</h2>
+</div>
+<span class="text-[11px] font-label px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant border border-outline-variant">
+              1.6 KB SVG
+            </span>
+</div>
+<!-- Hero Adaptive Icon -->
+<div class="flex flex-col items-center justify-center py-3">
+<div class="relative w-32 h-32 rounded-full bg-surface-container-highest/90 border border-emerald-400/30 flex items-center justify-center shadow-lg shadow-black/40 group cursor-pointer transition-transform duration-200 hover:scale-105">
+<!-- 3 Nested Concentric Orbital Countdown Rings -->
+<svg class="w-24 h-24 -rotate-90 transform" viewbox="0 0 100 100">
+<!-- Outer Ring: 5-Hour rolling (Cyan #4FD8EB) -->
+<circle cx="50" cy="50" fill="none" r="42" stroke="rgba(79, 216, 235, 0.15)" stroke-width="4.5"></circle>
+<circle class="drop-shadow-[0_0_6px_rgba(79,216,235,0.6)]" cx="50" cy="50" fill="none" r="42" stroke="#4FD8EB" stroke-dasharray="264" stroke-dashoffset="70" stroke-linecap="round" stroke-width="5"></circle>
+<!-- Middle Ring: 7-Day tactical (Lime/Emerald #5EEAD4) -->
+<circle cx="50" cy="50" fill="none" r="30" stroke="rgba(94, 234, 212, 0.15)" stroke-width="5"></circle>
+<circle class="drop-shadow-[0_0_6px_rgba(94,234,212,0.6)]" cx="50" cy="50" fill="none" r="30" stroke="#5EEAD4" stroke-dasharray="188" stroke-dashoffset="60" stroke-linecap="round" stroke-width="5.5"></circle>
+<!-- Inner Ring: 30-Day strategic (Amber #FFB77C) -->
+<circle cx="50" cy="50" fill="none" r="18" stroke="rgba(255, 183, 124, 0.15)" stroke-width="5"></circle>
+<circle class="drop-shadow-[0_0_6px_rgba(255,183,124,0.6)]" cx="50" cy="50" fill="none" r="18" stroke="#FFB77C" stroke-dasharray="113" stroke-dashoffset="35" stroke-linecap="round" stroke-width="5.5"></circle>
+</svg>
+<!-- Apex Telemetry Needle Pointer -->
+<div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+<div class="w-1.5 h-7 bg-gradient-to-t from-primary to-transparent -translate-y-3 rounded-full"></div>
+<div class="w-3 h-3 rounded-full bg-primary border-2 border-surface shadow-[0_0_8px_#4fd8eb]"></div>
+</div>
+<!-- Safe Area Ring -->
+<div class="absolute w-[78px] h-[78px] rounded-full border border-emerald-400/20 border-dotted pointer-events-none"></div>
+</div>
+<span class="mt-2 text-[11px] font-label text-on-surface-variant font-medium">3-Tier Reset Horizon Vectors</span>
+</div>
+<!-- Launcher Mask Previews (4 Shapes) -->
+<div class="mt-3 pt-3 border-t border-outline-variant/40">
+<div class="flex items-center justify-between mb-2">
+<span class="text-[11px] font-label font-semibold text-on-surface-variant">Launcher Mask Previews</span>
+<span class="text-[10px] font-label text-emerald-400">Triple Horizon Active</span>
+</div>
+<div class="grid grid-cols-4 gap-2 text-center">
+<!-- Pixel Circle -->
+<div class="flex flex-col items-center gap-1.5">
+<div class="w-12 h-12 rounded-full bg-surface-container-high border border-outline-variant flex items-center justify-center p-1 shadow-sm">
+<svg class="w-full h-full -rotate-90" viewbox="0 0 100 100">
+<circle cx="50" cy="50" fill="none" r="40" stroke="#4FD8EB" stroke-dasharray="251" stroke-dashoffset="80" stroke-width="7"></circle>
+<circle cx="50" cy="50" fill="none" r="28" stroke="#5EEAD4" stroke-dasharray="175" stroke-dashoffset="60" stroke-width="7"></circle>
+<circle cx="50" cy="50" fill="none" r="16" stroke="#FFB77C" stroke-dasharray="100" stroke-dashoffset="30" stroke-width="7"></circle>
+</svg>
+</div>
+<span class="text-[10px] font-label text-on-surface-variant">Circle (Pixel)</span>
+</div>
+<!-- Samsung Squircle -->
+<div class="flex flex-col items-center gap-1.5">
+<div class="w-12 h-12 custom-squircle bg-surface-container-high border border-outline-variant flex items-center justify-center p-1 shadow-sm">
+<svg class="w-full h-full -rotate-90" viewbox="0 0 100 100">
+<circle cx="50" cy="50" fill="none" r="40" stroke="#4FD8EB" stroke-dasharray="251" stroke-dashoffset="80" stroke-width="7"></circle>
+<circle cx="50" cy="50" fill="none" r="28" stroke="#5EEAD4" stroke-dasharray="175" stroke-dashoffset="60" stroke-width="7"></circle>
+<circle cx="50" cy="50" fill="none" r="16" stroke="#FFB77C" stroke-dasharray="100" stroke-dashoffset="30" stroke-width="7"></circle>
+</svg>
+</div>
+<span class="text-[10px] font-label text-on-surface-variant">Squircle (OneUI)</span>
+</div>
+<!-- Xiaomi Rounded Square -->
+<div class="flex flex-col items-center gap-1.5">
+<div class="w-12 h-12 launcher-rounded-square bg-surface-container-high border border-outline-variant flex items-center justify-center p-1 shadow-sm">
+<svg class="w-full h-full -rotate-90" viewbox="0 0 100 100">
+<circle cx="50" cy="50" fill="none" r="40" stroke="#4FD8EB" stroke-dasharray="251" stroke-dashoffset="80" stroke-width="7"></circle>
+<circle cx="50" cy="50" fill="none" r="28" stroke="#5EEAD4" stroke-dasharray="175" stroke-dashoffset="60" stroke-width="7"></circle>
+<circle cx="50" cy="50" fill="none" r="16" stroke="#FFB77C" stroke-dasharray="100" stroke-dashoffset="30" stroke-width="7"></circle>
+</svg>
+</div>
+<span class="text-[10px] font-label text-on-surface-variant">Square (HyperOS)</span>
+</div>
+<!-- Material You Themed Monochrome -->
+<div class="flex flex-col items-center gap-1.5">
+<div class="w-12 h-12 rounded-full bg-secondary-container/80 border border-secondary/40 flex items-center justify-center p-1 shadow-sm">
+<svg class="w-full h-full -rotate-90" viewbox="0 0 100 100">
+<circle cx="50" cy="50" fill="none" r="40" stroke="#B1CBCD" stroke-dasharray="251" stroke-dashoffset="80" stroke-width="7"></circle>
+<circle cx="50" cy="50" fill="none" r="28" stroke="#B1CBCD" stroke-dasharray="175" stroke-dashoffset="60" stroke-width="7"></circle>
+<circle cx="50" cy="50" fill="none" r="16" stroke="#B1CBCD" stroke-dasharray="100" stroke-dashoffset="30" stroke-width="7"></circle>
+</svg>
+</div>
+<span class="text-[10px] font-label text-on-surface-variant">Themed (Mono)</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Technical Specs Bar -->
+<div class="mt-4 pt-2.5 border-t border-outline-variant/30 flex items-center justify-between text-[11px] font-label text-on-surface-variant">
+<span class="flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+            Triple-Ring Vector Path
+          </span>
+<span class="text-emerald-400 font-medium">Multi-Layer Parallax Ready</span>
+</div>
+</article>
+<!-- ================= CARD 3: Concept C ================= -->
+<article class="bg-surface-container rounded-lg p-5 border border-outline-variant/50 relative overflow-hidden flex flex-col justify-between hover:border-primary/40 transition-colors duration-200">
+<div class="absolute -top-16 -right-16 w-36 h-36 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
+<div>
+<!-- Header -->
+<div class="flex items-start justify-between mb-4">
+<div>
+<div class="flex items-center gap-2">
+<span class="font-label text-xs tracking-wider uppercase text-tertiary font-bold">Concept C</span>
+<span class="px-2 py-0.5 rounded-full text-[10px] font-label font-medium bg-surface-container-high text-on-surface-variant border border-outline-variant">Multi-Agent Tri-Core</span>
+</div>
+<h2 class="font-headline font-bold text-base text-on-surface mt-0.5">Tri-Core Orca Prism</h2>
+</div>
+<span class="text-[11px] font-label px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant border border-outline-variant">
+              1.4 KB SVG
+            </span>
+</div>
+<!-- Hero Adaptive Icon -->
+<div class="flex flex-col items-center justify-center py-3">
+<div class="relative w-32 h-32 rounded-full bg-surface-container-highest/90 border border-tertiary/30 flex items-center justify-center shadow-lg shadow-black/40 group cursor-pointer transition-transform duration-200 hover:scale-105">
+<!-- Segmented Consumption Outer Arc -->
+<svg class="w-24 h-24 transform" viewbox="0 0 100 100">
+<circle cx="50" cy="50" fill="none" r="41" stroke="#324B4C" stroke-dasharray="6 4" stroke-width="4"></circle>
+<circle cx="50" cy="50" fill="none" r="41" stroke="#4FD8EB" stroke-dasharray="55 180" stroke-linecap="round" stroke-width="4.5"></circle>
+<!-- Faceted Triangular Telemetry Prism Core -->
+<!-- Vertex 1 (Top/Argon Cyan #4FD8EB) -->
+<!-- Vertex 2 (Bottom-Left/Flash Emerald #5EEAD4) -->
+<!-- Vertex 3 (Bottom-Right/Grok Amber #FFB77C) -->
+<polygon fill="none" points="50,22 76,70 24,70" stroke="rgba(255,255,255,0.15)" stroke-width="2"></polygon>
+<!-- Three Faceted Shards -->
+<polygon class="drop-shadow-[0_0_8px_rgba(79,216,235,0.4)]" fill="#4FD8EB" fill-opacity="0.8" points="50,24 50,54 26,68"></polygon>
+<polygon class="drop-shadow-[0_0_8px_rgba(94,234,212,0.4)]" fill="#5EEAD4" fill-opacity="0.85" points="50,24 74,68 50,54"></polygon>
+<polygon class="drop-shadow-[0_0_8px_rgba(255,183,124,0.4)]" fill="#FFB77C" fill-opacity="0.85" points="26,68 50,54 74,68"></polygon>
+</svg>
+<!-- Central Power Pip -->
+<div class="absolute w-2 h-2 rounded-full bg-white shadow-[0_0_8px_#ffffff] pointer-events-none"></div>
+<!-- Safe Area Ring -->
+<div class="absolute w-[78px] h-[78px] rounded-full border border-tertiary/20 border-dotted pointer-events-none"></div>
+</div>
+<span class="mt-2 text-[11px] font-label text-on-surface-variant font-medium">Faceted Tri-Prism Vector Silhouette</span>
+</div>
+<!-- Launcher Mask Previews (4 Shapes) -->
+<div class="mt-3 pt-3 border-t border-outline-variant/40">
+<div class="flex items-center justify-between mb-2">
+<span class="text-[11px] font-label font-semibold text-on-surface-variant">Launcher Mask Previews</span>
+<span class="text-[10px] font-label text-tertiary">Agent Telemetry Cores</span>
+</div>
+<div class="grid grid-cols-4 gap-2 text-center">
+<!-- Pixel Circle -->
+<div class="flex flex-col items-center gap-1.5">
+<div class="w-12 h-12 rounded-full bg-surface-container-high border border-outline-variant flex items-center justify-center p-1.5 shadow-sm">
+<svg class="w-7 h-7" viewbox="0 0 100 100">
+<polygon fill="none" points="50,20 80,75 20,75" stroke="#4FD8EB" stroke-width="8"></polygon>
+<circle cx="50" cy="50" fill="#FFB77C" r="10"></circle>
+</svg>
+</div>
+<span class="text-[10px] font-label text-on-surface-variant">Circle (Pixel)</span>
+</div>
+<!-- Samsung Squircle -->
+<div class="flex flex-col items-center gap-1.5">
+<div class="w-12 h-12 custom-squircle bg-surface-container-high border border-outline-variant flex items-center justify-center p-1.5 shadow-sm">
+<svg class="w-7 h-7" viewbox="0 0 100 100">
+<polygon fill="none" points="50,20 80,75 20,75" stroke="#4FD8EB" stroke-width="8"></polygon>
+<circle cx="50" cy="50" fill="#FFB77C" r="10"></circle>
+</svg>
+</div>
+<span class="text-[10px] font-label text-on-surface-variant">Squircle (OneUI)</span>
+</div>
+<!-- Xiaomi Rounded Square -->
+<div class="flex flex-col items-center gap-1.5">
+<div class="w-12 h-12 launcher-rounded-square bg-surface-container-high border border-outline-variant flex items-center justify-center p-1.5 shadow-sm">
+<svg class="w-7 h-7" viewbox="0 0 100 100">
+<polygon fill="none" points="50,20 80,75 20,75" stroke="#4FD8EB" stroke-width="8"></polygon>
+<circle cx="50" cy="50" fill="#FFB77C" r="10"></circle>
+</svg>
+</div>
+<span class="text-[10px] font-label text-on-surface-variant">Square (HyperOS)</span>
+</div>
+<!-- Material You Themed Monochrome -->
+<div class="flex flex-col items-center gap-1.5">
+<div class="w-12 h-12 rounded-full bg-secondary-container/80 border border-secondary/40 flex items-center justify-center p-1.5 shadow-sm">
+<svg class="w-7 h-7" viewbox="0 0 100 100">
+<polygon fill="none" points="50,20 80,75 20,75" stroke="#B1CBCD" stroke-width="8"></polygon>
+<circle cx="50" cy="50" fill="#B1CBCD" r="10"></circle>
+</svg>
+</div>
+<span class="text-[10px] font-label text-on-surface-variant">Themed (Mono)</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Technical Specs Bar -->
+<div class="mt-4 pt-2.5 border-t border-outline-variant/30 flex items-center justify-between text-[11px] font-label text-on-surface-variant">
+<span class="flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span>
+            Faceted Tri-Prism Geometry
+          </span>
+<span class="text-tertiary font-medium">72dp Hero Silhouette</span>
+</div>
+</article>
+<!-- ================= CARD 4: Concept D ================= -->
+<article class="bg-surface-container rounded-lg p-5 border border-outline-variant/50 relative overflow-hidden flex flex-col justify-between hover:border-primary/40 transition-colors duration-200">
+<div class="absolute -top-16 -right-16 w-36 h-36 bg-cyan-400/10 rounded-full blur-3xl pointer-events-none"></div>
+<div>
+<!-- Header -->
+<div class="flex items-start justify-between mb-4">
+<div>
+<div class="flex items-center gap-2">
+<span class="font-label text-xs tracking-wider uppercase text-primary font-bold">Concept D</span>
+<span class="px-2 py-0.5 rounded-full text-[10px] font-label font-medium bg-surface-container-high text-on-surface-variant border border-outline-variant">Precision Dial</span>
+</div>
+<h2 class="font-headline font-bold text-base text-on-surface mt-0.5">Cyber Chronometer</h2>
+</div>
+<span class="text-[11px] font-label px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant border border-outline-variant">
+              1.8 KB SVG
+            </span>
+</div>
+<!-- Hero Adaptive Icon -->
+<div class="flex flex-col items-center justify-center py-3">
+<div class="relative w-32 h-32 rounded-full bg-surface-container-highest/90 border border-primary/30 flex items-center justify-center shadow-lg shadow-black/40 group cursor-pointer transition-transform duration-200 hover:scale-105">
+<!-- Dial with 60-degree Tick Marks & High-Contrast Arc -->
+<svg class="w-24 h-24" viewbox="0 0 100 100">
+<!-- Precision Stencil Perimeter Ticks -->
+<circle cx="50" cy="50" fill="none" r="43" stroke="#223133" stroke-dasharray="1.5 7.5" stroke-width="4"></circle>
+<!-- Highlight Ticks -->
+<circle cx="50" cy="50" fill="none" r="43" stroke="#4FD8EB" stroke-dasharray="2 24" stroke-width="4.5"></circle>
+<!-- Segmented Arc Gauge -->
+<circle cx="50" cy="50" fill="none" r="32" stroke="rgba(79, 216, 235, 0.15)" stroke-width="6"></circle>
+<circle class="drop-shadow-[0_0_6px_rgba(79,216,235,0.7)]" cx="50" cy="50" fill="none" r="32" stroke="#4FD8EB" stroke-dasharray="140 200" stroke-dashoffset="15" stroke-linecap="round" stroke-width="6"></circle>
+<!-- Dual Crosshairs -->
+<line stroke="rgba(224, 234, 233, 0.3)" stroke-dasharray="3 3" stroke-width="1.2" x1="28" x2="72" y1="50" y2="50"></line>
+<line stroke="rgba(224, 234, 233, 0.3)" stroke-dasharray="3 3" stroke-width="1.2" x1="50" x2="50" y1="28" y2="72"></line>
+<!-- Central Status Pip with Focus Ring -->
+<circle cx="50" cy="50" fill="#004F57" r="6" stroke="#4FD8EB" stroke-width="2"></circle>
+<circle cx="50" cy="50" fill="#4FD8EB" r="2.5"></circle>
+</svg>
+<!-- Safe Area Ring -->
+<div class="absolute w-[78px] h-[78px] rounded-full border border-primary/20 border-dotted pointer-events-none"></div>
+</div>
+<span class="mt-2 text-[11px] font-label text-on-surface-variant font-medium">High-Contrast Stencil Vector Dial</span>
+</div>
+<!-- Launcher Mask Previews (4 Shapes) -->
+<div class="mt-3 pt-3 border-t border-outline-variant/40">
+<div class="flex items-center justify-between mb-2">
+<span class="text-[11px] font-label font-semibold text-on-surface-variant">Launcher Mask Previews</span>
+<span class="text-[10px] font-label text-primary">Sub-Pixel Precision</span>
+</div>
+<div class="grid grid-cols-4 gap-2 text-center">
+<!-- Pixel Circle -->
+<div class="flex flex-col items-center gap-1.5">
+<div class="w-12 h-12 rounded-full bg-surface-container-high border border-outline-variant flex items-center justify-center p-1.5 shadow-sm">
+<svg class="w-8 h-8" viewbox="0 0 100 100">
+<circle cx="50" cy="50" fill="none" r="38" stroke="#4FD8EB" stroke-dasharray="1.5 6" stroke-width="6"></circle>
+<circle cx="50" cy="50" fill="none" r="22" stroke="#4FD8EB" stroke-width="6"></circle>
+<circle cx="50" cy="50" fill="#4FD8EB" r="6"></circle>
+</svg>
+</div>
+<span class="text-[10px] font-label text-on-surface-variant">Circle (Pixel)</span>
+</div>
+<!-- Samsung Squircle -->
+<div class="flex flex-col items-center gap-1.5">
+<div class="w-12 h-12 custom-squircle bg-surface-container-high border border-outline-variant flex items-center justify-center p-1.5 shadow-sm">
+<svg class="w-8 h-8" viewbox="0 0 100 100">
+<circle cx="50" cy="50" fill="none" r="38" stroke="#4FD8EB" stroke-dasharray="1.5 6" stroke-width="6"></circle>
+<circle cx="50" cy="50" fill="none" r="22" stroke="#4FD8EB" stroke-width="6"></circle>
+<circle cx="50" cy="50" fill="#4FD8EB" r="6"></circle>
+</svg>
+</div>
+<span class="text-[10px] font-label text-on-surface-variant">Squircle (OneUI)</span>
+</div>
+<!-- Xiaomi Rounded Square -->
+<div class="flex flex-col items-center gap-1.5">
+<div class="w-12 h-12 launcher-rounded-square bg-surface-container-high border border-outline-variant flex items-center justify-center p-1.5 shadow-sm">
+<svg class="w-8 h-8" viewbox="0 0 100 100">
+<circle cx="50" cy="50" fill="none" r="38" stroke="#4FD8EB" stroke-dasharray="1.5 6" stroke-width="6"></circle>
+<circle cx="50" cy="50" fill="none" r="22" stroke="#4FD8EB" stroke-width="6"></circle>
+<circle cx="50" cy="50" fill="#4FD8EB" r="6"></circle>
+</svg>
+</div>
+<span class="text-[10px] font-label text-on-surface-variant">Square (HyperOS)</span>
+</div>
+<!-- Material You Themed Monochrome -->
+<div class="flex flex-col items-center gap-1.5">
+<div class="w-12 h-12 rounded-full bg-secondary-container/80 border border-secondary/40 flex items-center justify-center p-1.5 shadow-sm">
+<svg class="w-8 h-8" viewbox="0 0 100 100">
+<circle cx="50" cy="50" fill="none" r="38" stroke="#B1CBCD" stroke-dasharray="1.5 6" stroke-width="6"></circle>
+<circle cx="50" cy="50" fill="none" r="22" stroke="#B1CBCD" stroke-width="6"></circle>
+<circle cx="50" cy="50" fill="#B1CBCD" r="6"></circle>
+</svg>
+</div>
+<span class="text-[10px] font-label text-on-surface-variant">Themed (Mono)</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Technical Specs Bar -->
+<div class="mt-4 pt-2.5 border-t border-outline-variant/30 flex items-center justify-between text-[11px] font-label text-on-surface-variant">
+<span class="flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+            High-Density Stencil Marks
+          </span>
+<span class="text-primary font-medium">1:1 Vector Fidelity Quad HD+</span>
+</div>
+</article>
+</section>
+<!-- Bottom Technical Card: Safe-Zone Compliance Guidelines -->
+<section class="bg-surface-container rounded-lg p-5 border border-outline-variant/60 shadow-md">
+<div class="flex flex-col lg:flex-row items-center gap-6">
+<!-- Vector Technical Diagram (108dp / 72dp / 66dp) -->
+<div class="relative w-48 h-48 flex-shrink-0 flex items-center justify-center bg-surface-container-lowest rounded-2xl border border-outline-variant/50 p-2">
+<!-- 108dp Outer Canvas Boundary -->
+<div class="absolute inset-2 border-2 border-dashed border-outline text-[9px] font-mono text-on-surface-variant flex items-start justify-start p-1.5 rounded">
+<span>108dp Canvas</span>
+</div>
+<!-- 18dp Parallax Margin Zone Indicator -->
+<div class="absolute inset-5 rounded-full bg-primary/5 pointer-events-none"></div>
+<!-- 72dp Mask Boundary Circle -->
+<div class="w-32 h-32 rounded-full border-2 border-tertiary/60 flex items-center justify-center relative">
+<span class="absolute top-1 text-[9px] font-mono text-tertiary font-medium">72dp Mask</span>
+<!-- 66dp Guaranteed Safe Area Circle -->
+<div class="w-24 h-24 rounded-full border-2 border-primary bg-primary/10 flex items-center justify-center relative">
+<span class="text-[10px] font-headline font-bold text-primary tracking-tight text-center leading-3">
+                66dp<br/><span class="text-[8px] font-normal text-on-primary-container">Safe Zone</span>
+</span>
+</div>
+</div>
+</div>
+<!-- Guidelines Details List -->
+<div class="flex-1 space-y-3">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" data-icon="grid_goldenratio">grid_goldenratio</span>
+<h3 class="font-headline font-bold text-base text-on-surface">Android 13–15 Adaptive Icon Safe-Zone Compliance Guidelines</h3>
+</div>
+<p class="text-xs text-on-surface-variant leading-relaxed">
+            Launcher systems dynamically crop icons using vendor masks. To maintain perfect visual telemetry on Android 14/15 Pixel Launcher, geometry must strictly respect three nested constraints:
+          </p>
+<ul class="space-y-2 text-xs text-on-surface">
+<li class="flex items-start gap-2.5">
+<span class="material-symbols-outlined text-primary text-base mt-0.5" data-icon="layers">layers</span>
+<span>
+<strong class="font-semibold text-primary">Foreground &amp; Background Separation:</strong> Packaged as dual standalone XML drawables (<code class="text-[11px] bg-surface-container-high px-1 py-0.5 rounded font-mono text-secondary">&lt;adaptive-icon&gt;</code>) to allow continuous physical spring translations.
+              </span>
+</li>
+<li class="flex items-start gap-2.5">
+<span class="material-symbols-outlined text-emerald-400 text-base mt-0.5" data-icon="palette">palette</span>
+<span>
+<strong class="font-semibold text-emerald-400">Material You Dynamic Theming:</strong> Dedicated monochrome drawable (<code class="text-[11px] bg-surface-container-high px-1 py-0.5 rounded font-mono text-secondary">&lt;monochrome android:drawable="..."&gt;</code>) tinted dynamically with system Monet palette.
+              </span>
+</li>
+<li class="flex items-start gap-2.5">
+<span class="material-symbols-outlined text-tertiary text-base mt-0.5" data-icon="animation">animation</span>
+<span>
+<strong class="font-semibold text-tertiary">18dp Outer Motion Margin:</strong> Outer perimeter buffer reserved for physics-based launcher parallax drift, drag-and-drop elasticity, and 3D glance tilt without clipping.
+              </span>
+</li>
+</ul>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar Component (Exact execution from Shared JSON Anchors) -->
+<nav class="fixed bottom-0 left-0 right-0 z-50 flex justify-around items-center px-4 py-2 max-w-md mx-auto bg-surface-container dark:bg-surface-container floating pill rounded-full mb-4 mx-4 shadow-lg dark:shadow-none">
+<!-- Item 1: Icon Lab (Active tab based on showcase intent) -->
+<a aria-label="Icon Lab" class="flex flex-col items-center justify-center bg-primary-container dark:bg-primary-container text-on-primary-container dark:text-on-primary-container rounded-full px-4 py-1.5 active:scale-95 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined text-lg" data-icon="palette">palette</span>
+<span class="font-label text-xs font-medium tracking-tight">Icon Lab</span>
+</a>
+<!-- Item 2: Launcher Preview -->
+<a aria-label="Launcher Preview" class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant px-3 py-1.5 hover:bg-surface-container-high dark:hover:bg-surface-container-high rounded-full active:scale-95 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined text-lg" data-icon="layers">layers</span>
+<span class="font-label text-xs font-medium tracking-tight">Launcher Preview</span>
+</a>
+<!-- Item 3: Guidelines -->
+<a aria-label="Guidelines" class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant px-3 py-1.5 hover:bg-surface-container-high dark:hover:bg-surface-container-high rounded-full active:scale-95 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined text-lg" data-icon="grid_goldenratio">grid_goldenratio</span>
+<span class="font-label text-xs font-medium tracking-tight">Guidelines</span>
+</a>
+<!-- Item 4: Export -->
+<a aria-label="Export" class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant px-3 py-1.5 hover:bg-surface-container-high dark:hover:bg-surface-container-high rounded-full active:scale-95 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined text-lg" data-icon="file_download">file_download</span>
+<span class="font-label text-xs font-medium tracking-tight">Export</span>
+</a>
+</nav>
+</body></html>

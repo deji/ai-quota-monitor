@@ -68,6 +68,10 @@ All non-trivial work in this repository uses three distinct agent roles and **th
    - Key `ConnectionSettingsForm` draft state on individual credential strings (never on the whole `SyncSettings` object, which also carries `activeHoursStart`/`End`), and serialize all settings mutations in `QuotaRepositoryImpl` under `settingsMutex`.
    - Use `SyncSettings.hasUsableTransport` (`tailscaleUrl.isNotBlank() || (gistId.isNotBlank() && gistAesKey.isNotBlank())`) everywhere transport readiness is checked.
    - Never persist `SeedData` to `cached_snapshot`; ensure `testConnection` probes non-destructively (preserving stored secrets and restoring prior `ConnectionState` on failure); and keep collector port `8741` consistent across code, placeholders, and docs.
+7. **Android Adaptive Launcher Icons & Material You Theming Invariants (`APP-ICO1` / Issue #2)**:
+   - Adaptive icons must adhere to the 108dp outer canvas / 66dp diameter safe area circle (center `(54, 54)`, $R \le 33\text{dp}$; maximum foreground extent is the amber pace pip at 29.8dp, alongside the arc stroke at 29.25dp) to prevent clipping under arbitrary OEM launcher masks (Circle, Squircle, Rounded Square, Teardrop).
+   - Android 13+ (API 33+) Material You dynamic theming requires a dedicated `<monochrome>` layer in `ic_launcher.xml` and `ic_launcher_round.xml`. It must use `#FFFFFF` fills/strokes with differentiated alpha (e.g. 30% alpha for background tracks). Crucially, because VectorDrawable uses source-over blending, stacking a `#00000000` path does not create cutouts; true knockouts must be subpaths using `android:fillType="evenOdd"`.
+   - Always back adaptive vector drawables with hermetic unit tests (`AdaptiveIconResourceTest`) asserting geometry and attribute invariants.
 
 ---
 

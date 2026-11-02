@@ -24,6 +24,8 @@ Following owner review of the three Stitch prototype sets (`projects/81570706549
 ## 2. Stitch Prototype Assets Inventory (`.stitch/designs/`)
 
 - **Hybrid Master**: [`.stitch/designs/hybrid/01-hybrid-master-dashboard.png`](../../.stitch/designs/hybrid/01-hybrid-master-dashboard.png)
+- **Adaptive Launcher Icon Exploration (`projects/8157070654946262217`, screen `3fa498b599d94569b9be4f056c1603bb`)**:
+  - [`.stitch/designs/icons/adaptive-icon-proposals.png`](../../.stitch/designs/icons/adaptive-icon-proposals.png) · [`adaptive-icon-proposals.html`](../../.stitch/designs/icons/adaptive-icon-proposals.html)
 - **Set 1 — Conservative (`assets/6341266814161057284`)**:
   - [`01-dashboard.png`](../../.stitch/designs/conservative/01-dashboard.png) · [`02-detail-history.png`](../../.stitch/designs/conservative/02-detail-history.png) · [`03-widgets-settings.png`](../../.stitch/designs/conservative/03-widgets-settings.png)
 - **Set 2 — Modern (`assets/8610081051554797998`)**:
