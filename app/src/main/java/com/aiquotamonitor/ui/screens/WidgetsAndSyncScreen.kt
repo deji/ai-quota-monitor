@@ -34,6 +34,7 @@ fun WidgetsAndSyncScreen(
     val snapshot by viewModel.activeSnapshot.collectAsState()
     val savedSettings by viewModel.settings.collectAsState()
     val connectionState by viewModel.connectionState.collectAsState()
+    val polarity by viewModel.polarity.collectAsState()
     val hiddenBucketIds by viewModel.hiddenBucketIds.collectAsState()
     val pinnedBucketId by viewModel.pinnedBucketId.collectAsState()
 
@@ -90,7 +91,8 @@ fun WidgetsAndSyncScreen(
         GlancePreviewCard(
             snapshot = snapshot,
             hiddenBucketIds = hiddenBucketIds,
-            pinnedBucketId = pinnedBucketId
+            pinnedBucketId = pinnedBucketId,
+            polarity = polarity
         )
 
         ActiveHoursSlider(

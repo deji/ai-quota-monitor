@@ -10,6 +10,9 @@ import com.aiquotamonitor.data.repository.SyncSettings
 import com.aiquotamonitor.domain.model.QuotaSnapshot
 import com.aiquotamonitor.domain.model.SmartPrimeStatus
 import java.io.IOException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -830,5 +833,34 @@ class QuotaRepositoryImplTest {
         repository.toggleBucketVisibility("gemini-5h")
         assertEquals(setOf("3p-weekly", "gemini-5h"), repository.hiddenBucketIdsFlow.value)
         assertEquals(setOf("3p-weekly", "gemini-5h"), store.getHiddenBucketIds())
+    }
+
+    @Test
+    fun testConcurrentPinningAndUnhidingKeepsBucketPinnedAndVisible() = runTest {
+        val sharedPrefs = com.aiquotamonitor.data.local.InMemorySharedPreferences()
+        val store = PreferencesStore(sharedPreferences = sharedPrefs)
+        val repository = QuotaRepositoryImpl(
+            preferencesStore = store,
+            tailscaleClient = FakeTailscaleClient(),
+            gistClient = FakeGistClient()
+        )
+
+        // Verify initial state: 3p-5h is hidden
+        assertTrue(repository.hiddenBucketIdsFlow.value.contains("3p-5h"))
+
+        // Run setPinnedBucket and unhide concurrently across background dispatchers inside coroutineScope
+        coroutineScope {
+            val pinJob = async(Dispatchers.Default) {
+                repository.setPinnedBucket("3p-5h")
+            }
+            val unhideJob = async(Dispatchers.Default) {
+                repository.setHiddenBuckets(PreferencesStore.DEFAULT_HIDDEN_BUCKET_IDS - "3p-5h")
+            }
+            pinJob.await()
+            unhideJob.await()
+        }
+
+        assertEquals("3p-5h", repository.pinnedBucketIdFlow.value)
+        assertFalse(repository.hiddenBucketIdsFlow.value.contains("3p-5h"))
     }
 }

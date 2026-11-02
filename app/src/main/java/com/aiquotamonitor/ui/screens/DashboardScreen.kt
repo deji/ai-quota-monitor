@@ -267,12 +267,8 @@ fun DashboardScreen(
                 onPrimePulse = { viewModel.primeGrok() },
                 isPriming = isPriming,
                 isScrubbing = isScrubbing,
-                onOpenCodeClick = {
-                    selectedBucket = openCodeProvider?.buckets?.firstOrNull()
-                },
-                onGrokClick = {
-                    selectedBucket = grokProvider?.buckets?.firstOrNull()
-                }
+                hiddenBucketIds = hiddenBucketIds,
+                onBucketClick = { selectedBucket = it }
             )
 
             AntigravityBucketsCard(

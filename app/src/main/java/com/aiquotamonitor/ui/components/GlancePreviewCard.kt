@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.aiquotamonitor.domain.model.QuotaPolarity
 import com.aiquotamonitor.domain.model.QuotaSnapshot
 import com.aiquotamonitor.ui.theme.QuotaCyan
 import com.aiquotamonitor.ui.theme.QuotaEmerald
@@ -34,11 +35,14 @@ fun GlancePreviewCard(
     snapshot: QuotaSnapshot,
     modifier: Modifier = Modifier,
     hiddenBucketIds: Set<String> = emptySet(),
-    pinnedBucketId: String? = null
+    pinnedBucketId: String? = null,
+    polarity: QuotaPolarity = QuotaPolarity.REMAINING
 ) {
     val hero = snapshot.heroBucket(hiddenBucketIds, pinnedBucketId)
-    val heroPercent = hero?.remainingPercent ?: 35.0
+    val heroPercent = hero?.displayPercent(polarity) ?: 35.0
     val heroLabel = hero?.label ?: "Gemini 4 Argon"
+    val polaritySuffix = if (polarity == QuotaPolarity.REMAINING) "Left" else "Used"
+    val polarityTag = if (polarity == QuotaPolarity.REMAINING) "REM" else "USED"
 
     Box(
         modifier = modifier
@@ -88,7 +92,7 @@ fun GlancePreviewCard(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "AI QUOTA",
+                            text = "AI QUOTA • $polarityTag",
                             style = MaterialTheme.typography.labelSmall,
                             color = QuotaCyan,
                             fontSize = 9.sp,
@@ -128,7 +132,7 @@ fun GlancePreviewCard(
                                 fontSize = 32.sp
                             )
                             Text(
-                                text = "$heroLabel Left",
+                                text = "$heroLabel $polaritySuffix",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = Color(0xFF94A3B8),
                                 fontSize = 10.sp

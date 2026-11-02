@@ -62,14 +62,6 @@ val ORCA_CORE_VISIBLE_IDS: Set<String> = setOf(
     "grok-weekly-credits"
 )
 
-val ORCA_CORE_HIDDEN_BUCKET_IDS: Set<String> = setOf(
-    "3p-5h",
-    "3p-weekly",
-    "gemini-weekly",
-    "opencode-weekly",
-    "opencode-monthly"
-)
-
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ModelFilterSheet(
@@ -213,9 +205,6 @@ fun ModelFilterSheet(
                         if (pinnedBucketId == bucketId) {
                             onSetPinnedBucket(null)
                         } else {
-                            if (bucketId in hiddenBucketIds) {
-                                onToggleVisibility(bucketId)
-                            }
                             onSetPinnedBucket(bucketId)
                         }
                     }
