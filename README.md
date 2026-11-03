@@ -125,6 +125,12 @@ Once your Pixel 8 Pro has Wireless Debugging enabled (and is paired with this Ma
 # Auto-discovers paired Wireless ADB over Bonjour (_adb-tls-connect._tcp) if not yet connected, installs, and launches:
 ./scripts/deploy-pixel8pro.sh
 
+# Or deploy specifically to a local virtual emulator (e.g. Pixel_8_Pro_Virtual / emulator-5554):
+./scripts/deploy-pixel8pro.sh --emulator
+
+# Or target a specific ADB serial when multiple devices are attached:
+./scripts/deploy-pixel8pro.sh --device <serial>
+
 # Or build and install the signed Release APK:
 ./scripts/deploy-pixel8pro.sh --release
 ```

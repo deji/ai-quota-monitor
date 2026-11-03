@@ -499,6 +499,19 @@ class TestRepoFreeOfSecretsAndPersonalIdentifiers(unittest.TestCase):
             "AQM-LINT-008: Never call onToggleBucket before onSetPinnedBucket (setPinnedBucket unhides atomically under settingsMutex)",
         )
 
+        # AQM-LINT-009: app/lint.xml must enforce IconXmlAndPng, IconLocation, and MipmapIcons as error
+        self.assertIn('id="IconXmlAndPng" severity="error"', lint_xml, "AQM-LINT-009: Missing IconXmlAndPng error in app/lint.xml")
+        self.assertIn('id="IconLocation" severity="error"', lint_xml, "AQM-LINT-009: Missing IconLocation error in app/lint.xml")
+        self.assertIn('id="MipmapIcons" severity="error"', lint_xml, "AQM-LINT-009: Missing MipmapIcons error in app/lint.xml")
+
+        # AQM-LINT-010: scripts/deploy-pixel8pro.sh must support --device and --emulator with multi-device ambiguity protection
+        deploy_sh_path = os.path.join(self.repo_root, "scripts", "deploy-pixel8pro.sh")
+        with open(deploy_sh_path, "r", encoding="utf-8") as fh:
+            deploy_sh = fh.read()
+        self.assertIn("--device", deploy_sh, "AQM-LINT-010: scripts/deploy-pixel8pro.sh must support --device")
+        self.assertIn("--emulator", deploy_sh, "AQM-LINT-010: scripts/deploy-pixel8pro.sh must support --emulator")
+        self.assertIn("Multiple devices connected", deploy_sh, "AQM-LINT-010: deploy script must guard against ambiguous multi-device targets")
+
 
 if __name__ == "__main__":
     unittest.main()

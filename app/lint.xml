@@ -12,4 +12,9 @@
     <!-- Enforce Jetpack Compose state & saver correctness -->
     <issue id="MutableCollectionMutableState" severity="error" />
     <issue id="RememberSaveableSaverParameter" severity="error" />
+
+    <!-- Enforce adaptive launcher icon resource hygiene (APP-ICO1 / APP-ICO2) -->
+    <issue id="IconXmlAndPng" severity="error" />
+    <issue id="IconLocation" severity="error" />
+    <issue id="MipmapIcons" severity="error" />
 </lint>

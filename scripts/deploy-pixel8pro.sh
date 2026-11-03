@@ -12,17 +12,46 @@ export PATH="${JAVA_HOME:+$JAVA_HOME/bin:}$HOME/.local/bin:$ANDROID_HOME/platfor
 
 BUILD_VARIANT="debug"
 WIRELESS_PAIR=0
+TARGET_DEVICE=""
+EMULATOR_ONLY=0
 
-for arg in "$@"; do
-  case "$arg" in
+while [[ $# -gt 0 ]]; do
+  case "$1" in
     --wireless)
       WIRELESS_PAIR=1
+      shift
       ;;
     --release)
       BUILD_VARIANT="release"
+      shift
       ;;
     --debug)
       BUILD_VARIANT="debug"
+      shift
+      ;;
+    --device|-s)
+      TARGET_DEVICE="$2"
+      shift 2
+      ;;
+    --emulator)
+      EMULATOR_ONLY=1
+      shift
+      ;;
+    --help|-h)
+      echo "Usage: ./scripts/deploy-pixel8pro.sh [--debug|--release] [--device <serial>] [--emulator] [--wireless]"
+      echo ""
+      echo "Options:"
+      echo "  --debug               Build and deploy debug APK (default)"
+      echo "  --release             Build and deploy release APK"
+      echo "  --device, -s <serial> Target a specific ADB device/emulator serial"
+      echo "  --emulator            Automatically target the running local emulator (e.g. emulator-5554)"
+      echo "  --wireless            Trigger interactive mDNS/Wi-Fi pairing for Pixel 8 Pro"
+      echo "  --help, -h            Show this help message"
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      exit 1
       ;;
   esac
 done
@@ -131,25 +160,58 @@ else
   fi
 fi
 
-if ! adb devices | grep -qE '[[:space:]]device$'; then
-  auto_connect_wireless_adb || true
+if [[ "$EMULATOR_ONLY" -eq 1 ]]; then
+  TARGET_DEVICE="$(adb devices | grep -E '^emulator-[0-9]+[[:space:]]+device' | awk '{print $1}' | head -n 1 || true)"
+  if [[ -z "$TARGET_DEVICE" ]]; then
+    echo "ERROR: --emulator requested but no running emulator found in 'adb devices'." >&2
+    echo "Start an emulator via 'orca emulator attach Pixel_8_Pro_Virtual' or Android Studio." >&2
+    exit 1
+  fi
+fi
+
+if [[ -z "$TARGET_DEVICE" ]]; then
+  if ! adb devices | grep -qE '[[:space:]]device$'; then
+    auto_connect_wireless_adb || true
+  fi
 fi
 
 echo "==> Checking connected ADB devices..."
 adb devices
 
-if ! adb devices | grep -qE '[[:space:]]device$'; then
+CONNECTED_DEVICES=()
+while IFS= read -r dev; do
+  [[ -n "$dev" ]] && CONNECTED_DEVICES+=("$dev")
+done < <(adb devices | grep -E '[[:space:]]device$' | awk '{print $1}')
+
+if [[ ${#CONNECTED_DEVICES[@]} -eq 0 ]]; then
   echo ""
-  echo "ERROR: No connected Android device found."
+  echo "ERROR: No connected Android device or emulator found."
   echo "To connect your Pixel 8 Pro wirelessly, run:"
   echo "  ./scripts/deploy-pixel8pro.sh --wireless"
-  echo "Or see the step-by-step Wireless Debugging guide in README.md."
+  echo "Or attach a local virtual device:"
+  echo "  orca emulator attach Pixel_8_Pro_Virtual"
   exit 1
 fi
 
-echo "==> Installing $APK_PATH onto connected Pixel 8 Pro..."
-adb install -r "$APK_PATH"
+if [[ -z "$TARGET_DEVICE" ]]; then
+  if [[ ${#CONNECTED_DEVICES[@]} -eq 1 ]]; then
+    TARGET_DEVICE="${CONNECTED_DEVICES[0]}"
+  else
+    echo ""
+    echo "ERROR: Multiple devices connected (${CONNECTED_DEVICES[*]})."
+    echo "To avoid deploying to the wrong device (e.g. personal hardware), specify:"
+    echo "  --device <serial>    (e.g. ./scripts/deploy-pixel8pro.sh --device ${CONNECTED_DEVICES[0]})"
+    echo "  --emulator           (to target an active local emulator)"
+    exit 1
+  fi
+fi
+
+ADB_TARGET=(-s "$TARGET_DEVICE")
+echo "==> Deploying to target device: $TARGET_DEVICE"
+
+echo "==> Installing $APK_PATH onto $TARGET_DEVICE..."
+adb "${ADB_TARGET[@]}" install -r "$APK_PATH"
 
 echo "==> Launching AI Quota Monitor (MainActivity)..."
-adb shell am start -n com.aiquotamonitor/.ui.MainActivity
+adb "${ADB_TARGET[@]}" shell am start -n com.aiquotamonitor/.ui.MainActivity
 echo "Done."
