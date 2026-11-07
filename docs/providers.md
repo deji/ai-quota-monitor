@@ -41,7 +41,7 @@ Running `quota.py` and `python3 -m collector collect --json` on the live host co
 - **Verified Buckets**:
   | Group (`name`) | Bucket (`id`) | Window Duration | Orca Stage Role |
   | :--- | :--- | :--- | :--- |
-  | `Gemini 4 Argon` | `gemini-argon-wtu-weekly` | `168h` (7 days) | **PLANNER** (`gemini-4-argon-high`) |
+  | `Gemini 4 Argon` | `gemini-argon-wtu-weekly` | `168h` (7 days) | **PLANNER** (`gemini-4-argon-medium`) |
   | `Gemini Models` | `gemini-5h` | `5h` (rolling) | **BUILDER** (`gemini-3.8-flash-high`) |
   | `Gemini Models` | `gemini-weekly` | `168h` (7 days) | **BUILDER** (`gemini-3.8-flash-high`) |
   | `Claude and GPT models` | `3p-5h` | `5h` (rolling) | Standby / 3P |

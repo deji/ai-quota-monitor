@@ -22,6 +22,36 @@ data class QuotaSnapshot(
         } catch (_: Exception) {
             false
         }
+
+    /**
+     * Age of this snapshot in seconds relative to [nowEpochMs].
+     * Returns null when [capturedAt] is blank or cannot be parsed.
+     * Negative values mean the snapshot timestamp is in the future.
+     */
+    fun ageSeconds(nowEpochMs: Long = System.currentTimeMillis()): Long? {
+        if (capturedAt.isBlank()) return null
+        return try {
+            val captured = java.time.Instant.parse(capturedAt)
+            java.time.Duration.between(captured, java.time.Instant.ofEpochMilli(nowEpochMs)).seconds
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Compact, non-blocking age label for status pills:
+     * `"Just now"`, `"3m old"`, `"2h old"`, `"2h 5m old"`, or `""` when unknown.
+     */
+    fun formatAgeShort(nowEpochMs: Long = System.currentTimeMillis()): String {
+        val seconds = ageSeconds(nowEpochMs) ?: return ""
+        return when {
+            seconds < 60 -> "Just now"
+            seconds < 3600 -> "${seconds / 60}m old"
+            (seconds / 60) % 60 == 0L -> "${seconds / 3600}h old"
+            else -> "${seconds / 3600}h ${(seconds % 3600) / 60}m old"
+        }
+    }
+
     /**
      * Find bucket by id across all providers
      */

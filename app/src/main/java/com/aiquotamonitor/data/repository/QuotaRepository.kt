@@ -12,6 +12,12 @@ interface QuotaRepository {
     val hiddenBucketIdsFlow: StateFlow<Set<String>>
     val pinnedBucketIdFlow: StateFlow<String?>
 
+    /** True only while a background/foreground auto-sync tick is in flight. */
+    val isAutoSyncingFlow: StateFlow<Boolean>
+
+    /** Epoch millis of the last sync attempt (successful or failed), or 0 when none yet. */
+    val lastSyncAttemptEpochMsFlow: StateFlow<Long>
+
     suspend fun refresh(forceTailscale: Boolean = false, isManual: Boolean = false): Result<QuotaSnapshot>
     suspend fun primeGrok(): Result<SmartPrimeStatus>
     suspend fun updateActiveHours(start: String, end: String): Result<QuotaSnapshot>

@@ -1,6 +1,6 @@
 ---
 name: orca-quota-engineering
-description: Project-specific architecture, multi-agent Orca orchestration workflow (agy Argon planner + agy Flash implementer + grok 4.7 reviewer), cross-language AES-256-GCM relay invariants, provider wire parsing rules, and verification gates for ai-quota-monitor. Use whenever planning, implementing, testing, or reviewing changes in this repository.
+description: Project-specific architecture, multi-agent Orca orchestration workflow (agy Argon Medium planner + quota-aware opencode2/Flash implementer + grok 4.7 reviewer), cross-language AES-256-GCM relay invariants, provider wire parsing rules, and verification gates for ai-quota-monitor. Use whenever planning, implementing, testing, or reviewing changes in this repository.
 ---
 
 # Orca Quota Engineering Skill (`ai-quota-monitor`)
@@ -13,9 +13,9 @@ All non-trivial work in this repository uses three distinct agent roles and **th
 
 | Role | Agent / CLI | Model & Effort | Responsibility |
 | :--- | :--- | :--- | :--- |
-| **Planner & Coordinator** | `agy` (`antigravity`) | `gemini-4-argon-high` (`high`) | Architecture, Stitch UI/UX prototyping, task specs, worker supervision, and integration. |
-| **Implementer & Tester** | `agy` (`antigravity`) | `gemini-3.8-flash-high` (`high`) | Feature implementation, unit/UI tests, Gradle builds, and emulator/device verification. |
-| **Plan & Code Reviewer** | `grok` (Grok Build CLI) | `grok-4.7` (`--effort medium`) | Read-only review of plans, worktree diffs, and cross-system contracts. |
+| **Planner & Coordinator** | `agy` (`antigravity`; CLI `--agent antigravity`) | `gemini-4-argon-medium` (`medium`) | Architecture, Stitch UI/UX prototyping, task specs, worker supervision, and integration. Quota fallback per `orca-cheap-workers`: Argon Medium → `grok-4.7` medium → `gemini-3.8-flash-high` → `opencode2`. |
+| **Implementer & Tester** | Quota-aware routing (`orca-cheap-workers`) | Primary `opencode2` (`opencode-go/deepseek-v4.1-flash`, no flags); fallback `gemini-3.8-flash-high` (`high`) | Feature implementation, unit/UI tests, Gradle builds, and emulator/device verification. |
+| **Plan & Code Reviewer** | `grok` (Grok Build CLI) | `grok-4.7` (`--effort medium`) | Read-only review of plans, worktree diffs, and cross-system contracts. Gate 1 and Gate 2 always use `grok-4.7` medium as the project specialization of `orca-cheap-workers`'s "other expensive planner" rule. |
 
 ### The GitHub Issue-First Lifecycle (`scripts/gh-issue-workflow.sh`) & 3 Review Gates (`scripts/review-plan-and-code.sh`)
 0. **Gate 0 — GitHub Issue Creation & Plan Comment (Mandatory Before Code)**:
@@ -35,7 +35,7 @@ All non-trivial work in this repository uses three distinct agent roles and **th
    - **Grok Orca Worker Rule**: `orca orchestration worker-start --agent grok` reads `default = "grok-4.7"` and `default_reasoning_effort = "medium"` from `~/.grok/config.toml` (it does **not** accept `--model` or `--effort` CLI flags) and requires `[folders."<worktreePath>"]\ntrusted = true` in `~/.grok/trusted_folders.toml` so newly created worktrees never block on interactive TUI folder trust (`agent-trust-workspace`).
    - **Follow-Up Worker Dispatch Rule**: When sending Gate 1 review findings or follow-up instructions to a running worker terminal via `orca orchestration send`, always pass `--type dispatch` (valid types: `status, dispatch, worker_done, merge_ready, escalation, handoff, decision_gate, question, heartbeat`; `--type steer` is invalid).
 2. **Gate 2 — Worktree Implementation, Testing & Review Comments**:
-   Every commit must reference `#<issue-number>` (enforced by `.githooks/commit-msg`). After an `antigravity` (`gemini-3.8-flash-high`) worker finishes and passes unit/hygiene tests, post the `## [IMPLEMENTATION]` and `## [TESTING]` comments, release its worker terminal, and run `grok` against its worktree with `--issue <issue-number>` to post `## [REVIEW]`:
+   Every commit must reference `#<issue-number>` (enforced by `.githooks/commit-msg`). After a quota-routed implementer worker (`opencode2` primary, fallback `--agent antigravity --model gemini-3.8-flash-high --effort high`, never `--agent agy`) finishes and passes unit/hygiene tests, post the `## [IMPLEMENTATION]` and `## [TESTING]` comments, release its worker terminal, and run `grok` against its worktree with `--issue <issue-number>` to post `## [REVIEW]`:
    ```bash
    ./scripts/gh-issue-workflow.sh comment <issue-number> implementation "<summary>"
    ./scripts/gh-issue-workflow.sh comment <issue-number> testing "<test-output>"
@@ -96,6 +96,12 @@ All non-trivial work in this repository uses three distinct agent roles and **th
     - **Adaptive Icon Full-Bleed Rule**: `ic_launcher_background.xml` must seamlessly fill the entire 108dp canvas (`#0B0F12`) without sub-canvas geometry (e.g. inner discs of radius 36dp) that produces outer rim edge artifacts on larger circular or squircle launcher masks.
     - **Inactive Gauge Track Contrast**: On dark obsidian surfaces, inactive dial tracks must maintain sufficient luminance delta (e.g. `#243338` or ~15–20% alpha) to be legible at small launcher scales.
     - **Lint Rules (`AQM-LINT-009` & `AQM-LINT-010`)**: `app/lint.xml` enforces `IconXmlAndPng`, `IconLocation`, and `MipmapIcons` as error (`AQM-LINT-009`), and `scripts/deploy-pixel8pro.sh` enforces `--device` and `--emulator` options and fails closed when multiple connected devices exist without explicit targeting (`AQM-LINT-010`).
+11. **Lifecycle-Aware Foreground Auto-Sync & Snapshot Age Feedback (`APP-SYNC1` / Issue #1)**:
+    - **Never use `ConnectionState.SYNCING` for background polling**: it disables `ConnectionSettingsForm` buttons and can corrupt `testConnection` prior-state restoration. Use `isAutoSyncingFlow` / `QuotaViewModel.isAutoSyncing` and preserve the existing `ConnectionState`.
+    - **Serialize every network/snapshot writer** (`refresh`, `testConnection`, `primeGrok`, `updateActiveHours`, and the refresh inside `saveSettings`) through `syncMutex` with a monotonic generation guard; auto-sync ticks use atomic `tryLock()` and return immediately instead of queueing, and must not stamp `lastSyncAttemptEpochMsFlow`. Never nest `settingsMutex` inside `syncMutex` (persist a successful `testConnection` draft only after releasing `syncMutex`).
+    - **Stamp `lastSyncAttemptEpochMsFlow` at the start of every real attempt** (including failures, `saveSettings`, and the live network paths of `primeGrok` / `updateActiveHours`) and use the injectable `clock`. `runForegroundSyncLoop` polls every `AUTO_SYNC_INTERVAL_MS = 60_000L` while STARTED with a `AUTO_SYNC_MIN_GAP_MS = 30_000L` resume debounce, and must be launched only from `repeatOnLifecycle(Lifecycle.State.STARTED)` — never from a second `ON_START` observer.
+    - **Auto-sync eligibility** requires `settings.hasUsableTransport`, `scrubOffsetHours == 0.0`, `!isPriming`, `connectionState != SYNCING`, and `!isAutoSyncing`; background refresh must never touch `_userMessage`.
+    - **Freeze the scrub base snapshot** (`scrubFrozenSnapshot`) from offset `> 0.0` until reset to `0.0`, then immediately reveal the latest repository snapshot. `QuotaSnapshot.ageSeconds` / `formatAgeShort` must tolerate blank/unparseable `capturedAt` (`""`), future timestamps (`"Just now"`), and be driven by a 30s lifecycle-aware ticker rather than network polling. Drive `isStale` from `activeSnapshot` and OR it with a live `ageSeconds(nowEpochMs) > 7200` check in the UI so the `(Stale)` badge updates across the boundary.
 
 ---
 

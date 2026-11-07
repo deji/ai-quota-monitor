@@ -34,6 +34,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -43,6 +44,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import com.aiquotamonitor.data.repository.ConnectionState
 import com.aiquotamonitor.domain.model.QuotaBucket
 import com.aiquotamonitor.domain.model.QuotaSnapshot
@@ -61,6 +65,7 @@ import com.aiquotamonitor.ui.theme.QuotaCoral
 import com.aiquotamonitor.ui.theme.QuotaCyan
 import com.aiquotamonitor.ui.theme.QuotaEmerald
 import com.aiquotamonitor.ui.viewmodel.QuotaViewModel
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -76,9 +81,30 @@ fun DashboardScreen(
     val isScrubbing by viewModel.isScrubbing.collectAsState()
     val isPriming by viewModel.isPriming.collectAsState()
     val isSyncError by viewModel.isSyncError.collectAsState()
-    val isStale by viewModel.isStale.collectAsState()
+    val snapshotIsStale by viewModel.isStale.collectAsState()
+    val isAutoSyncing by viewModel.isAutoSyncing.collectAsState()
     val hiddenBucketIds by viewModel.hiddenBucketIds.collectAsState()
     val pinnedBucketId by viewModel.pinnedBucketId.collectAsState()
+
+    // Lifecycle-aware 30s clock so "3m old" advances even between network polls.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val nowEpochMs by produceState(
+        initialValue = System.currentTimeMillis(),
+        key1 = lifecycleOwner
+    ) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) {
+                value = System.currentTimeMillis()
+                delay(30_000L)
+            }
+        }
+    }
+    val ageLabel = snapshot.formatAgeShort(nowEpochMs)
+    val ageSuffix = if (ageLabel.isNotEmpty()) " · $ageLabel" else ""
+    // Re-evaluate staleness against the live 30s clock so the badge crosses the
+    // 7200s boundary even when no repository emission (or frozen scrub base) changes.
+    val isStale = snapshotIsStale || (snapshot.ageSeconds(nowEpochMs) ?: 0L) > 7200L
+    val isRefreshing = connectionState == ConnectionState.SYNCING || isAutoSyncing
 
     var selectedBucket by remember { mutableStateOf<QuotaBucket?>(null) }
     var showSyncHub by remember { mutableStateOf(false) }
@@ -148,7 +174,7 @@ fun DashboardScreen(
                         .border(1.dp, pillBorderColor, RoundedCornerShape(16.dp))
                         .padding(horizontal = 10.dp, vertical = 6.dp)
                 ) {
-                    if (connectionState == ConnectionState.SYNCING) {
+                    if (isRefreshing) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(10.dp),
                             strokeWidth = 2.dp,
@@ -172,9 +198,10 @@ fun DashboardScreen(
 
                     Text(
                         text = when {
-                            isSyncError -> "Fallback Mode"
-                            isStale -> "${connectionState.label} (Stale)"
-                            else -> connectionState.label
+                            isRefreshing -> "Refreshing...$ageSuffix"
+                            isSyncError -> "Fallback Mode$ageSuffix"
+                            isStale -> "${connectionState.label} (Stale)$ageSuffix"
+                            else -> "${connectionState.label}$ageSuffix"
                         },
                         style = MaterialTheme.typography.labelSmall,
                         color = if (isSyncError) QuotaCoral else if (isStale) QuotaAmber else MaterialTheme.colorScheme.onSurface,

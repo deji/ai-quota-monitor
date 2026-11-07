@@ -17,10 +17,10 @@ Key pillars:
   - When the Grok OAuth token (`~/.grok/auth.json`) is expired (`<= 0s`) or near expiry (`< 900s` / 15m), the collector executes `/opt/homebrew/bin/grok -p "reply with ok"` during configured active working hours (`08:00–22:00`, synced from the Android app via `POST /v1/config/active-hours`) or on explicit pull-to-refresh / prime pulse, returning reason `'primed_successfully'`. Outside active hours, it declines priming with honest reason `'near_expiry_outside_active_hours'` or `'token_expired_outside_active_hours'`; healthy tokens report `'token_healthy'`.
 - **Prototype-First via Google Stitch**: Visual language codified in [`.stitch/DESIGN.md`](../.stitch/DESIGN.md) and explored across 3 distinct aesthetic sets (`Conservative`, `Modern`, `Avant-Garde`) before converging on the **Hybrid Master Fusion**.
 - **Public-Repo Safe from Commit #1**: Pre-commit hooks (`.githooks/pre-commit`), automated repo hygiene unit tests, and externalized credentials ensure zero secrets, tokens, personal emails, or `/Users/<username>` paths ever enter Git history.
-- **Multi-Agent Orca Orchestration**:
-  - **Planning & Architecture**: `agy` with `gemini-4-argon-high` (Gemini 4 Argon High)
-  - **Implementation & Testing**: `agy` with `gemini-3.8-flash-high` (Gemini 3.8 Flash High)
-  - **Code & Plan Review**: `grok` CLI with `grok-4.7` (`--effort medium`)
+- **Multi-Agent Orca Orchestration** (quota-aware routing per `orca-cheap-workers`):
+  - **Planning & Architecture**: `agy` with `gemini-4-argon-medium` (Gemini 4 Argon Medium, `medium` effort). Fallback order: `gemini-4-argon-medium` → `grok-4.7` (`--effort medium`) → `gemini-3.8-flash-high` → `opencode2`.
+  - **Implementation & Testing**: Primary `opencode2` (`opencode-go/deepseek-v4.1-flash`, passing neither `--model` nor `--effort`), with `agy` `gemini-3.8-flash-high` (`--effort high`) as the quota fallback when OpenCode Go quota is `>= 80%` used or unavailable.
+  - **Code & Plan Review**: `grok` CLI with `grok-4.7` (`--effort medium`) for Gate 1 and Gate 2 in this repository.
 
 ---
 

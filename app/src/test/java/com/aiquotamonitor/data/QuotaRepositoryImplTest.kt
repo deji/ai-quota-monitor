@@ -10,10 +10,14 @@ import com.aiquotamonitor.data.repository.SyncSettings
 import com.aiquotamonitor.domain.model.QuotaSnapshot
 import com.aiquotamonitor.domain.model.SmartPrimeStatus
 import java.io.IOException
+import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -877,5 +881,214 @@ class QuotaRepositoryImplTest {
 
         assertEquals("3p-5h", repository.pinnedBucketIdFlow.value)
         assertFalse(repository.hiddenBucketIdsFlow.value.contains("3p-5h"))
+    }
+
+    // ---- Single-flight sync mutex & auto-sync signaling (Issue #1 / APP-SYNC1) ----
+
+    @Test
+    fun testAutoRefreshUsesIsAutoSyncingAndPreservesConnectionState() = runTest {
+        lateinit var repository: QuotaRepositoryImpl
+        var observedState: ConnectionState? = null
+        var observedAutoSyncing = false
+        val observingClient = object : TailscaleApiClient() {
+            override fun fetchQuota(baseUrl: String, token: String?): QuotaSnapshot {
+                observedState = repository.connectionStateFlow.value
+                observedAutoSyncing = repository.isAutoSyncingFlow.value
+                return SeedData.createSeedSnapshot()
+            }
+
+            override fun triggerRefresh(baseUrl: String, token: String?): QuotaSnapshot =
+                SeedData.createSeedSnapshot()
+        }
+        repository = QuotaRepositoryImpl(
+            preferencesStore = preferencesStore,
+            tailscaleClient = observingClient,
+            gistClient = FakeGistClient(),
+            clock = { 1234L }
+        )
+        repository.updateSettings(SyncSettings(tailscaleUrl = "http://100.64.0.1:8741"))
+
+        val result = repository.refresh(forceTailscale = false, isManual = false)
+
+        assertTrue(result.isSuccess)
+        assertEquals(
+            "Background auto-sync must preserve the prior connection state (never SYNCING)",
+            ConnectionState.DEMO_SEED,
+            observedState
+        )
+        assertTrue("isAutoSyncing must be true while the background fetch is in flight", observedAutoSyncing)
+        assertFalse("isAutoSyncing must clear after the background fetch", repository.isAutoSyncingFlow.value)
+        assertEquals(ConnectionState.TAILSCALE_LIVE, repository.connectionStateFlow.value)
+        assertEquals(1234L, repository.lastSyncAttemptEpochMsFlow.value)
+    }
+
+    @Test
+    fun testAutoRefreshSkipsImmediatelyWhenSyncMutexLocked() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val manualStarted = CompletableDeferred<Unit>()
+        var autoFetchCalls = 0
+        val blockingClient = object : TailscaleApiClient() {
+            override fun triggerRefresh(baseUrl: String, token: String?): QuotaSnapshot {
+                manualStarted.complete(Unit)
+                runBlocking { gate.await() }
+                return SeedData.createSeedSnapshot().copy(host = "manual-refresh")
+            }
+
+            override fun fetchQuota(baseUrl: String, token: String?): QuotaSnapshot {
+                autoFetchCalls++
+                return SeedData.createSeedSnapshot().copy(host = "auto-refresh")
+            }
+        }
+        val repository = QuotaRepositoryImpl(
+            preferencesStore = preferencesStore,
+            tailscaleClient = blockingClient,
+            gistClient = FakeGistClient()
+        )
+        repository.updateSettings(SyncSettings(tailscaleUrl = "http://100.64.0.1:8741"))
+
+        val manual = async(Dispatchers.IO) { repository.refresh(forceTailscale = false, isManual = true) }
+        withTimeout(5_000L) { manualStarted.await() }
+        val snapshotBeforeManualCompletes = repository.snapshotFlow.value
+
+        val auto = repository.refresh(forceTailscale = false, isManual = false)
+
+        assertTrue("Skipped auto-sync must report success", auto.isSuccess)
+        assertEquals("Skipped auto-sync must not hit the network", 0, autoFetchCalls)
+        assertEquals(snapshotBeforeManualCompletes, auto.getOrNull())
+
+        gate.complete(Unit)
+        assertTrue(manual.await().isSuccess)
+        assertEquals("manual-refresh", repository.snapshotFlow.value.host)
+    }
+
+    @Test
+    fun testConcurrentManualRefreshesAreSerializedBySyncMutex() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val firstStarted = CompletableDeferred<Unit>()
+        val secondStarted = CompletableDeferred<Unit>()
+        val calls = AtomicInteger(0)
+        val serializingClient = object : TailscaleApiClient() {
+            override fun triggerRefresh(baseUrl: String, token: String?): QuotaSnapshot {
+                val call = calls.incrementAndGet()
+                if (call == 1) {
+                    firstStarted.complete(Unit)
+                    runBlocking { gate.await() }
+                } else {
+                    secondStarted.complete(Unit)
+                }
+                return SeedData.createSeedSnapshot().copy(host = "host-$call")
+            }
+
+            override fun fetchQuota(baseUrl: String, token: String?): QuotaSnapshot =
+                SeedData.createSeedSnapshot()
+        }
+        val repository = QuotaRepositoryImpl(
+            preferencesStore = preferencesStore,
+            tailscaleClient = serializingClient,
+            gistClient = FakeGistClient()
+        )
+        repository.updateSettings(SyncSettings(tailscaleUrl = "http://100.64.0.1:8741"))
+
+        val first = async(Dispatchers.IO) { repository.refresh(forceTailscale = false, isManual = true) }
+        withTimeout(5_000L) { firstStarted.await() }
+        val second = async(Dispatchers.IO) { repository.refresh(forceTailscale = false, isManual = true) }
+        Thread.sleep(50)
+        assertFalse("Second refresh must wait on syncMutex", secondStarted.isCompleted)
+
+        gate.complete(Unit)
+        assertTrue(first.await().isSuccess)
+        assertTrue(second.await().isSuccess)
+
+        assertEquals("Both refreshes must eventually run exactly once", 2, calls.get())
+        assertEquals("The newest response must be the final applied snapshot", "host-2", repository.snapshotFlow.value.host)
+    }
+
+    @Test
+    fun testTestConnectionRestoresLiveStateAfterBackgroundSync() = runTest {
+        val fakeTailscale = FakeTailscaleClient()
+        val repository = QuotaRepositoryImpl(
+            preferencesStore = preferencesStore,
+            tailscaleClient = fakeTailscale,
+            gistClient = FakeGistClient()
+        )
+        repository.updateSettings(SyncSettings(tailscaleUrl = "http://100.64.0.1:8741"))
+
+        assertTrue(repository.refresh(forceTailscale = false, isManual = false).isSuccess)
+        assertEquals(ConnectionState.TAILSCALE_LIVE, repository.connectionStateFlow.value)
+
+        fakeTailscale.shouldFailRefresh = true
+        val probe = repository.testConnection(SyncSettings(tailscaleUrl = "http://100.99.99.99:8741"))
+
+        assertTrue(probe.isFailure)
+        assertEquals(
+            "Probe failure must restore the prior live state untouched by background sync",
+            ConnectionState.TAILSCALE_LIVE,
+            repository.connectionStateFlow.value
+        )
+        assertFalse(repository.isAutoSyncingFlow.value)
+    }
+
+    @Test
+    fun testFailedRefreshStillStampsLastSyncAttemptAndClearsAutoFlag() = runTest {
+        val repository = QuotaRepositoryImpl(
+            preferencesStore = preferencesStore,
+            tailscaleClient = FakeTailscaleClient(shouldFailFetch = true, shouldFailRefresh = true),
+            gistClient = FakeGistClient(shouldFail = true),
+            clock = { 555L }
+        )
+        repository.updateSettings(SyncSettings(tailscaleUrl = "http://100.64.0.1:8741"))
+
+        val result = repository.refresh(forceTailscale = false, isManual = false)
+
+        assertTrue(result.isSuccess)
+        assertEquals("Failed/unreachable attempts must still stamp the debounce clock", 555L, repository.lastSyncAttemptEpochMsFlow.value)
+        assertFalse(repository.isAutoSyncingFlow.value)
+    }
+
+    @Test
+    fun testRefreshAndSaveSettingsStampLastSyncAttempt() = runTest {
+        var now = 111L
+        val repository = QuotaRepositoryImpl(
+            preferencesStore = preferencesStore,
+            tailscaleClient = FakeTailscaleClient(),
+            gistClient = FakeGistClient(),
+            clock = { now }
+        )
+        repository.updateSettings(SyncSettings(tailscaleUrl = "http://100.64.0.1:8741"))
+
+        repository.refresh(forceTailscale = false, isManual = false)
+        assertEquals(111L, repository.lastSyncAttemptEpochMsFlow.value)
+
+        now = 222L
+        assertTrue(repository.saveSettings(SyncSettings(tailscaleUrl = "http://100.64.0.1:8741")).isSuccess)
+        assertEquals(222L, repository.lastSyncAttemptEpochMsFlow.value)
+    }
+
+    @Test
+    fun testPrimeGrokAndUpdateActiveHoursStampLastSyncAttempt() = runTest {
+        var now = 333L
+        val repository = QuotaRepositoryImpl(
+            preferencesStore = preferencesStore,
+            tailscaleClient = FakeTailscaleClient(),
+            gistClient = FakeGistClient(),
+            clock = { now }
+        )
+        repository.updateSettings(SyncSettings(tailscaleUrl = "http://100.64.0.1:8741"))
+
+        now = 444L
+        assertTrue(repository.primeGrok().isSuccess)
+        assertEquals(
+            "Live primeGrok network calls must stamp the resume-debounce clock",
+            444L,
+            repository.lastSyncAttemptEpochMsFlow.value
+        )
+
+        now = 555L
+        assertTrue(repository.updateActiveHours("09:00", "21:00").isSuccess)
+        assertEquals(
+            "Live updateActiveHours network calls must stamp the resume-debounce clock",
+            555L,
+            repository.lastSyncAttemptEpochMsFlow.value
+        )
     }
 }

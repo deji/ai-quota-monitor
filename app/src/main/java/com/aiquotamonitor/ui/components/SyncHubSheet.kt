@@ -39,6 +39,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -48,12 +49,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import com.aiquotamonitor.data.repository.ConnectionState
 import com.aiquotamonitor.ui.theme.QuotaAmber
 import com.aiquotamonitor.ui.theme.QuotaCoral
 import com.aiquotamonitor.ui.theme.QuotaCyan
 import com.aiquotamonitor.ui.theme.QuotaEmerald
 import com.aiquotamonitor.ui.viewmodel.QuotaViewModel
+import kotlinx.coroutines.delay
 
 /**
  * ModalBottomSheet opened from the Dashboard top-bar status pill.
@@ -71,9 +76,30 @@ fun SyncHubSheet(
     val settings by viewModel.settings.collectAsState()
     val syncError by viewModel.syncError.collectAsState()
     val isSyncError by viewModel.isSyncError.collectAsState()
-    val isStale by viewModel.isStale.collectAsState()
+    val snapshotIsStale by viewModel.isStale.collectAsState()
     val isPriming by viewModel.isPriming.collectAsState()
+    val isAutoSyncing by viewModel.isAutoSyncing.collectAsState()
     val userMessage by viewModel.userMessage.collectAsState()
+    val snapshot by viewModel.activeSnapshot.collectAsState()
+
+    // Lifecycle-aware 30s clock so the snapshot age stays live while the sheet is open.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val nowEpochMs by produceState(
+        initialValue = System.currentTimeMillis(),
+        key1 = lifecycleOwner
+    ) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) {
+                value = System.currentTimeMillis()
+                delay(30_000L)
+            }
+        }
+    }
+    val ageLabel = snapshot.formatAgeShort(nowEpochMs)
+    val ageSuffix = if (ageLabel.isNotEmpty()) " · $ageLabel" else ""
+    // Combine the frozen-snapshot marker with a live 30s age evaluation so the
+    // badge lands on the correct side of the 7200s boundary between emissions.
+    val isStale = snapshotIsStale || (snapshot.ageSeconds(nowEpochMs) ?: 0L) > 7200L
 
     val isConfigured = settings.hasUsableTransport
     var isEditExpanded by rememberSaveable { mutableStateOf(false) }
@@ -157,13 +183,15 @@ fun SyncHubSheet(
 
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = if (isStale) "${connectionState.label} (Stale)" else connectionState.label,
+                            text = if (isStale) "${connectionState.label} (Stale)$ageSuffix" else "${connectionState.label}$ageSuffix",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = when {
+                                connectionState == ConnectionState.SYNCING -> "Refreshing quota telemetry..."
+                                isAutoSyncing -> "Syncing in background..."
                                 isSyncError -> "Fallback active due to transport error"
                                 isStale -> "Snapshot captured over 2 hours ago (>7200s)"
                                 else -> "Operating nominally"

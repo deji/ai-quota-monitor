@@ -5,16 +5,21 @@ import com.aiquotamonitor.data.local.SeedData
 import com.aiquotamonitor.data.repository.ConnectionState
 import com.aiquotamonitor.data.repository.QuotaRepository
 import com.aiquotamonitor.data.repository.SyncSettings
+import com.aiquotamonitor.domain.calculator.HorizonSimulator
 import com.aiquotamonitor.domain.model.QuotaSnapshot
 import com.aiquotamonitor.domain.model.SmartPrimeStatus
 import java.io.IOException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -23,6 +28,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -34,7 +40,8 @@ class QuotaViewModelTest {
     private lateinit var preferencesStore: PreferencesStore
 
     private class FakeQuotaRepository(
-        initialSettings: SyncSettings = SyncSettings()
+        initialSettings: SyncSettings = SyncSettings(),
+        private val clock: () -> Long = { System.currentTimeMillis() }
     ) : QuotaRepository {
         private val _snapshotFlow = MutableStateFlow(SeedData.createSeedSnapshot())
         override val snapshotFlow: StateFlow<QuotaSnapshot> = _snapshotFlow.asStateFlow()
@@ -54,6 +61,14 @@ class QuotaViewModelTest {
         private val _pinnedBucketIdFlow = MutableStateFlow<String?>(null)
         override val pinnedBucketIdFlow: StateFlow<String?> = _pinnedBucketIdFlow.asStateFlow()
 
+        private val _isAutoSyncingFlow = MutableStateFlow(false)
+        override val isAutoSyncingFlow: StateFlow<Boolean> = _isAutoSyncingFlow.asStateFlow()
+
+        private val _lastSyncAttemptEpochMsFlow = MutableStateFlow(0L)
+        override val lastSyncAttemptEpochMsFlow: StateFlow<Long> = _lastSyncAttemptEpochMsFlow.asStateFlow()
+
+        var primeGate: CompletableDeferred<Unit>? = null
+        var refreshCallCount = 0
         var refreshCalled = false
         var testConnectionCalled = false
         var lastForceTailscale: Boolean = false
@@ -62,36 +77,47 @@ class QuotaViewModelTest {
         var refreshErrorMessage: String? = null
 
         override suspend fun refresh(forceTailscale: Boolean, isManual: Boolean): Result<QuotaSnapshot> {
+            refreshCallCount++
             refreshCalled = true
             lastForceTailscale = forceTailscale
             lastIsManual = isManual
-            if (shouldFailRefresh) {
-                val ex = IOException(refreshErrorMessage ?: "Refresh error")
-                if (forceTailscale) {
-                    _connectionStateFlow.value = ConnectionState.OFFLINE
-                    _syncErrorFlow.value = ex.message
-                    return Result.failure(ex)
+            _lastSyncAttemptEpochMsFlow.value = clock()
+            if (!isManual) _isAutoSyncingFlow.value = true
+            return try {
+                if (shouldFailRefresh) {
+                    val ex = IOException(refreshErrorMessage ?: "Refresh error")
+                    if (forceTailscale) {
+                        _connectionStateFlow.value = ConnectionState.OFFLINE
+                        _syncErrorFlow.value = ex.message
+                        Result.failure(ex)
+                    } else {
+                        _connectionStateFlow.value = ConnectionState.OFFLINE
+                        _syncErrorFlow.value = ex.message
+                        Result.success(_snapshotFlow.value)
+                    }
+                } else {
+                    val settings = _settingsFlow.value
+                    if (settings.tailscaleUrl.isNotBlank()) {
+                        _connectionStateFlow.value = ConnectionState.TAILSCALE_LIVE
+                        _syncErrorFlow.value = null
+                    } else if (settings.gistId.isNotBlank() && settings.gistAesKey.isNotBlank()) {
+                        _connectionStateFlow.value = ConnectionState.CLOUD_RELAY_SYNCED
+                        _syncErrorFlow.value = null
+                    } else {
+                        _connectionStateFlow.value = ConnectionState.DEMO_SEED
+                        _syncErrorFlow.value = "No sync endpoints configured"
+                    }
+                    Result.success(_snapshotFlow.value)
                 }
-                _connectionStateFlow.value = ConnectionState.OFFLINE
-                _syncErrorFlow.value = ex.message
-                return Result.success(_snapshotFlow.value)
+            } finally {
+                if (!isManual) _isAutoSyncingFlow.value = false
             }
-            val settings = _settingsFlow.value
-            if (settings.tailscaleUrl.isNotBlank()) {
-                _connectionStateFlow.value = ConnectionState.TAILSCALE_LIVE
-                _syncErrorFlow.value = null
-            } else if (settings.gistId.isNotBlank() && settings.gistAesKey.isNotBlank()) {
-                _connectionStateFlow.value = ConnectionState.CLOUD_RELAY_SYNCED
-                _syncErrorFlow.value = null
-            } else {
-                _connectionStateFlow.value = ConnectionState.DEMO_SEED
-                _syncErrorFlow.value = "No sync endpoints configured"
-            }
-            return Result.success(_snapshotFlow.value)
         }
 
-        override suspend fun primeGrok(): Result<SmartPrimeStatus> =
-            Result.success(_snapshotFlow.value.smartPrime)
+        override suspend fun primeGrok(): Result<SmartPrimeStatus> {
+            primeGate?.await()
+            return Result.success(_snapshotFlow.value.smartPrime)
+        }
 
         override suspend fun updateActiveHours(start: String, end: String): Result<QuotaSnapshot> {
             val latest = _settingsFlow.value
@@ -194,6 +220,18 @@ class QuotaViewModelTest {
 
         fun setConnectionState(state: ConnectionState) {
             _connectionStateFlow.value = state
+        }
+
+        fun setAutoSyncing(value: Boolean) {
+            _isAutoSyncingFlow.value = value
+        }
+
+        fun setLastSyncAttempt(epochMs: Long) {
+            _lastSyncAttemptEpochMsFlow.value = epochMs
+        }
+
+        fun setSnapshot(snapshot: QuotaSnapshot) {
+            _snapshotFlow.value = snapshot
         }
     }
 
@@ -451,5 +489,217 @@ class QuotaViewModelTest {
         viewModel.setPinnedBucket(null)
         advanceUntilIdle()
         assertEquals(null, viewModel.pinnedBucketId.value)
+    }
+
+    // ---- Foreground auto-sync (Issue #1 / APP-SYNC1) ----
+
+    private fun configuredRepo(clock: () -> Long): FakeQuotaRepository =
+        FakeQuotaRepository(
+            initialSettings = SyncSettings(tailscaleUrl = "http://100.64.0.1:8741"),
+            clock = clock
+        )
+
+    @Test
+    fun testForegroundLoopSkipsResumeWithinDebounceGap() = runTest(testDispatcher) {
+        val fakeRepo = configuredRepo { testScheduler.currentTime }
+        fakeRepo.setLastSyncAttempt(testScheduler.currentTime - 10_000L)
+        val viewModel = QuotaViewModel(fakeRepo, preferencesStore, clock = { testScheduler.currentTime })
+
+        val job = launch(testDispatcher) {
+            viewModel.runForegroundSyncLoop(pollIntervalMs = 60_000L, minResumeGapMs = 30_000L)
+        }
+        runCurrent()
+
+        assertEquals("Resume tick must wait for the 30s debounce gap", 0, fakeRepo.refreshCallCount)
+        job.cancelAndJoin()
+    }
+
+    @Test
+    fun testForegroundLoopRunsResumeTickAndPollsEveryInterval() = runTest(testDispatcher) {
+        val fakeRepo = configuredRepo { testScheduler.currentTime }
+        val viewModel = QuotaViewModel(fakeRepo, preferencesStore, clock = { testScheduler.currentTime })
+
+        val job = launch(testDispatcher) {
+            viewModel.runForegroundSyncLoop(pollIntervalMs = 60_000L, minResumeGapMs = 30_000L)
+        }
+        runCurrent()
+
+        assertEquals(1, fakeRepo.refreshCallCount)
+        assertFalse("Foreground loop must issue non-manual refreshes", fakeRepo.lastIsManual)
+
+        advanceTimeBy(60_000L)
+        runCurrent()
+        assertEquals(2, fakeRepo.refreshCallCount)
+
+        job.cancelAndJoin()
+    }
+
+    @Test
+    fun testForegroundLoopStopsAfterCancellation() = runTest(testDispatcher) {
+        val fakeRepo = configuredRepo { testScheduler.currentTime }
+        val viewModel = QuotaViewModel(fakeRepo, preferencesStore, clock = { testScheduler.currentTime })
+
+        val job = launch(testDispatcher) {
+            viewModel.runForegroundSyncLoop(pollIntervalMs = 60_000L, minResumeGapMs = 0L)
+        }
+        runCurrent()
+        val callsBeforeCancel = fakeRepo.refreshCallCount
+
+        job.cancelAndJoin()
+        advanceTimeBy(300_000L)
+        runCurrent()
+
+        assertEquals(callsBeforeCancel, fakeRepo.refreshCallCount)
+        assertTrue("Cancelled loop must not leave an auto-sync in flight", !viewModel.isAutoSyncing.value)
+    }
+
+    @Test
+    fun testForegroundLoopPausesWhileScrubbing() = runTest(testDispatcher) {
+        val fakeRepo = configuredRepo { testScheduler.currentTime }
+        val viewModel = QuotaViewModel(fakeRepo, preferencesStore, clock = { testScheduler.currentTime })
+
+        viewModel.setScrubOffset(1.5)
+        val scrubbingJob = launch(testDispatcher) {
+            viewModel.runForegroundSyncLoop(pollIntervalMs = 60_000L, minResumeGapMs = 0L)
+        }
+        runCurrent()
+        assertEquals("Auto-sync must not run while the user scrubs", 0, fakeRepo.refreshCallCount)
+        scrubbingJob.cancelAndJoin()
+
+        viewModel.resetScrub()
+        val resetJob = launch(testDispatcher) {
+            viewModel.runForegroundSyncLoop(pollIntervalMs = 60_000L, minResumeGapMs = 0L)
+        }
+        runCurrent()
+        assertEquals(1, fakeRepo.refreshCallCount)
+        resetJob.cancelAndJoin()
+    }
+
+    @Test
+    fun testForegroundLoopPausesWhilePriming() = runTest(testDispatcher) {
+        val fakeRepo = configuredRepo { testScheduler.currentTime }
+        val gate = CompletableDeferred<Unit>()
+        fakeRepo.primeGate = gate
+        val viewModel = QuotaViewModel(fakeRepo, preferencesStore, clock = { testScheduler.currentTime })
+
+        viewModel.primeGrok()
+        runCurrent()
+        assertTrue(viewModel.isPriming.value)
+
+        val job = launch(testDispatcher) {
+            viewModel.runForegroundSyncLoop(pollIntervalMs = 60_000L, minResumeGapMs = 0L)
+        }
+        runCurrent()
+        assertEquals("Auto-sync must not run while priming", 0, fakeRepo.refreshCallCount)
+
+        job.cancelAndJoin()
+        gate.complete(Unit)
+        runCurrent()
+        assertFalse(viewModel.isPriming.value)
+    }
+
+    @Test
+    fun testForegroundLoopPausesWhenTransportUnconfigured() = runTest(testDispatcher) {
+        val fakeRepo = FakeQuotaRepository(clock = { testScheduler.currentTime })
+        val viewModel = QuotaViewModel(fakeRepo, preferencesStore, clock = { testScheduler.currentTime })
+
+        val job = launch(testDispatcher) {
+            viewModel.runForegroundSyncLoop(pollIntervalMs = 60_000L, minResumeGapMs = 0L)
+        }
+        runCurrent()
+        assertEquals(0, fakeRepo.refreshCallCount)
+        job.cancelAndJoin()
+    }
+
+    @Test
+    fun testForegroundLoopPausesDuringManualSyncingState() = runTest(testDispatcher) {
+        val fakeRepo = configuredRepo { testScheduler.currentTime }
+        fakeRepo.setConnectionState(ConnectionState.SYNCING)
+        val viewModel = QuotaViewModel(fakeRepo, preferencesStore, clock = { testScheduler.currentTime })
+
+        val job = launch(testDispatcher) {
+            viewModel.runForegroundSyncLoop(pollIntervalMs = 60_000L, minResumeGapMs = 0L)
+        }
+        runCurrent()
+        assertEquals(0, fakeRepo.refreshCallCount)
+        job.cancelAndJoin()
+    }
+
+    @Test
+    fun testForegroundLoopPausesWhileAutoSyncAlreadyInFlight() = runTest(testDispatcher) {
+        val fakeRepo = configuredRepo { testScheduler.currentTime }
+        fakeRepo.setAutoSyncing(true)
+        val viewModel = QuotaViewModel(fakeRepo, preferencesStore, clock = { testScheduler.currentTime })
+
+        val job = launch(testDispatcher) {
+            viewModel.runForegroundSyncLoop(pollIntervalMs = 60_000L, minResumeGapMs = 0L)
+        }
+        runCurrent()
+        assertEquals(0, fakeRepo.refreshCallCount)
+        job.cancelAndJoin()
+    }
+
+    @Test
+    fun testScrubFreezesBaseSnapshotUntilReset() = runTest(testDispatcher) {
+        val fakeRepo = FakeQuotaRepository(clock = { testScheduler.currentTime })
+        val original = SeedData.createSeedSnapshot().copy(host = "original-host")
+        fakeRepo.setSnapshot(original)
+        val viewModel = QuotaViewModel(fakeRepo, preferencesStore, clock = { testScheduler.currentTime })
+        backgroundScope.launch(testDispatcher) { viewModel.activeSnapshot.collect {} }
+        runCurrent()
+
+        viewModel.setScrubOffset(2.0)
+        runCurrent()
+        val frozenProjection = HorizonSimulator.project(original, 2.0)
+        assertEquals(frozenProjection, viewModel.activeSnapshot.value)
+
+        // Simulate an in-flight refresh landing mid-scrub.
+        val refreshed = original.copy(host = "refreshed-host")
+        fakeRepo.setSnapshot(refreshed)
+        runCurrent()
+        assertEquals(
+            "Mid-scrub snapshot updates must not move the projected UI",
+            frozenProjection,
+            viewModel.activeSnapshot.value
+        )
+
+        viewModel.resetScrub()
+        runCurrent()
+        assertEquals("Resetting the scrubber must immediately show the latest snapshot", refreshed, viewModel.activeSnapshot.value)
+    }
+
+    @Test
+    fun testAutoSyncNeverTouchesUserMessage() = runTest(testDispatcher) {
+        val fakeRepo = configuredRepo { testScheduler.currentTime }
+        val viewModel = QuotaViewModel(fakeRepo, preferencesStore, clock = { testScheduler.currentTime })
+        backgroundScope.launch(testDispatcher) { viewModel.isSyncError.collect {} }
+
+        viewModel.refresh(isManual = false)
+        advanceUntilIdle()
+        assertNull("Background sync must never set a user message", viewModel.userMessage.value)
+
+        viewModel.refresh(isManual = true)
+        advanceUntilIdle()
+        val manualMessage = viewModel.userMessage.value
+        assertNotNull(manualMessage)
+
+        viewModel.refresh(isManual = false)
+        advanceUntilIdle()
+        assertEquals("Background sync must never clear an existing user message", manualMessage, viewModel.userMessage.value)
+    }
+
+    @Test
+    fun testIsAutoSyncingMirrorsRepositoryFlow() = runTest(testDispatcher) {
+        val fakeRepo = configuredRepo { testScheduler.currentTime }
+        val viewModel = QuotaViewModel(fakeRepo, preferencesStore, clock = { testScheduler.currentTime })
+        backgroundScope.launch(testDispatcher) { viewModel.isAutoSyncing.collect {} }
+
+        assertFalse(viewModel.isAutoSyncing.value)
+        fakeRepo.setAutoSyncing(true)
+        runCurrent()
+        assertTrue(viewModel.isAutoSyncing.value)
+        fakeRepo.setAutoSyncing(false)
+        runCurrent()
+        assertFalse(viewModel.isAutoSyncing.value)
     }
 }

@@ -10,9 +10,9 @@ Per the project's orchestration rules, every stage uses a dedicated agent, model
 
 | Stage / Role | Agent | Model ID | Effort | Invocation Policy |
 | :--- | :--- | :--- | :--- | :--- |
-| **Planner & Coordinator** | `agy` (Antigravity) | `gemini-4-argon-high` | `high` | Runs in the primary coordinator session. Owns architecture, Stitch prototyping, task specs, dispatch, and final verification. |
-| **Implementer & Tester** | `agy` (Antigravity) | `gemini-3.8-flash-high` | `high` | Dispatched as supervised Orca workers per task/module. Owns code edits, unit/UI tests, Gradle builds, and emulator/device verification. |
-| **Code Reviewer** | `grok` (Grok Build CLI) | `grok-4.7` | `medium` | Dispatched read-only on the diff/worktree after implementation and green tests. Must never modify files or commit. |
+| **Planner & Coordinator** | `agy` (Antigravity) | `gemini-4-argon-medium` | `medium` | Runs in the primary coordinator session. Owns architecture, Stitch prototyping, task specs, dispatch, and final verification. Quota fallback per `orca-cheap-workers`: `gemini-4-argon-medium` → `grok-4.7` medium → `gemini-3.8-flash-high` → `opencode2`. |
+| **Implementer & Tester** | Quota-aware routing (`orca-cheap-workers`) | Primary `opencode2` (`opencode-go/deepseek-v4.1-flash`); fallback `gemini-3.8-flash-high` | Primary: no flags; fallback: `high` | Dispatched as supervised Orca workers per task/module. Primary `--agent opencode2` (pass neither `--model` nor `--effort`); fall back to `--agent antigravity --model gemini-3.8-flash-high --effort high` when OpenCode Go quota is `>= 80%` used or unavailable. Owns code edits, unit/UI tests, Gradle builds, and emulator/device verification. |
+| **Code Reviewer** | `grok` (Grok Build CLI) | `grok-4.7` | `medium` | Dispatched read-only on the diff/worktree after implementation and green tests. Must never modify files or commit. Gate 1 and Gate 2 always use `grok-4.7` medium as the project specialization of `orca-cheap-workers`'s "other expensive planner" rule. |
 
 ---
 
@@ -51,15 +51,17 @@ orca orchestration worker-start \
   --json
 ./scripts/gh-issue-workflow.sh comment <issue-number> plan "<plan-and-gate1-review-markdown-or-@file>"
 
-# 3. Dispatch an Implementer & Tester worker (agy with Gemini 3.8 Flash High)
+# 3. Dispatch an Implementer & Tester worker (quota-aware orca-cheap-workers routing)
+# Primary: opencode2 on opencode-go/deepseek-v4.1-flash (pass neither --model nor --effort)
 orca orchestration worker-start \
   --task-title "Issue #<issue-number>: <concise-task-title>" \
   --spec "$(cat <path-to-spec.md>)" \
   --worktree "<worktreeSelector>" \
-  --agent antigravity \
-  --model gemini-3.8-flash-high \
-  --effort high \
+  --agent opencode2 \
   --json
+
+# Fallback only when OpenCode Go quota is >= 80% used or unavailable:
+# orca orchestration worker-start ... --agent antigravity --model gemini-3.8-flash-high --effort high --json
 
 # (Optional) Send follow-up instructions to a running worker terminal (--type dispatch)
 # orca orchestration send --to "<terminalId>" --type dispatch --summary "<summary>" --body "<instructions>" --json
@@ -121,4 +123,4 @@ Before acknowledging a `worker_done` delivery:
 1. Inspect `git status --short` and `git diff --stat` in the worker's worktree.
 2. Re-run the acceptance test suite and `.githooks/pre-commit` check.
 3. Choose the settled worker's disposition (`worker-release`, `worker-retain`, or immediate follow-up `worker-start --terminal`) before running `orca orchestration check --ack <delivery_id>`.
-4. Never edit code directly from the review report in the coordinator turn if a follow-up implementation fix is needed—dispatch the fix to an implementer worker (`gemini-3.8-flash-high`).
+4. Never edit code directly from the review report in the coordinator turn if a follow-up implementation fix is needed—dispatch the fix to a quota-routed implementer worker (`opencode2` primary, `gemini-3.8-flash-high` fallback).

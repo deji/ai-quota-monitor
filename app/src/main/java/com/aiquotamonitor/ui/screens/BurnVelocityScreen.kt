@@ -279,7 +279,7 @@ fun BurnVelocityScreen(
 
                 StageCheckpointRow(
                     stage = "PLANNER",
-                    model = "Gemini 4 Argon High",
+                    model = "Gemini 4 Argon Medium",
                     status = "Ready · -33.1% pace delta",
                     statusColor = QuotaEmerald
                 )

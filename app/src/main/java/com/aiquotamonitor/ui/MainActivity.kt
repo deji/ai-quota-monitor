@@ -23,6 +23,7 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -31,6 +32,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import com.aiquotamonitor.data.local.PreferencesStore
 import com.aiquotamonitor.data.repository.QuotaRepositoryImpl
 import com.aiquotamonitor.ui.screens.BurnVelocityScreen
@@ -72,6 +76,14 @@ fun MainContent(
     modifier: Modifier = Modifier
 ) {
     var currentDestination by rememberSaveable { mutableStateOf(AppDestination.DASHBOARD) }
+
+    // Single lifecycle-aware foreground auto-sync entry point.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(lifecycleOwner, viewModel) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            viewModel.runForegroundSyncLoop()
+        }
+    }
 
     // Predictive back: return to Dashboard if on another tab
     BackHandler(enabled = currentDestination != AppDestination.DASHBOARD) {

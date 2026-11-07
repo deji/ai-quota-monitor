@@ -13,9 +13,9 @@ All work in this repository is coordinated through **Orca Orchestration** (`orca
 
 | Role | Agent / CLI | Model & Effort | Responsibilities |
 | :--- | :--- | :--- | :--- |
-| **Planner & Coordinator** | `agy` (Antigravity) | `gemini-4-argon-high` (`Gemini 4 Argon (High)`) | Architecture, Stitch UI/UX prototype design & alignment, task decomposition, Orca dispatch & supervision, integration sign-off. |
-| **Implementer & Tester** | `agy` (Antigravity) | `gemini-3.8-flash-high` (`Gemini 3.8 Flash (High)`) | Feature implementation, unit/UI/screenshot tests, Gradle builds, emulator/device verification via `orca-emulator-android` / `android` CLI. |
-| **Code & Plan Reviewer** | `grok` (Grok Build CLI) | `grok-4.7` (`--effort medium`) | Read-only plan, diff, cross-system contract, security/secret-hygiene, and Compose performance review before implementation and before merge. |
+| **Planner & Coordinator** | `agy` (Antigravity; CLI `--agent antigravity`) | `gemini-4-argon-medium` (`Gemini 4 Argon (Medium)`, `medium` effort) | Architecture, Stitch UI/UX prototype design & alignment, task decomposition, Orca dispatch & supervision, integration sign-off. Quota fallback per `orca-cheap-workers`: Argon Medium → `grok-4.7` medium → `gemini-3.8-flash-high` → `opencode2`. |
+| **Implementer & Tester** | Quota-aware routing (`orca-cheap-workers`) | Primary `opencode2` (`opencode-go/deepseek-v4.1-flash`); fallback `--agent antigravity --model gemini-3.8-flash-high --effort high` (product nickname `agy`, never `--agent agy`) | Feature implementation, unit/UI/screenshot tests, Gradle builds, emulator/device verification via `orca-emulator-android` / `android` CLI. |
+| **Code & Plan Reviewer** | `grok` (Grok Build CLI) | `grok-4.7` (`--effort medium`) | Read-only plan, diff, cross-system contract, security/secret-hygiene, and Compose performance review before implementation and before merge. Gate 1 & Gate 2 always use `grok-4.7` medium in this repository. |
 
 See [`docs/workers.md`](docs/workers.md), [`docs/lessons.md`](docs/lessons.md), and [`.agents/skills/orca-quota-engineering/SKILL.md`](.agents/skills/orca-quota-engineering/SKILL.md) for the exact 3-gate Orca workflow and verification scripts (`./scripts/verify-all.sh` and `./scripts/review-plan-and-code.sh`).
 
