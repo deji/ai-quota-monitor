@@ -9,9 +9,10 @@ Every bug or feature in `ai-quota-monitor` **must** be filed as a GitHub Issue f
    ./scripts/gh-issue-workflow.sh create "<title>" "<symptom-or-feature-scope>" "bug"
    ```
 2. **Document All 4 Stages as Issue Comments**:
-   - **Plan (`## [PLAN]`)**: `./scripts/gh-issue-workflow.sh comment <issue-number> plan "<plan>"`
+   - **Plan (`## [PLAN]`)**: `./scripts/gh-issue-workflow.sh comment <issue-number> plan "<plan>"`. The body contains exactly one of `UI evidence: before-and-after` or `UI evidence: none`.
+   - **Before the UI edit**: when the plan says `before-and-after`, `./scripts/gh-issue-workflow.sh before-shot <issue-number> --attach "$TMPDIR/before.png#Before: previous screen"`. The commit hook rejects a UI commit until this receipt exists.
    - **Implementation (`## [IMPLEMENTATION]`)**: `./scripts/gh-issue-workflow.sh comment <issue-number> implementation "<diff-summary-and-commits>"`
-   - **Testing (`## [TESTING]`)**: `./scripts/gh-issue-workflow.sh comment <issue-number> testing "<verify-all-and-device-test-results>"`
+   - **Testing (`## [TESTING]`)**: `./scripts/gh-issue-workflow.sh comment <issue-number> testing "<verify-all-and-device-test-results>" --attach "$TMPDIR/before.png#Before: previous screen" --attach "$TMPDIR/after.png#After: screen after the change"`. The Before file must be the one registered before the edit. Collector-only work includes `No emulator UI was exercised.`
    - **Review (`## [REVIEW]`)**: `./scripts/review-plan-and-code.sh worktree "<worktree-path>" --issue <issue-number>`
 3. **Verify & Close**:
    ```bash

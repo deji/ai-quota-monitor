@@ -45,3 +45,45 @@ if [ "${AQM_SKIP_ISSUE_REF:-0}" != "1" ]; then
     fi
   fi
 fi
+
+# 4. A UI commit is rejected until before-shot registered the pre-change screenshot.
+#    Skipped when this hook is reused to scrub a GitHub comment (AQM_SKIP_ISSUE_REF=1).
+if [ "${AQM_SKIP_ISSUE_REF:-0}" != "1" ] && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  ui_staged=$(git diff --cached --name-only | grep -E '^(app/src/main/res/|app/src/main/java/com/aiquotamonitor/ui/|app/src/main/java/com/aiquotamonitor/widget/)' || true)
+  if [ -n "$ui_staged" ]; then
+    issue=$(printf '%s\n' "$raw_content" | grep -Eo '#[0-9]+' | head -n 1 | tr -d '#')
+    if [ -z "$issue" ]; then
+      echo "commit-msg: a UI change needs an issue number so the before screenshot can be checked." >&2
+      exit 1
+    fi
+    root=$(git rev-parse --show-toplevel)
+    receipt="$root/.aqm-ui-evidence/$issue/receipt"
+    if [ ! -f "$receipt" ]; then
+      echo "commit-msg: capture the before screenshot before changing UI files." >&2
+      echo "Run: ./scripts/gh-issue-workflow.sh before-shot $issue --attach \"\$TMPDIR/before.png#Before: previous screen\"" >&2
+      exit 1
+    fi
+    mode=$(grep '^mode=' "$receipt" | head -n 1 | cut -d= -f2-)
+    case "$mode" in
+      none)
+        ;;
+      before-and-after)
+        head_sha=$(grep '^head=' "$receipt" | head -n 1 | cut -d= -f2-)
+        current=$(git rev-parse HEAD)
+        image_rel=$(grep '^image=' "$receipt" | head -n 1 | cut -d= -f2-)
+        if [ "$head_sha" != "$current" ] && ! git merge-base --is-ancestor "$head_sha" "$current"; then
+          echo "commit-msg: the before screenshot is not from this change's starting commit." >&2
+          exit 1
+        fi
+        if [ ! -f "$root/$image_rel" ]; then
+          echo "commit-msg: the registered before screenshot file is missing." >&2
+          exit 1
+        fi
+        ;;
+      *)
+        echo "commit-msg: the before-shot receipt is invalid." >&2
+        exit 1
+        ;;
+    esac
+  fi
+fi

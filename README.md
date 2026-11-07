@@ -164,8 +164,13 @@ All bugs and features follow a mandatory **GitHub Issue-First Workflow** where t
 
 # 2. Post Plan, Implementation, and Testing comments on the Issue
 ./scripts/gh-issue-workflow.sh comment <issue-number> plan "<plan-details>"
+# Plan includes one line: UI evidence: before-and-after  or  UI evidence: none
+# Capture the before shot before editing UI files:
+./scripts/gh-issue-workflow.sh before-shot <issue-number> --attach "$TMPDIR/before.png#Before: previous screen"
 ./scripts/gh-issue-workflow.sh comment <issue-number> implementation "<commit-and-diff-summary>"
-./scripts/gh-issue-workflow.sh comment <issue-number> testing "<verify-all-results>"
+./scripts/gh-issue-workflow.sh comment <issue-number> testing "<verify-all-results>" \
+  --attach "$TMPDIR/before.png#Before: previous screen" \
+  --attach "$TMPDIR/after.png#After: screen after the change"
 
 # 3. Run the 3-Gate Grok 4.7 review and automatically post ## [REVIEW] to the Issue
 ./scripts/review-plan-and-code.sh plan --issue <issue-number>

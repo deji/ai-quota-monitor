@@ -512,6 +512,170 @@ class TestRepoFreeOfSecretsAndPersonalIdentifiers(unittest.TestCase):
         self.assertIn("--emulator", deploy_sh, "AQM-LINT-010: scripts/deploy-pixel8pro.sh must support --emulator")
         self.assertIn("Multiple devices connected", deploy_sh, "AQM-LINT-010: deploy script must guard against ambiguous multi-device targets")
 
+        # AQM-LINT-012: emulator UI evidence must be attached to the GitHub testing comment
+        workflow_path = os.path.join(self.repo_root, "scripts", "gh-issue-workflow.sh")
+        with open(workflow_path, "r", encoding="utf-8") as fh:
+            workflow_sh = fh.read()
+        self.assertIn("--attach", workflow_sh, "AQM-LINT-012: testing comments must be able to attach screenshots")
+        self.assertIn("before-shot", workflow_sh, "AQM-LINT-012: UI commits require a before screenshot")
+        self.assertIn("UI evidence: before-and-after", workflow_sh, "AQM-LINT-012: the plan decides whether a before shot is required")
+        self.assertIn(
+            "No emulator UI was exercised.",
+            workflow_sh,
+            "AQM-LINT-012: collector-only testing comments need an explicit opt-out",
+        )
+
+    def test_testing_comment_attaches_emulator_screenshots(self):
+        """AQM-LINT-012: emulator evidence is uploaded to the issue and is not committed."""
+        import struct
+        import zlib
+
+        def tiny_png():
+            def chunk(tag, data):
+                return struct.pack(">I", len(data)) + tag + data + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF)
+            ihdr = struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0)
+            raw = zlib.compress(b"\x00\xff\x00\x00")
+            return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", ihdr) + chunk(b"IDAT", raw) + chunk(b"IEND", b"")
+
+        script = os.path.join(self.repo_root, "scripts", "gh-issue-workflow.sh")
+        with tempfile.TemporaryDirectory() as tmp:
+            shot = os.path.join(tmp, "device-serial-must-not-leak.png")
+            with open(shot, "wb") as fh:
+                fh.write(tiny_png())
+            inside = os.path.join(self.repo_root, ".screenshot-must-not-be-committed.png")
+            log = os.path.join(tmp, "gh-args.txt")
+            fake_bin = os.path.join(tmp, "bin")
+            os.makedirs(fake_bin)
+            fake_gh = os.path.join(fake_bin, "gh")
+            with open(fake_gh, "w", encoding="utf-8") as fh:
+                fh.write(
+                    "#!/bin/sh\n"
+                    "printf '%s\\n' \"$@\" >> \"$GH_LOG\"\n"
+                    "printf '\\n---\\n' >> \"$GH_LOG\"\n"
+                    "exit 0\n"
+                )
+            os.chmod(fake_gh, 0o755)
+            env = os.environ.copy()
+            env["PATH"] = fake_bin + os.pathsep + env.get("PATH", "")
+            env["GH_LOG"] = log
+
+            def run(args):
+                return subprocess.run(
+                    ["bash", script, *args],
+                    cwd=self.repo_root,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                )
+
+            missing = run(["comment", "7", "testing", "Checked the emulator drawer."])
+            self.assertNotEqual(missing.returncode, 0, missing.stdout + missing.stderr)
+            self.assertIn("before-shot", missing.stderr)
+            self.assertFalse(os.path.exists(log), "gh must not be called when the screenshot is missing")
+
+            bare_plan = run(["comment", "7", "plan", "Verify later on the emulator."])
+            self.assertNotEqual(bare_plan.returncode, 0, bare_plan.stderr)
+            self.assertIn("UI evidence:", bare_plan.stderr)
+
+            planned = run([
+                "comment", "7", "plan",
+                "Verify later on the emulator.\n\nUI evidence: none",
+            ])
+            self.assertEqual(planned.returncode, 0, planned.stderr)
+            os.remove(log)
+
+            opted_out = run(["comment", "7", "testing", "No emulator UI was exercised."])
+            self.assertEqual(opted_out.returncode, 0, opted_out.stderr)
+            with open(log, encoding="utf-8") as fh:
+                self.assertIn("## [TESTING]", fh.read())
+
+            os.remove(log)
+            evidence_root = os.path.join(tmp, "evidence-repo")
+            os.makedirs(evidence_root)
+            subprocess.run(["git", "init", "-q"], cwd=evidence_root, check=True)
+            subprocess.run(["git", "config", "user.email", "user@example.com"], cwd=evidence_root, check=True)
+            subprocess.run(["git", "config", "user.name", "Test User"], cwd=evidence_root, check=True)
+            with open(os.path.join(evidence_root, "README"), "w", encoding="utf-8") as fh:
+                fh.write("base\n")
+            subprocess.run(["git", "add", "README"], cwd=evidence_root, check=True)
+            subprocess.run(["git", "commit", "-q", "--no-verify", "-m", "base"], cwd=evidence_root, check=True)
+            subprocess.run(["git", "branch", "-M", "main"], cwd=evidence_root, check=True)
+            env["AQM_UI_EVIDENCE_ROOT"] = evidence_root
+            env["AQM_UI_EVIDENCE_PLAN"] = "UI evidence: before-and-after\n"
+            registered = run(["before-shot", "7", "--attach", shot + "#Before: inner disc"])
+            self.assertEqual(registered.returncode, 0, registered.stdout + registered.stderr)
+
+            ui_dir = os.path.join(evidence_root, "app", "src", "main", "java", "com", "aiquotamonitor", "ui")
+            os.makedirs(ui_dir)
+            with open(os.path.join(ui_dir, "Example.kt"), "w", encoding="utf-8") as fh:
+                fh.write("fun changed() = 1\n")
+            subprocess.run(["git", "checkout", "-q", "-b", "change"], cwd=evidence_root, check=True)
+            subprocess.run(["git", "add", "app"], cwd=evidence_root, check=True)
+            subprocess.run(["git", "commit", "-q", "--no-verify", "-m", "UI edit #7"], cwd=evidence_root, check=True)
+            late = run(["before-shot", "7", "--attach", shot + "#Before: inner disc"])
+            self.assertNotEqual(late.returncode, 0, late.stderr)
+            self.assertIn("already differ", late.stderr)
+            subprocess.run(["git", "checkout", "-q", "main"], cwd=evidence_root, check=True)
+            ui_dir = os.path.join(evidence_root, "app", "src", "main", "java", "com", "aiquotamonitor", "ui")
+            os.makedirs(ui_dir, exist_ok=True)
+            with open(os.path.join(ui_dir, "Pending.kt"), "w", encoding="utf-8") as fh:
+                fh.write("fun pending() = 1\n")
+            subprocess.run(["git", "add", "app"], cwd=evidence_root, check=True)
+            msg_file = os.path.join(tmp, "COMMIT_EDITMSG")
+            with open(msg_file, "w", encoding="utf-8") as fh:
+                fh.write("Change the sheet #7\n")
+            hook = os.path.join(self.repo_root, ".githooks", "commit-msg")
+            blocked = subprocess.run(
+                ["sh", hook, msg_file], cwd=evidence_root, capture_output=True, text=True,
+            )
+            self.assertEqual(blocked.returncode, 0, blocked.stderr)
+            os.remove(os.path.join(evidence_root, ".aqm-ui-evidence", "7", "receipt"))
+            blocked = subprocess.run(
+                ["sh", hook, msg_file], cwd=evidence_root, capture_output=True, text=True,
+            )
+            self.assertNotEqual(blocked.returncode, 0, blocked.stderr)
+            self.assertIn("before screenshot", blocked.stderr)
+            subprocess.run(["git", "reset", "-q", "HEAD"], cwd=evidence_root, check=True)
+
+            only_after = run([
+                "comment", "7", "testing", "Verified on the emulator.",
+                "--attach", shot + "#After: full-bleed plate",
+            ])
+            self.assertNotEqual(only_after.returncode, 0, only_after.stderr)
+            self.assertIn("Before", only_after.stderr)
+            self.assertFalse(os.path.exists(log), "gh must not be called without both shots")
+
+            registered_again = run(["before-shot", "7", "--attach", shot + "#Before: inner disc"])
+            self.assertEqual(registered_again.returncode, 0, registered_again.stdout + registered_again.stderr)
+
+            attached = run([
+                "comment", "7", "testing", "Verified on the emulator.",
+                "--attach", shot + "#After: full-bleed plate",
+                "--attach", shot + "#Before: inner disc",
+            ])
+            self.assertEqual(attached.returncode, 0, attached.stderr)
+            with open(log, encoding="utf-8") as fh:
+                recorded = fh.read()
+            self.assertLess(recorded.index("Before: inner disc"), recorded.index("After: full-bleed plate"))
+            self.assertIn("emulator-evidence-2.png#Before: inner disc", recorded)
+            self.assertIn("emulator-evidence-1.png#After: full-bleed plate", recorded)
+            self.assertNotIn("device-serial-must-not-leak", recorded)
+            self.assertNotIn(shot, recorded)
+            self.assertNotIn("/Users/", recorded.split("--body", 1)[-1].split("--attach", 1)[0])
+
+            with open(inside, "wb") as fh:
+                fh.write(tiny_png())
+            try:
+                rejected = run([
+                    "comment", "7", "testing", "Verified on the emulator.",
+                    "--attach", inside + "#In repo shot",
+                ])
+                self.assertNotEqual(rejected.returncode, 0, rejected.stderr)
+                self.assertIn("outside the repository", rejected.stderr)
+            finally:
+                if os.path.exists(inside):
+                    os.remove(inside)
+
 
 if __name__ == "__main__":
     unittest.main()

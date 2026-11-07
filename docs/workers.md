@@ -50,6 +50,10 @@ orca orchestration worker-start \
   --agent grok \
   --json
 ./scripts/gh-issue-workflow.sh comment <issue-number> plan "<plan-and-gate1-review-markdown-or-@file>"
+# The plan must include one line: UI evidence: before-and-after
+# or UI evidence: none.
+# When shots are required, capture before editing UI files:
+# ./scripts/gh-issue-workflow.sh before-shot <issue-number> --attach "$TMPDIR/before.png#Before: previous screen"
 
 # 3. Dispatch an Implementer & Tester worker (quota-aware orca-cheap-workers routing)
 # Primary: opencode2 on opencode-go/deepseek-v4.1-flash (pass neither --model nor --effort)
@@ -71,7 +75,9 @@ orca orchestration check --wait --types "worker_done,escalation,question" --time
 
 # 5. Record Implementation (## [IMPLEMENTATION]) and Testing (## [TESTING]) on the Issue
 ./scripts/gh-issue-workflow.sh comment <issue-number> implementation "<summary-of-changes>"
-./scripts/gh-issue-workflow.sh comment <issue-number> testing "<verify-all-output>"
+./scripts/gh-issue-workflow.sh comment <issue-number> testing "<verify-all-output>" \
+  --attach "$TMPDIR/before.png#Before: previous screen" \
+  --attach "$TMPDIR/after.png#After: screen after the change"
 ```
 
 ### Dispatching the Read-Only Reviewer (`grok` with `grok-4.7` Medium) & Posting `## [REVIEW]`

@@ -58,3 +58,6 @@ Thumbs.db
 
 # Scratch files
 scratch/
+
+# Local before-screenshot receipts. The images stay out of git.
+.aqm-ui-evidence/

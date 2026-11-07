@@ -23,6 +23,8 @@ All non-trivial work in this repository uses three distinct agent roles and **th
    ```bash
    ./scripts/gh-issue-workflow.sh create "<title>" "<description>" "enhancement"
    ./scripts/gh-issue-workflow.sh comment <issue-number> plan "<plan-markdown>"
+   # The plan body must contain exactly one line: UI evidence: before-and-after
+   # or UI evidence: none.
    ```
 1. **Gate 1 — Plan Review (Pre-Implementation, Mandatory on Every Feature/UX Issue)**:
    Before dispatching implementation workers for a new feature, UX change, or architectural change, run a supervised `grok-4.7` (`--effort medium`) Plan Review against the task spec and `docs/plan.md` + `docs/providers.md`, and post the review to `## [PLAN]`:
@@ -37,8 +39,12 @@ All non-trivial work in this repository uses three distinct agent roles and **th
 2. **Gate 2 — Worktree Implementation, Testing & Review Comments**:
    Every commit must reference `#<issue-number>` (enforced by `.githooks/commit-msg`). After a quota-routed implementer worker (`opencode2` primary, fallback `--agent antigravity --model gemini-3.8-flash-high --effort high`, never `--agent agy`) finishes and passes unit/hygiene tests, post the `## [IMPLEMENTATION]` and `## [TESTING]` comments, release its worker terminal, and run `grok` against its worktree with `--issue <issue-number>` to post `## [REVIEW]`:
    ```bash
+   # Before editing UI files, when the plan says UI evidence: before-and-after:
+   ./scripts/gh-issue-workflow.sh before-shot <issue-number> --attach "$TMPDIR/before.png#Before: previous screen"
    ./scripts/gh-issue-workflow.sh comment <issue-number> implementation "<summary>"
-   ./scripts/gh-issue-workflow.sh comment <issue-number> testing "<test-output>"
+   ./scripts/gh-issue-workflow.sh comment <issue-number> testing "<test-output>" \
+     --attach "$TMPDIR/before.png#Before: previous screen" \
+     --attach "$TMPDIR/after.png#After: screen after the change"
    ./scripts/review-plan-and-code.sh worktree "<worktree-path>" --issue <issue-number>
    ```
 3. **Gate 3 — Cross-System Integration Review & Issue Verification (Pre-Merge / Close)**:
@@ -93,6 +99,7 @@ All non-trivial work in this repository uses three distinct agent roles and **th
 10. **Personal Device Isolation, Local ARM64 AVD Testing & Linting Rules (`AQM-LINT-009` & `AQM-LINT-010` / `APP-ICO2`)**:
     - **Personal Device Off-Limits**: Personal devices connected over USB or wireless ADB must NEVER be automatically targeted or probed by automated agents or deployment scripts. Always target the local virtual device (`Pixel_8_Pro_Virtual` / `emulator-5554`) or pass `--emulator`.
     - **Local AVD Lifecycle**: Apple Silicon Mac AVDs run native ARM64 with Hypervisor acceleration (`orca emulator attach Pixel_8_Pro_Virtual` boots and binds directly to Orca's Emulator pane). Use `orca emulator ax` to inspect the UI Automator hierarchy and `adb -s emulator-5554 exec-out screencap -p` for visual evidence.
+    - **Screenshot evidence stays on the GitHub issue (`SEC-G2`)**: The plan comment decides with exactly one line, `UI evidence: before-and-after` or `UI evidence: none`. When shots are required, the implementer runs `before-shot` while the UI files still match the pre-change commit. `.githooks/commit-msg` rejects a later UI commit until that receipt exists. The testing comment must attach the same Before file plus an After file. The script checks the Before file hash, posts Before first, refuses in-repo paths, and uses a cleaned filename. `git commit --no-verify` skips the hook. The hook does not press the shutter; it refuses the commit until a real PNG was registered first. Collector-only results that never opened the UI must include `No emulator UI was exercised.`
     - **Adaptive Icon Full-Bleed Rule**: `ic_launcher_background.xml` must seamlessly fill the entire 108dp canvas (`#0B0F12`) without sub-canvas geometry (e.g. inner discs of radius 36dp) that produces outer rim edge artifacts on larger circular or squircle launcher masks.
     - **Inactive Gauge Track Contrast**: On dark obsidian surfaces, inactive dial tracks must maintain sufficient luminance delta (e.g. `#243338` or ~15–20% alpha) to be legible at small launcher scales.
     - **Lint Rules (`AQM-LINT-009` & `AQM-LINT-010`)**: `app/lint.xml` enforces `IconXmlAndPng`, `IconLocation`, and `MipmapIcons` as error (`AQM-LINT-009`), and `scripts/deploy-pixel8pro.sh` enforces `--device` and `--emulator` options and fails closed when multiple connected devices exist without explicit targeting (`AQM-LINT-010`).
