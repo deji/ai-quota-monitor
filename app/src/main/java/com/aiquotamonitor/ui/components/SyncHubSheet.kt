@@ -103,6 +103,7 @@ fun SyncHubSheet(
 
     val isConfigured = settings.hasUsableTransport
     var isEditExpanded by rememberSaveable { mutableStateOf(false) }
+    val scrollState = rememberScrollState()
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -110,12 +111,11 @@ fun SyncHubSheet(
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
     ) {
+        // Pinned title row so drags on the header stay on the sheet surface.
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(start = 20.dp, end = 20.dp, top = 8.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -150,7 +150,19 @@ fun SyncHubSheet(
                     )
                 }
             }
+        }
 
+        // Bounded verticalScroll (never LazyColumn) so ConnectionSettingsForm keeps its
+        // focus, draft text, `isEditExpanded`, and the 30s age ticker while scrolling.
+        Column(
+            modifier = Modifier
+                .weight(1f, fill = false)
+                .fillMaxWidth()
+                .sheetContentNestedScroll(sheetState, scrollState)
+                .verticalScroll(scrollState)
+                .padding(horizontal = 20.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
             val statusColor = when {
                 isSyncError -> QuotaCoral
                 isStale -> QuotaAmber

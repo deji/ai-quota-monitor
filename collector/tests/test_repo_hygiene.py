@@ -529,6 +529,43 @@ class TestRepoFreeOfSecretsAndPersonalIdentifiers(unittest.TestCase):
         self.assertIn("--emulator", deploy_sh, "AQM-LINT-010: scripts/deploy-pixel8pro.sh must support --emulator")
         self.assertIn("Multiple devices connected", deploy_sh, "AQM-LINT-010: deploy script must guard against ambiguous multi-device targets")
 
+        # AQM-LINT-011: every ModalBottomSheet with a scrollable body must pin its chrome and
+        # route the bounded scroller through SheetScrollGuard (never verticalScroll on the
+        # root content child). See APP-UX3.
+        components_dir = os.path.join(
+            self.repo_root,
+            "app",
+            "src",
+            "main",
+            "java",
+            "com",
+            "aiquotamonitor",
+            "ui",
+            "components",
+        )
+        root_vertical_scroll = re.compile(r"fillMaxWidth\(\)\s*\n\s*\.verticalScroll\(")
+        guard_before_scroll = re.compile(
+            r"\.sheetContentNestedScroll\(sheetState, scrollState\)\s*\n\s*\.verticalScroll\(scrollState\)"
+        )
+        for sheet_name in ("ModelFilterSheet.kt", "SyncHubSheet.kt", "BucketDetailSheet.kt"):
+            sheet_path = os.path.join(components_dir, sheet_name)
+            with open(sheet_path, "r", encoding="utf-8") as fh:
+                sheet_kt = fh.read()
+            self.assertIsNone(
+                root_vertical_scroll.search(sheet_kt),
+                f"AQM-LINT-011: {sheet_name} must not put verticalScroll on the root ModalBottomSheet content child",
+            )
+            self.assertIn(
+                "weight(1f, fill = false)",
+                sheet_kt,
+                f"AQM-LINT-011: {sheet_name} must bound its scroll body with weight(1f, fill = false)",
+            )
+            self.assertRegex(
+                sheet_kt,
+                guard_before_scroll,
+                f"AQM-LINT-011: {sheet_name} must apply sheetContentNestedScroll immediately before verticalScroll",
+            )
+
         # AQM-LINT-012: emulator UI evidence must be attached to the GitHub testing comment
         workflow_path = os.path.join(self.repo_root, "scripts", "gh-issue-workflow.sh")
         with open(workflow_path, "r", encoding="utf-8") as fh:

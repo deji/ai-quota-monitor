@@ -43,6 +43,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -74,6 +75,9 @@ val KNOWN_ALL_BUCKET_IDS: Set<String> = setOf(
     "grok-weekly-credits"
 )
 
+/** Test tag for the bounded bucket list inside [ModelFilterSheet] (`APP-UX3`). */
+const val MODEL_FILTER_SCROLL_BODY_TAG: String = "ModelFilterScrollBody"
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ModelFilterSheet(
@@ -90,17 +94,20 @@ fun ModelFilterSheet(
 ) {
     BackHandler { onDismiss() }
 
+    val scrollState = rememberScrollState()
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = modifier
     ) {
+        // Pinned chrome: header, description, and quick presets never scroll, so drags
+        // on them stay with the sheet surface instead of fighting the bucket list.
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 8.dp)
+                .padding(start = 20.dp, end = 20.dp, top = 8.dp)
         ) {
             // Header: Title and Close button
             Row(
@@ -202,7 +209,19 @@ fun ModelFilterSheet(
                     )
                 )
             }
+        }
 
+        // Bounded scroll body beneath the pinned chrome. The weight lives in the sheet
+        // ColumnScope so verticalScroll is measured with a finite max height.
+        Column(
+            modifier = Modifier
+                .weight(1f, fill = false)
+                .fillMaxWidth()
+                .testTag(MODEL_FILTER_SCROLL_BODY_TAG)
+                .sheetContentNestedScroll(sheetState, scrollState)
+                .verticalScroll(scrollState)
+                .padding(horizontal = 20.dp)
+        ) {
             Spacer(modifier = Modifier.height(20.dp))
 
             // Grouped Model Quotas
