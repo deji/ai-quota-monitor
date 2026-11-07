@@ -72,12 +72,13 @@ fun BucketDetailSheet(
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
     ) {
+        val scrollState = rememberScrollState()
+
+        // Pinned title row so drags on the header stay on the sheet surface.
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(start = 20.dp, end = 20.dp, top = 8.dp)
         ) {
             // Header Row: Bucket Name + Close Button
             Row(
@@ -118,7 +119,18 @@ fun BucketDetailSheet(
                     )
                 }
             }
+        }
 
+        // Bounded scroll body beneath the pinned title.
+        Column(
+            modifier = Modifier
+                .weight(1f, fill = false)
+                .fillMaxWidth()
+                .sheetContentNestedScroll(sheetState, scrollState)
+                .verticalScroll(scrollState)
+                .padding(horizontal = 20.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
             // Hero Radial Arc Meter
             val displayPercent = bucket.displayPercent(polarity)
             val subtitle = if (polarity == QuotaPolarity.REMAINING) "Remaining" else "Consumed"
