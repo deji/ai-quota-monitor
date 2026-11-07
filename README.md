@@ -142,6 +142,9 @@ Or manually via `adb`:
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 adb shell am start -n com.aiquotamonitor/.ui.MainActivity
 ```
+
+To verify the adaptive launcher icon in both modes on a local emulator, swipe up to the app drawer for the standard icon, then enable **Wallpaper & style → Themed icons** and drag the app onto the home screen for the Material You monochrome rendering (the app drawer can keep a stale full-color cache).
+
 3. **Configure Sync in the App**:
    - Ensure the **Tailscale** app is active on your Pixel 8 Pro.
    - Tap the **Sync Status Pill** in the top app bar (or switch to the **Widgets & Sync** tab) to open the **Sync Hub**:
