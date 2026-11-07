@@ -339,6 +339,23 @@ class TestRepoFreeOfSecretsAndPersonalIdentifiers(unittest.TestCase):
                 f"Commit message with #1 should pass when AQM_REQUIRE_ISSUE_REF=1: {res.stderr}",
             )
 
+            # A merge of an already-reviewed UI branch must not demand a before-shot receipt.
+            ui_dir = os.path.join(tmpdir, "app", "src", "main", "java", "com", "aiquotamonitor", "ui")
+            os.makedirs(ui_dir, exist_ok=True)
+            with open(os.path.join(ui_dir, "Merged.kt"), "w", encoding="utf-8") as fh:
+                fh.write("fun merged() = 1\n")
+            subprocess.run(["git", "add", "app"], cwd=tmpdir, check=True)
+            with open(msg_file, "w", encoding="utf-8") as fh:
+                fh.write("Merge branch 'deji/issue-4-widget-buckets'\n")
+            res = subprocess.run(
+                ["sh", ".githooks/commit-msg", msg_file],
+                cwd=tmpdir,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(res.returncode, 0, f"Merge commit should not require a before shot: {res.stderr}")
+            subprocess.run(["git", "reset", "-q", "HEAD"], cwd=tmpdir, check=True)
+
     def test_learnings_and_docs_sync_gate(self):
         """Ensure living documentation, skills, and defect-to-lessons cross-references stay in sync."""
         required_files = [

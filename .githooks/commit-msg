@@ -48,7 +48,8 @@ fi
 
 # 4. A UI commit is rejected until before-shot registered the pre-change screenshot.
 #    Skipped when this hook is reused to scrub a GitHub comment (AQM_SKIP_ISSUE_REF=1).
-if [ "${AQM_SKIP_ISSUE_REF:-0}" != "1" ] && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+#    A merge commit is not a new UI edit; the branch commits were checked when they were made.
+if [ "${AQM_SKIP_ISSUE_REF:-0}" != "1" ] && git rev-parse --is-inside-work-tree >/dev/null 2>&1 && [ ! -e "$(git rev-parse --git-path MERGE_HEAD)" ] && ! printf '%s\n' "$raw_content" | grep -Eq '^Merge '; then
   ui_staged=$(git diff --cached --name-only | grep -E '^(app/src/main/res/|app/src/main/java/com/aiquotamonitor/ui/|app/src/main/java/com/aiquotamonitor/widget/)' || true)
   if [ -n "$ui_staged" ]; then
     issue=$(printf '%s\n' "$raw_content" | grep -Eo '#[0-9]+' | head -n 1 | tr -d '#')
