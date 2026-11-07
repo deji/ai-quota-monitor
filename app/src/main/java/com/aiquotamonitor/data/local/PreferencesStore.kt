@@ -3,6 +3,7 @@ package com.aiquotamonitor.data.local
 import android.content.Context
 import android.content.SharedPreferences
 import com.aiquotamonitor.data.repository.SyncSettings
+import com.aiquotamonitor.domain.model.MAX_WIDE_WIDGET_SLOTS
 import com.aiquotamonitor.domain.model.QuotaPolarity
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -26,6 +27,12 @@ class PreferencesStore(
 
     private val _pinnedBucketIdFlow = MutableStateFlow(getPinnedBucketId())
     val pinnedBucketIdFlow: StateFlow<String?> = _pinnedBucketIdFlow.asStateFlow()
+
+    private val _compactWidgetBucketIdFlow = MutableStateFlow(getCompactWidgetBucketId())
+    val compactWidgetBucketIdFlow: StateFlow<String?> = _compactWidgetBucketIdFlow.asStateFlow()
+
+    private val _wideWidgetBucketIdsFlow = MutableStateFlow(getWideWidgetBucketIds())
+    val wideWidgetBucketIdsFlow: StateFlow<List<String>> = _wideWidgetBucketIdsFlow.asStateFlow()
 
     private fun readSettings(): SyncSettings {
         val encryptedToken = prefs.getString(KEY_TAILSCALE_TOKEN, "") ?: ""
@@ -108,6 +115,46 @@ class PreferencesStore(
         _pinnedBucketIdFlow.value = bucketId
     }
 
+    fun getCompactWidgetBucketId(): String? {
+        return prefs.getString(KEY_COMPACT_WIDGET_BUCKET, null)
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+    }
+
+    fun saveCompactWidgetBucketId(bucketId: String?) {
+        val sanitized = bucketId?.trim()?.takeIf { it.isNotEmpty() }
+        if (sanitized != null) {
+            prefs.edit().putString(KEY_COMPACT_WIDGET_BUCKET, sanitized).apply()
+        } else {
+            prefs.edit().remove(KEY_COMPACT_WIDGET_BUCKET).apply()
+        }
+        _compactWidgetBucketIdFlow.value = sanitized
+    }
+
+    fun getWideWidgetBucketIds(): List<String> {
+        val raw = prefs.getString(KEY_WIDE_WIDGET_BUCKETS, null) ?: return emptyList()
+        return sanitizeWideWidgetBucketIds(raw.split(","))
+    }
+
+    fun saveWideWidgetBucketIds(bucketIds: List<String>) {
+        val sanitized = sanitizeWideWidgetBucketIds(bucketIds)
+        if (sanitized.isNotEmpty()) {
+            prefs.edit().putString(KEY_WIDE_WIDGET_BUCKETS, sanitized.joinToString(",")).apply()
+        } else {
+            prefs.edit().remove(KEY_WIDE_WIDGET_BUCKETS).apply()
+        }
+        _wideWidgetBucketIdsFlow.value = sanitized
+    }
+
+    private fun sanitizeWideWidgetBucketIds(values: List<String>): List<String> {
+        val sanitized = values
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .distinct()
+            .take(MAX_WIDE_WIDGET_SLOTS)
+        return ArrayList(sanitized).toList()
+    }
+
     companion object {
         val DEFAULT_HIDDEN_BUCKET_IDS: Set<String> = setOf("3p-5h", "3p-weekly")
 
@@ -122,6 +169,8 @@ class PreferencesStore(
         private const val KEY_POLARITY = "quota_polarity"
         private const val KEY_HIDDEN_BUCKETS = "hidden_bucket_ids"
         private const val KEY_PINNED_BUCKET = "pinned_bucket_id"
+        private const val KEY_COMPACT_WIDGET_BUCKET = "compact_widget_bucket_id"
+        private const val KEY_WIDE_WIDGET_BUCKETS = "wide_widget_bucket_ids"
     }
 }
 

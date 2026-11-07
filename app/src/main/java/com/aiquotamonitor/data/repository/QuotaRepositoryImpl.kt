@@ -6,6 +6,7 @@ import com.aiquotamonitor.data.local.PreferencesStore
 import com.aiquotamonitor.data.local.SeedData
 import com.aiquotamonitor.data.remote.GistRelayClient
 import com.aiquotamonitor.data.remote.TailscaleApiClient
+import com.aiquotamonitor.domain.model.MAX_WIDE_WIDGET_SLOTS
 import com.aiquotamonitor.domain.model.QuotaSnapshot
 import com.aiquotamonitor.domain.model.SmartPrimeStatus
 import com.aiquotamonitor.widget.QuotaCompactWidget
@@ -55,6 +56,8 @@ class QuotaRepositoryImpl(
     override val settingsFlow: StateFlow<SyncSettings> = preferencesStore.settingsFlow
     override val hiddenBucketIdsFlow: StateFlow<Set<String>> = preferencesStore.hiddenBucketIdsFlow
     override val pinnedBucketIdFlow: StateFlow<String?> = preferencesStore.pinnedBucketIdFlow
+    override val compactWidgetBucketIdFlow: StateFlow<String?> = preferencesStore.compactWidgetBucketIdFlow
+    override val wideWidgetBucketIdsFlow: StateFlow<List<String>> = preferencesStore.wideWidgetBucketIdsFlow
 
     private val _isAutoSyncingFlow = MutableStateFlow(false)
     override val isAutoSyncingFlow: StateFlow<Boolean> = _isAutoSyncingFlow.asStateFlow()
@@ -430,6 +433,58 @@ class QuotaRepositoryImpl(
             preferencesStore.savePinnedBucketId(bucketId)
         }
         triggerWidgetUpdates()
+    }
+
+    override suspend fun setCompactWidgetBucket(bucketId: String?) = withContext(Dispatchers.IO) {
+        val sanitized = bucketId?.trim()?.takeIf { it.isNotEmpty() }
+        settingsMutex.withLock {
+            preferencesStore.saveCompactWidgetBucketId(sanitized)
+            if (sanitized != null) {
+                unhideConcreteBucketIds(listOf(sanitized))
+            }
+        }
+        triggerWidgetUpdates()
+    }
+
+    override suspend fun setWideWidgetBuckets(bucketIds: List<String>) = withContext(Dispatchers.IO) {
+        settingsMutex.withLock {
+            preferencesStore.saveWideWidgetBucketIds(bucketIds)
+            unhideConcreteBucketIds(preferencesStore.getWideWidgetBucketIds())
+        }
+        triggerWidgetUpdates()
+    }
+
+    override suspend fun toggleWideWidgetBucket(bucketId: String) = withContext(Dispatchers.IO) {
+        settingsMutex.withLock {
+            val trimmed = bucketId.trim()
+            if (trimmed.isNotEmpty()) {
+                val current = preferencesStore.getWideWidgetBucketIds()
+                val next = when {
+                    current.contains(trimmed) -> current - trimmed
+                    current.size < MAX_WIDE_WIDGET_SLOTS -> (current + trimmed).distinct()
+                    else -> (current.take(MAX_WIDE_WIDGET_SLOTS - 1) + trimmed).distinct()
+                }
+                preferencesStore.saveWideWidgetBucketIds(next)
+                unhideConcreteBucketIds(listOf(trimmed))
+            }
+        }
+        triggerWidgetUpdates()
+    }
+
+    /**
+     * Remove concrete bucket ids from the hidden set in the current [settingsMutex]
+     * transaction. `role:` tokens are never bucket ids and must not touch visibility.
+     */
+    private fun unhideConcreteBucketIds(ids: Collection<String>) {
+        val concreteIds = ids
+            .filter { it.isNotBlank() && !it.startsWith("role:", ignoreCase = true) }
+            .toSet()
+        if (concreteIds.isEmpty()) return
+        val currentHidden = preferencesStore.getHiddenBucketIds()
+        val stillHidden = currentHidden - concreteIds
+        if (stillHidden != currentHidden) {
+            preferencesStore.saveHiddenBucketIds(stillHidden)
+        }
     }
 
     override fun setSnapshotForSimulation(simulated: QuotaSnapshot) {

@@ -37,6 +37,8 @@ fun WidgetsAndSyncScreen(
     val polarity by viewModel.polarity.collectAsState()
     val hiddenBucketIds by viewModel.hiddenBucketIds.collectAsState()
     val pinnedBucketId by viewModel.pinnedBucketId.collectAsState()
+    val compactWidgetBucketId by viewModel.compactWidgetBucketId.collectAsState()
+    val wideWidgetBucketIds by viewModel.wideWidgetBucketIds.collectAsState()
 
     val startHour = try {
         savedSettings.activeHoursStart.split(":").first().toInt()
@@ -92,7 +94,12 @@ fun WidgetsAndSyncScreen(
             snapshot = snapshot,
             hiddenBucketIds = hiddenBucketIds,
             pinnedBucketId = pinnedBucketId,
-            polarity = polarity
+            polarity = polarity,
+            compactWidgetBucketId = compactWidgetBucketId,
+            wideWidgetBucketIds = wideWidgetBucketIds,
+            onSelectCompactBucket = viewModel::setCompactWidgetBucket,
+            onSetWideBuckets = viewModel::setWideWidgetBuckets,
+            onToggleWideBucket = viewModel::toggleWideWidgetBucket
         )
 
         ActiveHoursSlider(
