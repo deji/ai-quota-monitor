@@ -87,6 +87,51 @@ class AdaptiveIconResourceTest {
     }
 
     @Test
+    fun testBackgroundIsFullBleedObsidianPlate() {
+        val doc = parseResXml("drawable/ic_launcher_background.xml")
+        val root = doc.documentElement
+        val paths = root.getElementsByTagName("path")
+
+        // APP-ICO2: exactly one full-bleed 108dp plate, no sub-canvas disc geometry.
+        assertEquals("Background must contain exactly 1 full-bleed path", 1, paths.length)
+
+        val plate = paths.item(0) as org.w3c.dom.Element
+        assertEquals(
+            "Background plate must be uniform obsidian #0B0F12",
+            "#0B0F12",
+            plate.getAttributeNS("http://schemas.android.com/apk/res/android", "fillColor")
+        )
+        assertEquals(
+            "Background plate must cover the full 108dp canvas",
+            "M0,0h108v108h-108z",
+            plate.getAttributeNS("http://schemas.android.com/apk/res/android", "pathData")
+        )
+
+        // The removed inner radius-36dp disc must not linger in any attribute.
+        val platePathData = plate.getAttributeNS("http://schemas.android.com/apk/res/android", "pathData")
+        assertTrue("Background must not contain the removed radius-36dp disc", !platePathData.contains("36,36"))
+    }
+
+    @Test
+    fun testForegroundInactiveTrackContrastColor() {
+        val doc = parseResXml("drawable/ic_launcher_foreground.xml")
+        val root = doc.documentElement
+        val paths = root.getElementsByTagName("path")
+
+        var trackColor: String? = null
+        for (i in 0 until paths.length) {
+            val elem = paths.item(i) as org.w3c.dom.Element
+            val pathData = elem.getAttributeNS("http://schemas.android.com/apk/res/android", "pathData")
+            if (pathData.contains("73.09,73.09")) {
+                trackColor = elem.getAttributeNS("http://schemas.android.com/apk/res/android", "strokeColor")
+            }
+        }
+
+        // APP-ICO2: #243338 keeps the full 270° dial visible on the #0B0F12 plate.
+        assertEquals("Inactive 270° track must use #243338 for launcher-size contrast", "#243338", trackColor)
+    }
+
+    @Test
     fun testForegroundAndMonochromeVectorAttributesAndSafeZone() {
         for (drawableName in listOf("drawable/ic_launcher_foreground.xml", "drawable/ic_launcher_monochrome.xml")) {
             val doc = parseResXml(drawableName)
