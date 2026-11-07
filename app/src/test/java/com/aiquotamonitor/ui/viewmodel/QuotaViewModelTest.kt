@@ -61,6 +61,12 @@ class QuotaViewModelTest {
         private val _pinnedBucketIdFlow = MutableStateFlow<String?>(null)
         override val pinnedBucketIdFlow: StateFlow<String?> = _pinnedBucketIdFlow.asStateFlow()
 
+        private val _compactWidgetBucketIdFlow = MutableStateFlow<String?>(null)
+        override val compactWidgetBucketIdFlow: StateFlow<String?> = _compactWidgetBucketIdFlow.asStateFlow()
+
+        private val _wideWidgetBucketIdsFlow = MutableStateFlow<List<String>>(emptyList())
+        override val wideWidgetBucketIdsFlow: StateFlow<List<String>> = _wideWidgetBucketIdsFlow.asStateFlow()
+
         private val _isAutoSyncingFlow = MutableStateFlow(false)
         override val isAutoSyncingFlow: StateFlow<Boolean> = _isAutoSyncingFlow.asStateFlow()
 
@@ -209,6 +215,43 @@ class QuotaViewModelTest {
                 if (current.contains(bucketId)) {
                     _hiddenBucketIdsFlow.value = current - bucketId
                 }
+            }
+        }
+
+        override suspend fun setCompactWidgetBucket(bucketId: String?) {
+            val sanitized = bucketId?.trim()?.takeIf { it.isNotEmpty() }
+            _compactWidgetBucketIdFlow.value = sanitized
+            sanitized?.let { unhideConcrete(it) }
+        }
+
+        override suspend fun setWideWidgetBuckets(bucketIds: List<String>) {
+            val sanitized = bucketIds
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .distinct()
+                .take(3)
+            _wideWidgetBucketIdsFlow.value = sanitized
+            sanitized.forEach { unhideConcrete(it) }
+        }
+
+        override suspend fun toggleWideWidgetBucket(bucketId: String) {
+            val trimmed = bucketId.trim()
+            if (trimmed.isEmpty()) return
+            val current = _wideWidgetBucketIdsFlow.value
+            val next = when {
+                current.contains(trimmed) -> current - trimmed
+                current.size < 3 -> (current + trimmed).distinct()
+                else -> (current.take(2) + trimmed).distinct()
+            }
+            _wideWidgetBucketIdsFlow.value = next
+            unhideConcrete(trimmed)
+        }
+
+        private fun unhideConcrete(bucketId: String) {
+            if (bucketId.startsWith("role:", ignoreCase = true)) return
+            val current = _hiddenBucketIdsFlow.value
+            if (current.contains(bucketId)) {
+                _hiddenBucketIdsFlow.value = current - bucketId
             }
         }
 
@@ -701,5 +744,66 @@ class QuotaViewModelTest {
         fakeRepo.setAutoSyncing(false)
         runCurrent()
         assertFalse(viewModel.isAutoSyncing.value)
+    }
+
+    @Test
+    fun testSetCompactWidgetBucketDelegatesAndEmits() = runTest(testDispatcher) {
+        val fakeRepo = configuredRepo { testScheduler.currentTime }
+        val viewModel = QuotaViewModel(fakeRepo, preferencesStore, clock = { testScheduler.currentTime })
+        backgroundScope.launch(testDispatcher) { viewModel.compactWidgetBucketId.collect {} }
+
+        assertNull(viewModel.compactWidgetBucketId.value)
+
+        viewModel.setCompactWidgetBucket("gemini-5h")
+        advanceUntilIdle()
+        assertEquals("gemini-5h", viewModel.compactWidgetBucketId.value)
+
+        viewModel.setCompactWidgetBucket("  role:planner  ")
+        advanceUntilIdle()
+        assertEquals("role:planner", viewModel.compactWidgetBucketId.value)
+
+        viewModel.setCompactWidgetBucket(null)
+        advanceUntilIdle()
+        assertNull(viewModel.compactWidgetBucketId.value)
+    }
+
+    @Test
+    fun testToggleWideWidgetBucketDelegatesAndRotatesSlots() = runTest(testDispatcher) {
+        val fakeRepo = configuredRepo { testScheduler.currentTime }
+        val viewModel = QuotaViewModel(fakeRepo, preferencesStore, clock = { testScheduler.currentTime })
+        backgroundScope.launch(testDispatcher) { viewModel.wideWidgetBucketIds.collect {} }
+
+        assertTrue(viewModel.wideWidgetBucketIds.value.isEmpty())
+
+        viewModel.toggleWideWidgetBucket("gemini-argon-wtu-weekly")
+        advanceUntilIdle()
+        viewModel.toggleWideWidgetBucket("opencode-rolling")
+        advanceUntilIdle()
+        viewModel.toggleWideWidgetBucket("grok-weekly-credits")
+        advanceUntilIdle()
+        assertEquals(
+            listOf("gemini-argon-wtu-weekly", "opencode-rolling", "grok-weekly-credits"),
+            viewModel.wideWidgetBucketIds.value
+        )
+
+        // A fourth selection replaces slot 3 while preserving the first two.
+        viewModel.toggleWideWidgetBucket("gemini-5h")
+        advanceUntilIdle()
+        assertEquals(
+            listOf("gemini-argon-wtu-weekly", "opencode-rolling", "gemini-5h"),
+            viewModel.wideWidgetBucketIds.value
+        )
+
+        // Tapping a selected chip removes it.
+        viewModel.toggleWideWidgetBucket("opencode-rolling")
+        advanceUntilIdle()
+        assertEquals(
+            listOf("gemini-argon-wtu-weekly", "gemini-5h"),
+            viewModel.wideWidgetBucketIds.value
+        )
+
+        viewModel.setWideWidgetBuckets(listOf(" role:PLANNER ", "role:PLANNER", ""))
+        advanceUntilIdle()
+        assertEquals(listOf("role:PLANNER"), viewModel.wideWidgetBucketIds.value)
     }
 }

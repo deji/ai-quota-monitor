@@ -31,9 +31,9 @@ import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.aiquotamonitor.data.local.PreferencesStore
 import com.aiquotamonitor.data.local.SeedData
-import com.aiquotamonitor.domain.model.OrcaRoleReadiness
 import com.aiquotamonitor.domain.model.QuotaPolarity
 import com.aiquotamonitor.domain.model.QuotaSnapshot
+import com.aiquotamonitor.domain.model.WidgetQuotaItem
 import com.aiquotamonitor.ui.MainActivity
 import kotlinx.serialization.json.Json
 
@@ -42,25 +42,31 @@ private val widgetJson = Json { ignoreUnknownKeys = true }
 class QuotaWideWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val prefs = PreferencesStore(context)
-        val polarity = prefs.getPolarity()
-        val cachedJson = prefs.getCachedSnapshotJson()
-        var isDemo = false
-        val snapshot = if (!cachedJson.isNullOrBlank()) {
-            try {
-                widgetJson.decodeFromString<QuotaSnapshot>(cachedJson)
-            } catch (_: Exception) {
+        provideContent {
+            // Read preferences and resolve inside provideContent so updateAll() during an
+            // active Glance session re-evaluates the ordered selection immediately.
+            val prefs = PreferencesStore(context)
+            val polarity = prefs.getPolarity()
+            val cachedJson = prefs.getCachedSnapshotJson()
+            var isDemo = false
+            val snapshot = if (!cachedJson.isNullOrBlank()) {
+                try {
+                    widgetJson.decodeFromString<QuotaSnapshot>(cachedJson)
+                } catch (_: Exception) {
+                    isDemo = true
+                    SeedData.createSeedSnapshot()
+                }
+            } else {
                 isDemo = true
                 SeedData.createSeedSnapshot()
             }
-        } else {
-            isDemo = true
-            SeedData.createSeedSnapshot()
-        }
-        val polarityTag = if (polarity == QuotaPolarity.REMAINING) "REM" else "USED"
-        val headerText = if (isDemo) "ORCA STAGE DECK • $polarityTag • DEMO" else "ORCA STAGE DECK • $polarityTag"
+            val items = snapshot.resolveWideWidgetItems(
+                wideBucketIds = prefs.getWideWidgetBucketIds(),
+                hiddenBucketIds = prefs.getHiddenBucketIds()
+            )
+            val polarityTag = if (polarity == QuotaPolarity.REMAINING) "REM" else "USED"
+            val headerText = if (isDemo) "ORCA STAGE DECK • $polarityTag • DEMO" else "ORCA STAGE DECK • $polarityTag"
 
-        provideContent {
             GlanceTheme {
                 Box(
                     modifier = GlanceModifier
@@ -99,17 +105,17 @@ class QuotaWideWidget : GlanceAppWidget() {
 
                         Spacer(modifier = GlanceModifier.height(10.dp))
 
-                        // 3-Column Roles Row
+                        // 3-slot deck (always exactly MAX_WIDE_WIDGET_SLOTS cells)
                         Row(
                             modifier = GlanceModifier.fillMaxWidth()
                         ) {
-                            snapshot.orcaRoles.forEachIndexed { index, role ->
-                                GlanceRoleCard(
-                                    role = role,
+                            items.forEachIndexed { index, item ->
+                                GlanceWideCell(
+                                    item = item,
                                     polarity = polarity,
                                     modifier = GlanceModifier.defaultWeight()
                                 )
-                                if (index < snapshot.orcaRoles.lastIndex) {
+                                if (index < items.lastIndex) {
                                     Spacer(modifier = GlanceModifier.width(8.dp))
                                 }
                             }
@@ -122,17 +128,27 @@ class QuotaWideWidget : GlanceAppWidget() {
 }
 
 @androidx.compose.runtime.Composable
-private fun GlanceRoleCard(
-    role: OrcaRoleReadiness,
+private fun GlanceWideCell(
+    item: WidgetQuotaItem,
     polarity: QuotaPolarity,
     modifier: GlanceModifier
 ) {
-    val displayPercent = role.displayPercent(polarity)
+    val displayPercent = item.displayPercent(polarity)
+    val isUnavailable = displayPercent.isNaN()
     val percentColor = when {
+        isUnavailable -> Color(0xFF94A3B8)
         displayPercent <= 20.0 -> Color(0xFFFFB4AB)
         displayPercent <= 40.0 -> Color(0xFFFFB951)
         else -> Color(0xFF5CE196)
     }
+    val showFallbackCue = item.isFallback && !isUnavailable
+    val headerColor = if (showFallbackCue) Color(0xFFFFB951) else Color(0xFF94A3B8)
+    val headerText = if (showFallbackCue) {
+        "FALLBACK • ${item.categoryLabel}"
+    } else {
+        item.categoryLabel
+    }
+    val pace = item.paceDeltaPercent
 
     Box(
         modifier = modifier
@@ -144,9 +160,10 @@ private fun GlanceRoleCard(
             modifier = GlanceModifier.fillMaxWidth()
         ) {
             Text(
-                text = role.role,
+                text = headerText,
+                maxLines = 1,
                 style = TextStyle(
-                    color = ColorProvider(Color(0xFF94A3B8)),
+                    color = ColorProvider(headerColor),
                     fontSize = 9.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -155,7 +172,7 @@ private fun GlanceRoleCard(
             Spacer(modifier = GlanceModifier.height(4.dp))
 
             Text(
-                text = "${displayPercent.toInt()}%",
+                text = if (isUnavailable) "--" else "${displayPercent.toInt()}%",
                 style = TextStyle(
                     color = ColorProvider(percentColor),
                     fontSize = 24.sp,
@@ -164,13 +181,26 @@ private fun GlanceRoleCard(
             )
 
             Text(
-                text = role.label,
+                text = item.titleLabel,
                 maxLines = 1,
                 style = TextStyle(
                     color = ColorProvider(Color(0xFFE2E8F0)),
                     fontSize = 10.sp
                 )
             )
+
+            if (!isUnavailable && pace != 0.0) {
+                Spacer(modifier = GlanceModifier.height(2.dp))
+                Text(
+                    text = if (pace <= 0) "Ahead: ${pace}%" else "Burn: +${pace}%",
+                    maxLines = 1,
+                    style = TextStyle(
+                        color = ColorProvider(if (pace <= 0) Color(0xFF5CE196) else Color(0xFFFFB951)),
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                )
+            }
         }
     }
 }

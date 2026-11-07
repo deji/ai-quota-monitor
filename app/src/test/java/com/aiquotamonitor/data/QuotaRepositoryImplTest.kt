@@ -20,6 +20,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -1090,5 +1091,290 @@ class QuotaRepositoryImplTest {
             555L,
             repository.lastSyncAttemptEpochMsFlow.value
         )
+    }
+
+    // ---- Configurable widget buckets (Issue #4 / APP-UX4) ----
+
+    private fun newRepository(
+        sharedPrefs: com.aiquotamonitor.data.local.InMemorySharedPreferences
+    ): Pair<PreferencesStore, QuotaRepositoryImpl> {
+        val store = PreferencesStore(sharedPreferences = sharedPrefs)
+        val repository = QuotaRepositoryImpl(
+            preferencesStore = store,
+            tailscaleClient = FakeTailscaleClient(),
+            gistClient = FakeGistClient()
+        )
+        return store to repository
+    }
+
+    @Test
+    fun testCompactWidgetBucketPersistenceAndAutoUnhide() = runTest {
+        val sharedPrefs = com.aiquotamonitor.data.local.InMemorySharedPreferences()
+        val (_, repository) = newRepository(sharedPrefs)
+
+        assertNull(repository.compactWidgetBucketIdFlow.value)
+
+        // 3p-weekly is hidden by default but selecting it must unhide it in the same transaction.
+        repository.setCompactWidgetBucket("3p-weekly")
+        assertEquals("3p-weekly", repository.compactWidgetBucketIdFlow.value)
+        assertFalse(repository.hiddenBucketIdsFlow.value.contains("3p-weekly"))
+
+        val restartedStore = PreferencesStore(sharedPreferences = sharedPrefs)
+        assertEquals("3p-weekly", restartedStore.getCompactWidgetBucketId())
+        assertEquals("3p-weekly", restartedStore.compactWidgetBucketIdFlow.value)
+
+        // A role token is not a bucket id and must never mutate visibility.
+        repository.setHiddenBuckets(setOf("3p-5h"))
+        repository.setCompactWidgetBucket("  role:PLANNER  ")
+        assertEquals("role:PLANNER", repository.compactWidgetBucketIdFlow.value)
+        assertTrue(repository.hiddenBucketIdsFlow.value.contains("3p-5h"))
+
+        // Blank / null both mean Auto and remove the stored key.
+        repository.setCompactWidgetBucket("   ")
+        assertNull(repository.compactWidgetBucketIdFlow.value)
+        assertNull(restartedStore.getCompactWidgetBucketId())
+        assertFalse(sharedPrefs.getAll().containsKey("compact_widget_bucket_id"))
+    }
+
+    @Test
+    fun testWideWidgetBucketsOrderPersistenceAndAutoUnhide() = runTest {
+        val sharedPrefs = com.aiquotamonitor.data.local.InMemorySharedPreferences()
+        val (_, repository) = newRepository(sharedPrefs)
+
+        assertTrue(repository.wideWidgetBucketIdsFlow.value.isEmpty())
+
+        repository.setWideWidgetBuckets(
+            listOf(
+                "3p-weekly",
+                " gemini-5h ",
+                "3p-weekly",
+                "grok-weekly-credits",
+                "opencode-rolling"
+            )
+        )
+
+        assertEquals(
+            listOf("3p-weekly", "gemini-5h", "grok-weekly-credits"),
+            repository.wideWidgetBucketIdsFlow.value
+        )
+        assertFalse(repository.hiddenBucketIdsFlow.value.contains("3p-weekly"))
+
+        val restartedStore = PreferencesStore(sharedPreferences = sharedPrefs)
+        assertEquals(
+            listOf("3p-weekly", "gemini-5h", "grok-weekly-credits"),
+            restartedStore.getWideWidgetBucketIds()
+        )
+        assertEquals(restartedStore.getWideWidgetBucketIds(), restartedStore.wideWidgetBucketIdsFlow.value)
+
+        // Empty/blank means the Orca Roles default and removes the key.
+        repository.setWideWidgetBuckets(listOf(" ", ""))
+        assertTrue(repository.wideWidgetBucketIdsFlow.value.isEmpty())
+        assertFalse(sharedPrefs.getAll().containsKey("wide_widget_bucket_ids"))
+    }
+
+    @Test
+    fun testToggleWideWidgetBucketSanitizesAndSerializes() = runTest {
+        val sharedPrefs = com.aiquotamonitor.data.local.InMemorySharedPreferences()
+        val (_, repository) = newRepository(sharedPrefs)
+
+        repository.toggleWideWidgetBucket("  gemini-argon-wtu-weekly  ")
+        repository.toggleWideWidgetBucket("opencode-rolling")
+        repository.toggleWideWidgetBucket("grok-weekly-credits")
+        assertEquals(
+            listOf("gemini-argon-wtu-weekly", "opencode-rolling", "grok-weekly-credits"),
+            repository.wideWidgetBucketIdsFlow.value
+        )
+
+        // A fourth selection replaces slot 3, preserving the first two.
+        repository.toggleWideWidgetBucket("gemini-5h")
+        assertEquals(
+            listOf("gemini-argon-wtu-weekly", "opencode-rolling", "gemini-5h"),
+            repository.wideWidgetBucketIdsFlow.value
+        )
+
+        // Tapping a selected chip removes it.
+        repository.toggleWideWidgetBucket("opencode-rolling")
+        assertEquals(
+            listOf("gemini-argon-wtu-weekly", "gemini-5h"),
+            repository.wideWidgetBucketIdsFlow.value
+        )
+
+        // Blank ids are a no-op.
+        repository.toggleWideWidgetBucket("   ")
+        assertEquals(listOf("gemini-argon-wtu-weekly", "gemini-5h"), repository.wideWidgetBucketIdsFlow.value)
+    }
+
+    @Test
+    fun testConcurrentToggleWideWidgetBucketsDoesNotLoseUpdates() = runTest {
+        val sharedPrefs = com.aiquotamonitor.data.local.InMemorySharedPreferences()
+        val (_, repository) = newRepository(sharedPrefs)
+        val ids = listOf("gemini-argon-wtu-weekly", "opencode-rolling", "grok-weekly-credits")
+
+        coroutineScope {
+            ids.map { id ->
+                async(Dispatchers.Default) { repository.toggleWideWidgetBucket(id) }
+            }.forEach { it.await() }
+        }
+
+        assertEquals(3, repository.wideWidgetBucketIdsFlow.value.size)
+        assertEquals(ids.toSet(), repository.wideWidgetBucketIdsFlow.value.toSet())
+    }
+
+    @Test
+    fun testResolveCompactWidgetItemFallbackOnMissingOrHiddenBucket() {
+        val snapshot = SeedData.createSeedSnapshot()
+        val defaultHidden = PreferencesStore.DEFAULT_HIDDEN_BUCKET_IDS
+
+        // Auto mode selects the hero spotlight without a fallback cue.
+        val auto = snapshot.resolveCompactWidgetItem(null, defaultHidden, null)
+        assertNotNull(auto)
+        assertEquals("gemini-argon-wtu-weekly", auto?.id)
+        assertFalse(auto!!.isFallback)
+
+        // Concrete bucket match keeps its own provider category.
+        val concrete = snapshot.resolveCompactWidgetItem("gemini-5h", defaultHidden, null)
+        assertNotNull(concrete)
+        assertEquals("gemini-5h", concrete?.id)
+        assertEquals("AGY", concrete?.categoryLabel)
+        assertEquals("Gemini 3.8 Flash 5h Rolling", concrete?.titleLabel)
+        assertFalse(concrete!!.isFallback)
+
+        // Role tokens are case-insensitive and use OrcaRoleReadiness percents, not the raw bucket copy.
+        val planner = snapshot.resolveCompactWidgetItem("role:planner", defaultHidden, null)
+        assertNotNull(planner)
+        assertEquals("role:PLANNER", planner?.id)
+        assertTrue(planner?.isRole == true)
+        assertEquals("PLANNER", planner?.categoryLabel)
+        assertEquals(35.0, planner!!.remainingPercent, 0.0001)
+        assertEquals(65.0, planner.usedPercent, 0.0001)
+        assertEquals(-33.1, planner.paceDeltaPercent, 0.0001)
+        assertFalse(planner.isFallback)
+
+        // A missing concrete id falls back to the hero bucket with isFallback = true.
+        val missing = snapshot.resolveCompactWidgetItem("missing-bucket-id", defaultHidden, null)
+        assertNotNull(missing)
+        assertEquals("gemini-argon-wtu-weekly", missing?.id)
+        assertTrue(missing!!.isFallback)
+
+        // A hidden concrete id is treated as absent.
+        val hidden = snapshot.resolveCompactWidgetItem("3p-weekly", defaultHidden, null)
+        assertNotNull(hidden)
+        assertEquals("gemini-argon-wtu-weekly", hidden?.id)
+        assertTrue(hidden!!.isFallback)
+
+        // A hidden role primary cannot resolve the role; it falls back to the hero bucket.
+        val hiddenRole = snapshot.resolveCompactWidgetItem(
+            "role:PLANNER",
+            defaultHidden + "gemini-argon-wtu-weekly",
+            null
+        )
+        assertNotNull(hiddenRole)
+        assertEquals("grok-weekly-credits", hiddenRole?.id)
+        assertTrue(hiddenRole!!.isFallback)
+
+        // All hidden => no cell at all.
+        val allBucketIds = snapshot.providers.flatMap { it.buckets }.map { it.id }.toSet()
+        assertNull(snapshot.resolveCompactWidgetItem("gemini-5h", allBucketIds, null))
+    }
+
+    @Test
+    fun testResolveWideWidgetItemsCustomTwoPassDoesNotStealLaterSlots() {
+        val snapshot = SeedData.createSeedSnapshot()
+        val defaultHidden = PreferencesStore.DEFAULT_HIDDEN_BUCKET_IDS
+
+        val items = snapshot.resolveWideWidgetItems(
+            wideBucketIds = listOf("missing-bucket-id", "gemini-argon-wtu-weekly", "grok-weekly-credits"),
+            hiddenBucketIds = defaultHidden
+        )
+
+        assertEquals(3, items.size)
+        // Slot 1 must not steal the bucket explicitly configured for slot 2.
+        assertEquals("gemini-argon-wtu-weekly", items[1].id)
+        assertFalse(items[1].isFallback)
+        assertEquals("grok-weekly-credits", items[2].id)
+        assertFalse(items[2].isFallback)
+        // Slot 0 resolves from its own fallback substitute, with that substitute's identity.
+        assertEquals("opencode-weekly", items[0].id)
+        assertTrue(items[0].isFallback)
+        assertEquals("OPENCODE", items[0].categoryLabel)
+        assertFalse(items.any { it.remainingPercent.isNaN() })
+    }
+
+    @Test
+    fun testResolveWideWidgetItemsCustomRoleTokensReserveTheirPrimaries() {
+        val snapshot = SeedData.createSeedSnapshot()
+        val defaultHidden = PreferencesStore.DEFAULT_HIDDEN_BUCKET_IDS
+
+        val items = snapshot.resolveWideWidgetItems(
+            wideBucketIds = listOf("role:planner", "missing-bucket-id", "role:REVIEWER"),
+            hiddenBucketIds = defaultHidden
+        )
+
+        assertEquals(3, items.size)
+        assertEquals("role:PLANNER", items[0].id)
+        assertEquals(35.0, items[0].remainingPercent, 0.0001)
+        assertFalse(items[0].isFallback)
+        assertEquals("role:REVIEWER", items[2].id)
+        assertFalse(items[2].isFallback)
+        // The substitute must not reuse the missing slot's request or a reserved primary.
+        assertTrue(items[1].isFallback)
+        assertNotEquals("gemini-argon-wtu-weekly", items[1].id)
+        assertNotEquals("grok-weekly-credits", items[1].id)
+    }
+
+    @Test
+    fun testResolveWideWidgetItemsDefaultModeReservesRolePrimaries() {
+        val snapshot = SeedData.createSeedSnapshot()
+        val hidden = PreferencesStore.DEFAULT_HIDDEN_BUCKET_IDS + "gemini-argon-wtu-weekly"
+
+        val items = snapshot.resolveWideWidgetItems(emptyList(), hidden)
+
+        assertEquals(3, items.size)
+        // PLANNER is unresolved, so slot 0 fills from the pool without stealing BUILDER/REVIEWER.
+        assertTrue(items[0].isFallback)
+        assertEquals("opencode-weekly", items[0].id)
+        assertEquals("role:BUILDER", items[1].id)
+        assertEquals("role:REVIEWER", items[2].id)
+        assertFalse(items[1].isFallback)
+        assertFalse(items[2].isFallback)
+    }
+
+    @Test
+    fun testResolveWideWidgetItemsAlwaysReturnsThreeCells() {
+        // Empty snapshot: default mode still returns 3 NaN placeholders.
+        val emptySnapshot = SeedData.createSeedSnapshot().copy(providers = emptyList(), orcaRoles = emptyList())
+        val emptyItems = emptySnapshot.resolveWideWidgetItems(emptyList(), emptySet())
+        assertEquals(3, emptyItems.size)
+        assertTrue(emptyItems.all { it.remainingPercent.isNaN() })
+        assertTrue(emptyItems.all { it.titleLabel == "All models hidden" })
+        assertTrue(emptyItems.all { it.categoryLabel == "ORCA STAGE" })
+        assertTrue(emptyItems.all { it.isFallback })
+
+        // All hidden in custom mode: 3 NaN placeholders, never a 1- or 2-item list.
+        val snapshot = SeedData.createSeedSnapshot()
+        val allIds = snapshot.providers.flatMap { it.buckets }.map { it.id }.toSet()
+        val customItems = snapshot.resolveWideWidgetItems(
+            wideBucketIds = listOf("gemini-5h", "missing-bucket-id"),
+            hiddenBucketIds = allIds
+        )
+        assertEquals(3, customItems.size)
+        assertTrue(customItems.all { it.remainingPercent.isNaN() })
+        assertTrue(customItems.all { it.titleLabel == "All models hidden" })
+        assertEquals("gemini-5h", customItems[0].id)
+        assertEquals("missing-bucket-id", customItems[1].id)
+    }
+
+    @Test
+    fun testWideWidgetSelectionPreservedWhenBucketIsLaterHidden() = runTest {
+        val sharedPrefs = com.aiquotamonitor.data.local.InMemorySharedPreferences()
+        val (_, repository) = newRepository(sharedPrefs)
+
+        repository.setCompactWidgetBucket("gemini-5h")
+        repository.setWideWidgetBuckets(listOf("gemini-argon-wtu-weekly", "gemini-5h"))
+
+        repository.setHiddenBuckets(setOf("gemini-5h"))
+
+        assertEquals("gemini-5h", repository.compactWidgetBucketIdFlow.value)
+        assertEquals(listOf("gemini-argon-wtu-weekly", "gemini-5h"), repository.wideWidgetBucketIdsFlow.value)
     }
 }

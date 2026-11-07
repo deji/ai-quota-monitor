@@ -39,6 +39,8 @@ class QuotaViewModel(
     val syncError: StateFlow<String?> = repository.syncErrorFlow
     val hiddenBucketIds: StateFlow<Set<String>> = repository.hiddenBucketIdsFlow
     val pinnedBucketId: StateFlow<String?> = repository.pinnedBucketIdFlow
+    val compactWidgetBucketId: StateFlow<String?> = repository.compactWidgetBucketIdFlow
+    val wideWidgetBucketIds: StateFlow<List<String>> = repository.wideWidgetBucketIdsFlow
     val isAutoSyncing: StateFlow<Boolean> = repository.isAutoSyncingFlow
 
     val isSyncError: StateFlow<Boolean> = repository.syncErrorFlow
@@ -269,6 +271,31 @@ class QuotaViewModel(
     fun setPinnedBucket(bucketId: String?) {
         viewModelScope.launch {
             repository.setPinnedBucket(bucketId)
+            triggerWidgetUpdate()
+        }
+    }
+
+    fun setCompactWidgetBucket(bucketId: String?) {
+        viewModelScope.launch {
+            repository.setCompactWidgetBucket(bucketId)
+            triggerWidgetUpdate()
+        }
+    }
+
+    fun setWideWidgetBuckets(bucketIds: List<String>) {
+        viewModelScope.launch {
+            repository.setWideWidgetBuckets(bucketIds)
+            triggerWidgetUpdate()
+        }
+    }
+
+    /**
+     * Delegates directly to the repository so the next list is computed inside
+     * `settingsMutex`; computing it from a `StateFlow` here would drop rapid taps.
+     */
+    fun toggleWideWidgetBucket(bucketId: String) {
+        viewModelScope.launch {
+            repository.toggleWideWidgetBucket(bucketId)
             triggerWidgetUpdate()
         }
     }

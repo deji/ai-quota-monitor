@@ -11,6 +11,8 @@ interface QuotaRepository {
     val syncErrorFlow: StateFlow<String?>
     val hiddenBucketIdsFlow: StateFlow<Set<String>>
     val pinnedBucketIdFlow: StateFlow<String?>
+    val compactWidgetBucketIdFlow: StateFlow<String?>
+    val wideWidgetBucketIdsFlow: StateFlow<List<String>>
 
     /** True only while a background/foreground auto-sync tick is in flight. */
     val isAutoSyncingFlow: StateFlow<Boolean>
@@ -27,6 +29,9 @@ interface QuotaRepository {
     suspend fun setHiddenBuckets(hiddenIds: Set<String>)
     suspend fun toggleBucketVisibility(bucketId: String)
     suspend fun setPinnedBucket(bucketId: String?)
+    suspend fun setCompactWidgetBucket(bucketId: String?)
+    suspend fun setWideWidgetBuckets(bucketIds: List<String>)
+    suspend fun toggleWideWidgetBucket(bucketId: String)
     fun setSnapshotForSimulation(simulated: QuotaSnapshot)
     fun resetSimulation()
 }

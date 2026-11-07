@@ -41,33 +41,39 @@ private val widgetJson = Json { ignoreUnknownKeys = true }
 class QuotaCompactWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val prefs = PreferencesStore(context)
-        val polarity = prefs.getPolarity()
-        val cachedJson = prefs.getCachedSnapshotJson()
-        var isDemo = false
-        val snapshot = if (!cachedJson.isNullOrBlank()) {
-            try {
-                widgetJson.decodeFromString<QuotaSnapshot>(cachedJson)
-            } catch (_: Exception) {
+        provideContent {
+            // Read preferences and resolve inside provideContent so updateAll() during an
+            // active Glance session re-evaluates the selection instead of reusing stale values.
+            val prefs = PreferencesStore(context)
+            val polarity = prefs.getPolarity()
+            val cachedJson = prefs.getCachedSnapshotJson()
+            var isDemo = false
+            val snapshot = if (!cachedJson.isNullOrBlank()) {
+                try {
+                    widgetJson.decodeFromString<QuotaSnapshot>(cachedJson)
+                } catch (_: Exception) {
+                    isDemo = true
+                    SeedData.createSeedSnapshot()
+                }
+            } else {
                 isDemo = true
                 SeedData.createSeedSnapshot()
             }
-        } else {
-            isDemo = true
-            SeedData.createSeedSnapshot()
-        }
 
-        val hiddenBucketIds = prefs.getHiddenBucketIds()
-        val pinnedBucketId = prefs.getPinnedBucketId()
-        val hero = snapshot.heroBucket(hiddenBucketIds, pinnedBucketId)
-        val percent = hero?.displayPercent(polarity)
-        val label = hero?.label
-        val pace = hero?.paceDeltaPercent ?: 0.0
-        val polarityTag = if (polarity == QuotaPolarity.REMAINING) "REM" else "USED"
-        val headerText = if (isDemo) "AI QUOTA • $polarityTag • DEMO" else "AI QUOTA • $polarityTag"
-        val dotColor = if (isDemo) Color(0xFFFFB951) else Color(0xFF5CE196)
+            val hiddenBucketIds = prefs.getHiddenBucketIds()
+            val pinnedBucketId = prefs.getPinnedBucketId()
+            val item = snapshot.resolveCompactWidgetItem(
+                compactBucketId = prefs.getCompactWidgetBucketId(),
+                hiddenBucketIds = hiddenBucketIds,
+                pinnedBucketId = pinnedBucketId
+            )
+            val displayPercent = item?.displayPercent(polarity)
+            val polaritySuffix = if (polarity == QuotaPolarity.REMAINING) "Left" else "Used"
+            val pace = item?.paceDeltaPercent ?: 0.0
+            val polarityTag = if (polarity == QuotaPolarity.REMAINING) "REM" else "USED"
+            val headerText = if (isDemo) "AI QUOTA • $polarityTag • DEMO" else "AI QUOTA • $polarityTag"
+            val dotColor = if (isDemo) Color(0xFFFFB951) else Color(0xFF5CE196)
 
-        provideContent {
             GlanceTheme {
                 Box(
                     modifier = GlanceModifier
@@ -107,7 +113,7 @@ class QuotaCompactWidget : GlanceAppWidget() {
 
                         Spacer(modifier = GlanceModifier.height(10.dp))
 
-                        if (hero == null) {
+                        if (item == null) {
                             Text(
                                 text = "--",
                                 style = TextStyle(
@@ -143,9 +149,26 @@ class QuotaCompactWidget : GlanceAppWidget() {
                                 )
                             }
                         } else {
+                            if (item.isFallback) {
+                                Text(
+                                    text = "FALLBACK • ${item.categoryLabel}",
+                                    maxLines = 1,
+                                    style = TextStyle(
+                                        color = ColorProvider(Color(0xFFFFB951)),
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                )
+                                Spacer(modifier = GlanceModifier.height(2.dp))
+                            }
+
                             // Large percentage
                             Text(
-                                text = "${percent?.toInt() ?: 0}%",
+                                text = if (displayPercent == null || displayPercent.isNaN()) {
+                                    "--"
+                                } else {
+                                    "${displayPercent.toInt()}%"
+                                },
                                 style = TextStyle(
                                     color = ColorProvider(Color(0xFFE2E8F0)),
                                     fontSize = 36.sp,
@@ -154,7 +177,7 @@ class QuotaCompactWidget : GlanceAppWidget() {
                             )
 
                             Text(
-                                text = label ?: "",
+                                text = "${item.titleLabel} $polaritySuffix",
                                 maxLines = 1,
                                 style = TextStyle(
                                     color = ColorProvider(Color(0xFF94A3B8)),
@@ -164,23 +187,25 @@ class QuotaCompactWidget : GlanceAppWidget() {
 
                             Spacer(modifier = GlanceModifier.defaultWeight())
 
-                            // Bottom Pace Status
-                            Row(
-                                modifier = GlanceModifier
-                                    .fillMaxWidth()
-                                    .cornerRadius(8.dp)
-                                    .background(ColorProvider(Color(0xFF1E252B)))
-                                    .padding(horizontal = 6.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = if (pace <= 0) "Ahead: ${pace}%" else "Burn: +${pace}%",
-                                    style = TextStyle(
-                                        color = ColorProvider(if (pace <= 0) Color(0xFF5CE196) else Color(0xFFFFB951)),
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.Bold
+                            // Bottom Pace Status (hidden for NaN placeholders)
+                            if (displayPercent != null && !displayPercent.isNaN()) {
+                                Row(
+                                    modifier = GlanceModifier
+                                        .fillMaxWidth()
+                                        .cornerRadius(8.dp)
+                                        .background(ColorProvider(Color(0xFF1E252B)))
+                                        .padding(horizontal = 6.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = if (pace <= 0) "Ahead: ${pace}%" else "Burn: +${pace}%",
+                                        style = TextStyle(
+                                            color = ColorProvider(if (pace <= 0) Color(0xFF5CE196) else Color(0xFFFFB951)),
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
                                     )
-                                )
+                                }
                             }
                         }
                     }
