@@ -157,7 +157,7 @@ private fun OpenCodeBentoCard(
                 letterSpacing = 0.8.sp
             )
             Text(
-                text = provider?.subtitle ?: "5h Rolling, Weekly & Monthly Pools",
+                text = provider?.subtitle ?: "5h, Weekly & Monthly",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
@@ -325,7 +325,7 @@ private fun GrokBentoCard(
                         letterSpacing = 0.8.sp
                     )
                     Text(
-                        text = provider?.subtitle ?: "Grok Build & Grok Bot Weekly",
+                        text = provider?.subtitle ?: "Build & Bot Weekly",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,

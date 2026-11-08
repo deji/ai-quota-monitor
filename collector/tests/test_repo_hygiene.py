@@ -633,9 +633,12 @@ class TestRepoFreeOfSecretsAndPersonalIdentifiers(unittest.TestCase):
                     "exit 0\n"
                 )
             os.chmod(fake_gh, 0o755)
+            evidence_root = os.path.join(tmp, "evidence-repo")
+            os.makedirs(evidence_root)
             env = os.environ.copy()
             env["PATH"] = fake_bin + os.pathsep + env.get("PATH", "")
             env["GH_LOG"] = log
+            env["AQM_UI_EVIDENCE_ROOT"] = evidence_root
 
             def run(args):
                 return subprocess.run(
@@ -668,8 +671,6 @@ class TestRepoFreeOfSecretsAndPersonalIdentifiers(unittest.TestCase):
                 self.assertIn("## [TESTING]", fh.read())
 
             os.remove(log)
-            evidence_root = os.path.join(tmp, "evidence-repo")
-            os.makedirs(evidence_root)
             subprocess.run(["git", "init", "-q"], cwd=evidence_root, check=True)
             subprocess.run(["git", "config", "user.email", "user@example.com"], cwd=evidence_root, check=True)
             subprocess.run(["git", "config", "user.name", "Test User"], cwd=evidence_root, check=True)
@@ -678,7 +679,6 @@ class TestRepoFreeOfSecretsAndPersonalIdentifiers(unittest.TestCase):
             subprocess.run(["git", "add", "README"], cwd=evidence_root, check=True)
             subprocess.run(["git", "commit", "-q", "--no-verify", "-m", "base"], cwd=evidence_root, check=True)
             subprocess.run(["git", "branch", "-M", "main"], cwd=evidence_root, check=True)
-            env["AQM_UI_EVIDENCE_ROOT"] = evidence_root
             env["AQM_UI_EVIDENCE_PLAN"] = "UI evidence: before-and-after\n"
             registered = run(["before-shot", "7", "--attach", shot + "#Before: inner disc"])
             self.assertEqual(registered.returncode, 0, registered.stdout + registered.stderr)
@@ -724,7 +724,24 @@ class TestRepoFreeOfSecretsAndPersonalIdentifiers(unittest.TestCase):
                 ["sh", hook, msg_file], cwd=evidence_root, capture_output=True, text=True,
             )
             self.assertEqual(blocked.returncode, 0, blocked.stderr)
-            os.remove(os.path.join(evidence_root, ".aqm-ui-evidence", "7", "receipt"))
+            receipt_file = os.path.join(evidence_root, ".aqm-ui-evidence", "7", "receipt")
+            with open(receipt_file, "r", encoding="utf-8") as fh:
+                orig_receipt = fh.read()
+            with open(receipt_file, "w", encoding="utf-8") as fh:
+                fh.write(re.sub(r"^sha256=.*$", "sha256=0000", orig_receipt, flags=re.M))
+            bad_sha = subprocess.run(
+                ["sh", hook, msg_file], cwd=evidence_root, capture_output=True, text=True,
+            )
+            self.assertNotEqual(bad_sha.returncode, 0, bad_sha.stderr)
+            self.assertIn("sha256", bad_sha.stderr)
+            with open(receipt_file, "w", encoding="utf-8") as fh:
+                fh.write(re.sub(r"^image=.*$", "image=.aqm-ui-evidence/7/before.sub/evil.png", orig_receipt, flags=re.M))
+            bad_img = subprocess.run(
+                ["sh", hook, msg_file], cwd=evidence_root, capture_output=True, text=True,
+            )
+            self.assertNotEqual(bad_img.returncode, 0, bad_img.stderr)
+            self.assertIn("image path", bad_img.stderr)
+            os.remove(receipt_file)
             blocked = subprocess.run(
                 ["sh", hook, msg_file], cwd=evidence_root, capture_output=True, text=True,
             )

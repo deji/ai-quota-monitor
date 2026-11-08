@@ -111,7 +111,7 @@ object SeedData {
         val openCodeProvider = ProviderQuota(
             id = "opencode_go",
             displayName = "OpenCode Go",
-            subtitle = "5h Rolling, Weekly & Monthly Pools",
+            subtitle = "5h, Weekly & Monthly",
             status = "ok",
             buckets = listOf(
                 QuotaBucket(
@@ -165,7 +165,7 @@ object SeedData {
         val grokProvider = ProviderQuota(
             id = "grok",
             displayName = "Grok Build CLI",
-            subtitle = "Grok Build & Grok Bot Weekly",
+            subtitle = "Build & Bot Weekly",
             status = "ok",
             buckets = listOf(
                 QuotaBucket(

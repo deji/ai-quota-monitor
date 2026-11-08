@@ -87,6 +87,13 @@ if [ "${AQM_SKIP_ISSUE_REF:-0}" != "1" ] && git rev-parse --is-inside-work-tree 
         fi
         case "$image_rel" in
           ".aqm-ui-evidence/$issue/before."*)
+            suffix="${image_rel#.aqm-ui-evidence/$issue/before.}"
+            case "$suffix" in
+              ""|*/*|*..*)
+                echo "commit-msg: the before-shot receipt image path is invalid." >&2
+                exit 1
+                ;;
+            esac
             ;;
           *)
             echo "commit-msg: the before-shot receipt image path is invalid." >&2

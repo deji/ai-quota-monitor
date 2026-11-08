@@ -350,7 +350,6 @@ class GrokProvider:
             "grokchat",
             "grok_chat",
             "grok-chat",
-            "grok",
         }
 
         def _numeric_pct(raw: Any) -> Optional[float]:
@@ -609,14 +608,14 @@ def assemble_snapshot(
         {
             "id": "opencode_go",
             "displayName": "OpenCode Go",
-            "subtitle": "5h Rolling, Weekly & Monthly Pools",
+            "subtitle": "5h, Weekly & Monthly",
             "status": errs.get("opencode_go", "ok"),
             "buckets": norm_oc,
         },
         {
             "id": "grok",
             "displayName": "Grok Build CLI",
-            "subtitle": "Grok Build & Grok Bot Weekly",
+            "subtitle": "Build & Bot Weekly",
             "status": errs.get("grok", "ok"),
             "buckets": norm_grok,
         },
