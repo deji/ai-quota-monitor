@@ -155,10 +155,18 @@ class TestCollectorProviderParsers(unittest.TestCase):
 
         weekly = next(b for b in buckets if b["id"] == "opencode-weekly")
         self.assertEqual(weekly["group"], "OpenCode Go")
+        self.assertEqual(weekly["label"], "Weekly Pool")
         self.assertEqual(weekly["usedPercent"], 2.0)
         self.assertEqual(weekly["remainingPercent"], 98.0)
         self.assertEqual(weekly["windowDurationHours"], 168.0)
         self.assertEqual(weekly["resetsAt"], "2026-11-02T00:00:00.000Z")
+
+        rolling = next(b for b in buckets if b["id"] == "opencode-rolling")
+        self.assertEqual(rolling["label"], "5-Hour Rolling")
+        self.assertEqual(rolling["windowType"], "rolling")
+
+        monthly = next(b for b in buckets if b["id"] == "opencode-monthly")
+        self.assertEqual(monthly["label"], "Monthly Pool")
 
     def test_opencode_parser_double_nested(self):
         """Verify handling of nested usage.usage response."""

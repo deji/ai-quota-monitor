@@ -222,9 +222,9 @@ class OpencodeGoProvider:
             return []
 
         specs = [
-            ("rolling", "opencode-rolling", "DeepSeek 4.1 Rolling", "rolling", 5.0),
-            ("weekly", "opencode-weekly", "DeepSeek 4.1 Weekly", "weekly", 168.0),
-            ("monthly", "opencode-monthly", "DeepSeek 4.1 Monthly", "monthly", 720.0),
+            ("rolling", "opencode-rolling", "5-Hour Rolling", "rolling", 5.0),
+            ("weekly", "opencode-weekly", "Weekly Pool", "weekly", 168.0),
+            ("monthly", "opencode-monthly", "Monthly Pool", "monthly", 720.0),
         ]
 
         buckets: List[Dict[str, Any]] = []
@@ -553,7 +553,7 @@ def assemble_snapshot(
         {
             "id": "opencode_go",
             "displayName": "OpenCode Go",
-            "subtitle": "DeepSeek 4.1 Flash",
+            "subtitle": "5h Rolling, Weekly & Monthly Pools",
             "status": errs.get("opencode_go", "ok"),
             "buckets": norm_oc,
         },
