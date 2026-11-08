@@ -46,12 +46,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
+import com.aiquotamonitor.BuildConfig
 import com.aiquotamonitor.data.repository.ConnectionState
 import com.aiquotamonitor.ui.theme.QuotaAmber
 import com.aiquotamonitor.ui.theme.QuotaCoral
@@ -416,6 +419,16 @@ fun SyncHubSheet(
                     fontSize = 11.sp
                 )
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "v${BuildConfig.VERSION_NAME}",
+                style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
+                fontFamily = FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.outlineVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
 
             Spacer(modifier = Modifier.height(24.dp))
         }
