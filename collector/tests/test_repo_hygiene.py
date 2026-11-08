@@ -339,7 +339,9 @@ class TestRepoFreeOfSecretsAndPersonalIdentifiers(unittest.TestCase):
                 f"Commit message with #1 should pass when AQM_REQUIRE_ISSUE_REF=1: {res.stderr}",
             )
 
-            # A merge of an already-reviewed UI branch must not demand a before-shot receipt.
+            # A message that only starts with "Merge " is not a real Git merge.
+            # Without MERGE_HEAD the UI commit must still be rejected until a
+            # before-shot receipt exists.
             ui_dir = os.path.join(tmpdir, "app", "src", "main", "java", "com", "aiquotamonitor", "ui")
             os.makedirs(ui_dir, exist_ok=True)
             with open(os.path.join(ui_dir, "Merged.kt"), "w", encoding="utf-8") as fh:
@@ -353,7 +355,27 @@ class TestRepoFreeOfSecretsAndPersonalIdentifiers(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
+            self.assertNotEqual(
+                res.returncode,
+                0,
+                "A message starting with 'Merge ' is not a real merge and must not bypass the UI receipt check",
+            )
+
+            # With MERGE_HEAD present, the same commit is a real Git merge and is exempt.
+            git_dir = subprocess.check_output(
+                ["git", "rev-parse", "--git-dir"], cwd=tmpdir, text=True
+            ).strip()
+            merge_head = os.path.join(tmpdir, git_dir, "MERGE_HEAD")
+            with open(merge_head, "w", encoding="utf-8") as fh:
+                fh.write(clean_oid + "\n")
+            res = subprocess.run(
+                ["sh", ".githooks/commit-msg", msg_file],
+                cwd=tmpdir,
+                capture_output=True,
+                text=True,
+            )
             self.assertEqual(res.returncode, 0, f"Merge commit should not require a before shot: {res.stderr}")
+            os.remove(merge_head)
             subprocess.run(["git", "reset", "-q", "HEAD"], cwd=tmpdir, check=True)
 
     def test_learnings_and_docs_sync_gate(self):
@@ -604,8 +626,10 @@ class TestRepoFreeOfSecretsAndPersonalIdentifiers(unittest.TestCase):
             with open(fake_gh, "w", encoding="utf-8") as fh:
                 fh.write(
                     "#!/bin/sh\n"
-                    "printf '%s\\n' \"$@\" >> \"$GH_LOG\"\n"
-                    "printf '\\n---\\n' >> \"$GH_LOG\"\n"
+                    "if [ \"$1\" = \"issue\" ] && [ \"$2\" = \"comment\" ]; then\n"
+                    "  printf '%s\\n' \"$@\" >> \"$GH_LOG\"\n"
+                    "  printf '\\n---\\n' >> \"$GH_LOG\"\n"
+                    "fi\n"
                     "exit 0\n"
                 )
             os.chmod(fake_gh, 0o755)
@@ -659,6 +683,16 @@ class TestRepoFreeOfSecretsAndPersonalIdentifiers(unittest.TestCase):
             registered = run(["before-shot", "7", "--attach", shot + "#Before: inner disc"])
             self.assertEqual(registered.returncode, 0, registered.stdout + registered.stderr)
 
+            # A before-and-after plan enforces evidence unconditionally, even when the
+            # testing body never mentions the emulator or asks for the collector-only opt-out.
+            no_attach = run(["comment", "7", "testing", "All checks passed."])
+            self.assertNotEqual(no_attach.returncode, 0, no_attach.stderr)
+            self.assertIn("Before", no_attach.stderr)
+            statement_only = run(["comment", "7", "testing", "No emulator UI was exercised."])
+            self.assertNotEqual(statement_only.returncode, 0, statement_only.stderr)
+            self.assertIn("collector-only opt-out is not permitted", statement_only.stderr)
+            self.assertFalse(os.path.exists(log), "gh must not post a testing comment without both screenshots")
+
             ui_dir = os.path.join(evidence_root, "app", "src", "main", "java", "com", "aiquotamonitor", "ui")
             os.makedirs(ui_dir)
             with open(os.path.join(ui_dir, "Example.kt"), "w", encoding="utf-8") as fh:
@@ -672,6 +706,13 @@ class TestRepoFreeOfSecretsAndPersonalIdentifiers(unittest.TestCase):
             subprocess.run(["git", "checkout", "-q", "main"], cwd=evidence_root, check=True)
             ui_dir = os.path.join(evidence_root, "app", "src", "main", "java", "com", "aiquotamonitor", "ui")
             os.makedirs(ui_dir, exist_ok=True)
+            untracked = os.path.join(ui_dir, "Untracked.kt")
+            with open(untracked, "w", encoding="utf-8") as fh:
+                fh.write("fun untracked() = 1\n")
+            untracked_shot = run(["before-shot", "7", "--attach", shot + "#Before: inner disc"])
+            self.assertNotEqual(untracked_shot.returncode, 0, untracked_shot.stderr)
+            self.assertIn("already differ", untracked_shot.stderr)
+            os.remove(untracked)
             with open(os.path.join(ui_dir, "Pending.kt"), "w", encoding="utf-8") as fh:
                 fh.write("fun pending() = 1\n")
             subprocess.run(["git", "add", "app"], cwd=evidence_root, check=True)
@@ -690,6 +731,7 @@ class TestRepoFreeOfSecretsAndPersonalIdentifiers(unittest.TestCase):
             self.assertNotEqual(blocked.returncode, 0, blocked.stderr)
             self.assertIn("before screenshot", blocked.stderr)
             subprocess.run(["git", "reset", "-q", "HEAD"], cwd=evidence_root, check=True)
+            os.remove(os.path.join(ui_dir, "Pending.kt"))
 
             only_after = run([
                 "comment", "7", "testing", "Verified on the emulator.",
