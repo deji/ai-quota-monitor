@@ -199,12 +199,59 @@ class TestCollectorProviderParsers(unittest.TestCase):
         }
 
         buckets = GrokProvider.parse(fixture)
-        self.assertEqual(len(buckets), 1)
+        self.assertEqual(len(buckets), 2)
         grok = buckets[0]
         self.assertEqual(grok["id"], "grok-weekly-credits")
         self.assertEqual(grok["usedPercent"], 3.0)
         self.assertEqual(grok["remainingPercent"], 97.0)
         self.assertEqual(grok["resetsAt"], "2026-11-05T16:45:10.524836+00:00")
+
+        bot = buckets[1]
+        self.assertEqual(bot["id"], "grok-bot-weekly")
+        self.assertEqual(bot["group"], "Grok Bot")
+        self.assertEqual(bot["label"], "Grok Bot Weekly")
+        self.assertEqual(bot["usedPercent"], 3.0)
+        self.assertEqual(bot["remainingPercent"], 97.0)
+        self.assertEqual(bot["resetsAt"], "2026-11-05T16:45:10.524836+00:00")
+
+    def test_grok_parser_grok_bot_product_usage(self):
+        fixture = {
+            "config": {
+                "creditUsagePercent": 15.0,
+                "productUsage": [
+                    {"product": "GrokBuild", "usagePercent": 15.0},
+                    {"product": "GrokBot", "usagePercent": 42.5},
+                ],
+                "billingPeriodEnd": "2026-04-20T00:00:00Z",
+            }
+        }
+
+        buckets = GrokProvider.parse(fixture)
+        self.assertEqual(len(buckets), 2)
+        self.assertEqual(buckets[0]["id"], "grok-weekly-credits")
+        self.assertEqual(buckets[0]["usedPercent"], 15.0)
+        self.assertEqual(buckets[0]["remainingPercent"], 85.0)
+        self.assertEqual(buckets[1]["id"], "grok-bot-weekly")
+        self.assertEqual(buckets[1]["label"], "Grok Bot Weekly")
+        self.assertEqual(buckets[1]["group"], "Grok Bot")
+        self.assertEqual(buckets[1]["usedPercent"], 42.5)
+        self.assertEqual(buckets[1]["remainingPercent"], 57.5)
+        self.assertEqual(buckets[1]["resetsAt"], "2026-04-20T00:00:00Z")
+
+    def test_grok_parser_bot_only_usage_still_emits_bucket(self):
+        """A Grok Bot reading remains valid even when Grok Build usage is absent."""
+        fixture = {
+            "config": {
+                "productUsage": [{"product": "grok-bot", "usagePercent": 25.0}],
+                "billingPeriodEnd": "2026-04-20T00:00:00Z",
+            }
+        }
+
+        buckets = GrokProvider.parse(fixture)
+        self.assertEqual(len(buckets), 1)
+        self.assertEqual(buckets[0]["id"], "grok-bot-weekly")
+        self.assertEqual(buckets[0]["usedPercent"], 25.0)
+        self.assertEqual(buckets[0]["remainingPercent"], 75.0)
 
     def test_grok_parser_fallback_and_bare_numbers(self):
         """Test productUsage fallback and bare numbers."""

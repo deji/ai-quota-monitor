@@ -72,7 +72,8 @@ val KNOWN_ALL_BUCKET_IDS: Set<String> = setOf(
     "opencode-rolling",
     "opencode-weekly",
     "opencode-monthly",
-    "grok-weekly-credits"
+    "grok-weekly-credits",
+    "grok-bot-weekly"
 )
 
 /** Test tag for the bounded bucket list inside [ModelFilterSheet] (`APP-UX3`). */

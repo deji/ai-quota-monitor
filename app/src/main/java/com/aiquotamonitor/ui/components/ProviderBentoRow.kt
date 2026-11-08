@@ -34,6 +34,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -45,6 +46,7 @@ import com.aiquotamonitor.domain.model.SmartPrimeStatus
 import com.aiquotamonitor.ui.theme.QuotaAmber
 import com.aiquotamonitor.ui.theme.QuotaCyan
 import com.aiquotamonitor.ui.theme.QuotaEmerald
+import kotlin.math.roundToInt
 
 @Composable
 fun ProviderBentoRow(
@@ -249,7 +251,9 @@ private fun GrokBentoCard(
     onBucketClick: ((QuotaBucket) -> Unit)?,
     modifier: Modifier = Modifier
 ) {
-    val creditBucket = visibleBuckets.firstOrNull()
+    val creditBucket = visibleBuckets.firstOrNull { it.id == "grok-weekly-credits" }
+        ?: visibleBuckets.firstOrNull()
+    val secondaryBuckets = visibleBuckets.filter { it.id != creditBucket?.id }
     val displayPercent = creditBucket?.displayPercent(polarity) ?: 97.0
 
     // Grok token lease scaling: dynamically normalize against max lease so leaseSec > 5400 doesn't distort/overflow
@@ -297,7 +301,7 @@ private fun GrokBentoCard(
                         letterSpacing = 0.8.sp
                     )
                     Text(
-                        text = "Grok 4.7 Credits",
+                        text = provider?.subtitle ?: "Grok Build & Grok Bot Weekly",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
@@ -360,6 +364,50 @@ private fun GrokBentoCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 8.sp,
                         letterSpacing = 0.5.sp
+                    )
+                }
+            }
+
+            // Secondary Grok quota pills (for example Grok Bot Weekly)
+            secondaryBuckets.forEach { bucket ->
+                Spacer(modifier = Modifier.height(10.dp))
+
+                val pillModifier = if (onBucketClick != null) {
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                        .clickable { onBucketClick(bucket) }
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                } else {
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                }
+
+                val pillPercent = bucket.displayPercent(polarity).roundToInt()
+                val polaritySuffix = if (polarity == QuotaPolarity.REMAINING) "left" else "used"
+
+                Row(
+                    modifier = pillModifier,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = bucket.label.removeSuffix(" Weekly"),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 10.sp
+                    )
+                    Text(
+                        text = "${pillPercent}% $polaritySuffix",
+                        style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        color = if (bucket.remainingPercent <= 50.0) QuotaAmber else QuotaEmerald,
+                        fontSize = 10.sp
                     )
                 }
             }
