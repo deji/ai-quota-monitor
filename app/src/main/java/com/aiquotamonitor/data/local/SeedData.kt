@@ -111,12 +111,12 @@ object SeedData {
         val openCodeProvider = ProviderQuota(
             id = "opencode_go",
             displayName = "OpenCode Go",
-            subtitle = "DeepSeek 4.1 Flash High-Throughput",
+            subtitle = "5h Rolling, Weekly & Monthly Pools",
             status = "ok",
             buckets = listOf(
                 QuotaBucket(
                     id = "opencode-rolling",
-                    group = "DeepSeek 4.1 Flash",
+                    group = "OpenCode Go",
                     label = "5-Hour Rolling",
                     windowType = "rolling",
                     windowDurationHours = 5,
@@ -131,8 +131,8 @@ object SeedData {
                 ),
                 QuotaBucket(
                     id = "opencode-weekly",
-                    group = "DeepSeek 4.1 Flash",
-                    label = "Weekly Budget",
+                    group = "OpenCode Go",
+                    label = "Weekly Pool",
                     windowType = "weekly",
                     windowDurationHours = 168,
                     remainingPercent = 98.0,
@@ -146,8 +146,8 @@ object SeedData {
                 ),
                 QuotaBucket(
                     id = "opencode-monthly",
-                    group = "DeepSeek 4.1 Flash",
-                    label = "Monthly Cap",
+                    group = "OpenCode Go",
+                    label = "Monthly Pool",
                     windowType = "monthly",
                     windowDurationHours = 720,
                     remainingPercent = 99.0,
