@@ -872,10 +872,285 @@ class TestCLIAndConfig(unittest.TestCase):
                 content = f.read()
 
             self.assertNotIn("__REPO_ROOT__", content)
+            self.assertNotIn("__PYTHON__", content)
+            self.assertNotIn("__LOG_DIR__", content)
+            self.assertNotIn("/tmp/", content)
             self.assertIn("<key>WorkingDirectory</key>", content)
             self.assertIn("<key>EnvironmentVariables</key>", content)
             self.assertIn("<key>PYTHONPATH</key>", content)
+            self.assertIn("<key>ThrottleInterval</key>", content)
+            self.assertIn("<string>tailscale</string>", content)
+            self.assertIn("/opt/homebrew/bin:", content)
+            self.assertIn("collector.log", content)
             self.assertIn("<string>/usr/local/bin/python3</string>", content)
+
+
+_HC_UUID = "00000000-0000-4000-8000-000000000000"
+_HC_BASE = f"https://hc-ping.com/{_HC_UUID}"
+
+
+class TestRestartSurvival(unittest.TestCase):
+    """Issue #11: login agent must bind Tailscale after restart and can ping Healthchecks."""
+
+    def test_checked_in_plist_template_has_no_tmp_logs(self):
+        plist_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "com.aiquotamonitor.collector.plist",
+        )
+        with open(plist_path, "r", encoding="utf-8") as handle:
+            text = handle.read()
+        self.assertIn("__PYTHON__", text)
+        self.assertIn("__REPO_ROOT__", text)
+        self.assertIn("__LOG_DIR__", text)
+        self.assertIn("tailscale", text)
+        self.assertIn("RunAtLoad", text)
+        self.assertIn("KeepAlive", text)
+        self.assertNotIn("/tmp/", text)
+        self.assertNotIn("/Users/", text)
+
+    def test_render_launchd_plist_substitutes_and_escapes(self):
+        from collector.launchd_agent import render_launchd_plist
+
+        text = render_launchd_plist(
+            repo_root="/opt/a&b",
+            python_bin="/usr/bin/python3",
+            log_dir="/var/log/aqm",
+        )
+        self.assertIn("/opt/a&amp;b", text)
+        self.assertNotIn("/opt/a&b<", text)
+        self.assertIn("/var/log/aqm/collector.log", text)
+        self.assertIn("<string>tailscale</string>", text)
+        self.assertNotIn("__REPO_ROOT__", text)
+        self.assertNotIn("__PYTHON__", text)
+        self.assertNotIn("__LOG_DIR__", text)
+        self.assertNotIn("/tmp/", text)
+        self.assertNotIn("/Users/", text)
+
+    def test_install_outside_launch_agents_does_not_bootstrap(self):
+        from collector.launchd_agent import install_launch_agent
+
+        def runner(cmd):
+            raise AssertionError(f"launchctl should not run: {cmd}")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            target = os.path.join(tmpdir, "agent.plist")
+            install_launch_agent(
+                target_path=target,
+                python_bin="/usr/bin/python3",
+                repo_root="/opt/aqm",
+                log_dir=os.path.join(tmpdir, "logs"),
+                load=True,
+                runner=runner,
+            )
+            self.assertTrue(os.path.exists(target))
+            with open(target, "r", encoding="utf-8") as handle:
+                self.assertIn("/opt/aqm", handle.read())
+
+    def test_bootstrap_launch_agent_enables_and_kickstarts(self):
+        from collector.launchd_agent import bootstrap_launch_agent
+
+        calls = []
+
+        def runner(cmd):
+            calls.append(list(cmd))
+
+            class Result:
+                returncode = 0
+                stdout = ""
+                stderr = ""
+
+            return Result()
+
+        bootstrap_launch_agent("/Library/LaunchAgents/com.aiquotamonitor.collector.plist", runner=runner)
+        self.assertEqual(calls[0][1], "bootout")
+        self.assertEqual(calls[1][1], "bootstrap")
+        self.assertEqual(calls[2][1], "enable")
+        self.assertEqual(calls[3][:3], ["launchctl", "kickstart", "-k"])
+
+    def test_load_config_preserves_tailscale_sentinel(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cfg_path = os.path.join(tmpdir, "config.json")
+            with open(cfg_path, "w", encoding="utf-8") as handle:
+                json.dump({"host": "tailscale"}, handle)
+            with patch("collector.config.get_tailscale_ip", side_effect=AssertionError("resolved too early")):
+                cfg = load_config(cfg_path)
+            self.assertEqual(cfg["host"], "tailscale")
+
+    def test_healthchecks_env_overrides_config(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cfg_path = os.path.join(tmpdir, "config.json")
+            with open(cfg_path, "w", encoding="utf-8") as handle:
+                json.dump({"healthchecksPingUrl": ""}, handle)
+            with patch.dict(os.environ, {"AQM_HEALTHCHECKS_PING_URL": _HC_BASE}):
+                cfg = load_config(cfg_path)
+            self.assertEqual(cfg["healthchecksPingUrl"], _HC_BASE)
+
+    def test_get_tailscale_ip_prefers_homebrew_binary(self):
+        from collector.config import get_tailscale_ip
+
+        class Proc:
+            returncode = 0
+            stdout = "100.90.1.2\n"
+            stderr = ""
+
+        with patch("collector.config.shutil.which", return_value=None), patch(
+            "collector.config.os.path.exists",
+            side_effect=lambda path: path == "/opt/homebrew/bin/tailscale",
+        ), patch("collector.config.subprocess.run", return_value=Proc()) as run:
+            self.assertEqual(get_tailscale_ip(), "100.90.1.2")
+            self.assertEqual(run.call_args.args[0][0], "/opt/homebrew/bin/tailscale")
+
+    def test_resolve_listen_host_waits_for_tailscale(self):
+        from collector.config import resolve_listen_host
+
+        now = {"t": 0.0}
+
+        def clock():
+            return now["t"]
+
+        def sleeper(seconds):
+            now["t"] += seconds
+
+        calls = {"n": 0}
+
+        def lookup():
+            calls["n"] += 1
+            if calls["n"] < 3:
+                return None
+            return "100.64.0.9"
+
+        waited = {"n": 0}
+
+        def on_wait():
+            waited["n"] += 1
+
+        ip = resolve_listen_host(
+            "tailscale",
+            wait_seconds=10,
+            interval_seconds=2,
+            sleeper=sleeper,
+            clock=clock,
+            lookup=lookup,
+            on_wait=on_wait,
+        )
+        self.assertEqual(ip, "100.64.0.9")
+        self.assertGreaterEqual(waited["n"], 1)
+
+    def test_resolve_listen_host_times_out_without_loopback(self):
+        from collector.config import resolve_listen_host
+
+        now = {"t": 0.0}
+
+        def clock():
+            return now["t"]
+
+        def sleeper(seconds):
+            now["t"] += seconds
+
+        ip = resolve_listen_host(
+            "tailscale",
+            wait_seconds=4,
+            interval_seconds=2,
+            sleeper=sleeper,
+            clock=clock,
+            lookup=lambda: None,
+        )
+        self.assertIsNone(ip)
+
+    def test_resolve_listen_host_passes_loopback_through(self):
+        from collector.config import resolve_listen_host
+
+        self.assertEqual(resolve_listen_host("127.0.0.1", lookup=lambda: None), "127.0.0.1")
+
+    def test_ping_rejects_unsafe_urls(self):
+        from collector.healthchecks import ping_healthchecks
+
+        def opener(req, timeout):
+            raise AssertionError(f"should not ping {req}")
+
+        self.assertFalse(ping_healthchecks(f"http://hc-ping.com/{_HC_UUID}", urlopen=opener))
+        self.assertFalse(ping_healthchecks(f"https://example.com/{_HC_UUID}", urlopen=opener))
+        self.assertFalse(ping_healthchecks("", urlopen=opener))
+        self.assertFalse(ping_healthchecks(None, urlopen=opener))
+
+    def test_ping_posts_start_fail_and_success(self):
+        from collector.healthchecks import ping_healthchecks
+
+        seen = []
+
+        class Resp:
+            status = 200
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+        def opener(req, timeout):
+            seen.append(req.full_url)
+            return Resp()
+
+        self.assertTrue(ping_healthchecks(_HC_BASE, signal="start", urlopen=opener))
+        self.assertTrue(ping_healthchecks(_HC_BASE + "/start", signal="fail", urlopen=opener))
+        self.assertTrue(ping_healthchecks(_HC_BASE, signal="success", urlopen=opener))
+        self.assertEqual(seen, [_HC_BASE + "/start", _HC_BASE + "/fail", _HC_BASE])
+
+    @patch("collector.cli.QuotaHTTPServer")
+    @patch("collector.cli.resolve_listen_host", return_value=None)
+    def test_serve_exits_when_tailscale_is_down(self, _resolve, server_cls):
+        from collector import cli
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cfg_path = os.path.join(tmpdir, "config.json")
+            with open(cfg_path, "w", encoding="utf-8") as handle:
+                json.dump({"host": "127.0.0.1", "bearerToken": "already-set", "port": 8741}, handle)
+            with patch("sys.argv", ["ai-quota-collector", "serve", "--host", "tailscale", "--config", cfg_path]):
+                with self.assertRaises(SystemExit) as ctx:
+                    cli.main()
+            self.assertEqual(ctx.exception.code, 75)
+            server_cls.assert_not_called()
+
+    @patch("collector.cli.resolve_listen_host", return_value="100.64.0.2")
+    @patch("collector.cli.QuotaHTTPServer")
+    def test_serve_does_not_persist_resolved_tailscale_ip(self, server_cls, _resolve):
+        from collector import cli
+
+        mock_server = MagicMock()
+        mock_server.serve_forever.side_effect = KeyboardInterrupt
+        server_cls.return_value = mock_server
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cfg_path = os.path.join(tmpdir, "config.json")
+            with open(cfg_path, "w", encoding="utf-8") as handle:
+                json.dump({"host": "tailscale", "bearerToken": "", "port": 8741}, handle)
+            with patch("sys.argv", ["ai-quota-collector", "serve", "--config", cfg_path]):
+                cli.main()
+            with open(cfg_path, "r", encoding="utf-8") as handle:
+                saved = json.load(handle)
+            self.assertEqual(saved["host"], "tailscale")
+            self.assertNotIn("100.64.0.2", json.dumps(saved))
+            _, kwargs = server_cls.call_args
+            self.assertEqual(kwargs.get("host"), "100.64.0.2")
+
+    @patch("collector.server.ping_healthchecks", return_value=True)
+    def test_health_ping_worker_sends_start_then_success(self, ping):
+        server = QuotaHTTPServer(
+            host="127.0.0.1",
+            port=0,
+            bearer_token="test-token",
+            config={
+                "healthchecksPingUrl": _HC_BASE,
+                "healthchecksIntervalSeconds": 30,
+            },
+        )
+        try:
+            server._stop_event.set()
+            server._health_ping_worker()
+        finally:
+            server.server.server_close()
+        signals = [call.kwargs.get("signal") for call in ping.call_args_list]
+        self.assertEqual(signals, ["start", "success"])
 
 
 if __name__ == "__main__":

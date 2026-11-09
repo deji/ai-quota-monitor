@@ -6,10 +6,12 @@
     <string>com.aiquotamonitor.collector</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/usr/bin/python3</string>
+        <string>__PYTHON__</string>
         <string>-m</string>
         <string>collector</string>
         <string>serve</string>
+        <string>--host</string>
+        <string>tailscale</string>
     </array>
     <key>WorkingDirectory</key>
     <string>__REPO_ROOT__</string>
@@ -17,14 +19,20 @@
     <dict>
         <key>PYTHONPATH</key>
         <string>__REPO_ROOT__</string>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
     </dict>
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
     <true/>
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+    <key>ProcessType</key>
+    <string>Background</string>
     <key>StandardOutPath</key>
-    <string>/tmp/ai_quota_monitor_collector.log</string>
+    <string>__LOG_DIR__/collector.log</string>
     <key>StandardErrorPath</key>
-    <string>/tmp/ai_quota_monitor_collector.err</string>
+    <string>__LOG_DIR__/collector.err</string>
 </dict>
 </plist>

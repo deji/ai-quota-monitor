@@ -11,6 +11,7 @@ from typing import Any, Dict, Optional
 
 from collector.config import save_config
 from collector.crypto_relay import encrypt_snapshot, publish_to_gist
+from collector.healthchecks import ping_healthchecks, prepare_healthchecks_url
 from collector.providers import collect_all_quotas
 from collector.smart_prime import evaluate_smart_prime
 from collector.storage import QuotaStorage
@@ -245,6 +246,7 @@ class QuotaHTTPServer:
         self.lock = threading.Lock()
         self._stop_event = threading.Event()
         self._bg_thread: Optional[threading.Thread] = None
+        self._health_thread: Optional[threading.Thread] = None
 
         # Isolate handler class attributes per server instance
         class InstanceHTTPHandler(ScrubbedHTTPHandler):
@@ -289,17 +291,57 @@ class QuotaHTTPServer:
             except Exception as e:
                 logger.warning("Background poll error: %s", type(e).__name__)
 
+    def _health_ping_worker(self) -> None:
+        """Ping Healthchecks.io while this process is alive. A missing ping is the failure signal."""
+        raw = str(self.config.get("healthchecksPingUrl") or "").strip()
+        if not raw:
+            return
+        if prepare_healthchecks_url(raw) is None:
+            logger.warning("healthchecks ping disabled: expected an https://hc-ping.com/<uuid> URL")
+            return
+        interval = _health_interval_seconds(self.config)
+        ping_healthchecks(raw, signal="start")
+        ping_healthchecks(raw, signal="success")
+        while not self._stop_event.wait(timeout=interval):
+            ping_healthchecks(raw, signal="success")
+
     def serve_forever(self) -> None:
         """Start listening for incoming requests and run background polling daemon."""
         if self._bg_thread is None:
-            self._bg_thread = threading.Thread(target=self._background_poll_worker, daemon=True)
+            self._bg_thread = threading.Thread(
+                target=self._background_poll_worker,
+                daemon=True,
+                name="quota-poll",
+            )
             self._bg_thread.start()
+        if self._health_thread is None and str(self.config.get("healthchecksPingUrl") or "").strip():
+            self._health_thread = threading.Thread(
+                target=self._health_ping_worker,
+                daemon=True,
+                name="healthchecks-ping",
+            )
+            self._health_thread.start()
         self.server.serve_forever()
 
     def shutdown(self) -> None:
-        """Stop server, signal background thread, and release port."""
+        """Stop server, signal background threads, and release port."""
         self._stop_event.set()
         self.server.shutdown()
         self.server.server_close()
         if self._bg_thread and self._bg_thread.is_alive():
             self._bg_thread.join(timeout=1.0)
+        if self._health_thread and self._health_thread.is_alive():
+            self._health_thread.join(timeout=1.0)
+
+
+def _health_interval_seconds(config: Dict[str, Any]) -> int:
+    raw = config.get("healthchecksIntervalSeconds", 60)
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        value = 60
+    if value < 30:
+        return 30
+    if value > 3600:
+        return 3600
+    return value

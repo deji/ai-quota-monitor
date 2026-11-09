@@ -73,11 +73,24 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s collector/tests -v
    python3 -m collector serve --host tailscale --port 8741
    ```
 
-4. **Install as a Background macOS `launchd` Agent**:
+4. **Install as a login `launchd` agent** (comes back after a restart once you are logged in):
    ```bash
    python3 -m collector install-launchd
    ```
-   This installs and loads `~/Library/LaunchAgents/com.aiquotamonitor.collector.plist` so the collector polls and publishes encrypted Gist snapshots automatically in the background.
+   This writes `~/Library/LaunchAgents/com.aiquotamonitor.collector.plist` and bootstraps `com.aiquotamonitor.collector` for the current login session. The agent runs `collector serve --host tailscale` at every login (`RunAtLoad` + `KeepAlive`). It waits up to 120 seconds for a Tailscale IPv4, then exits so launchd can retry. It does not bind `127.0.0.1` in place of Tailscale.
+
+   For a manual `python3 -m collector serve` with no `--host` flag, set `"host": "tailscale"` in `~/.config/ai-quota-monitor/config.json`. Re-run `install-launchd` after moving the checkout so the agent's working directory stays on that checkout.
+
+   Logs (kept across reboots): `~/Library/Logs/ai-quota-monitor/collector.log` and `collector.err`.
+
+5. **Optional Healthchecks.io ping**:
+   Create a check with a period of 1 minute and a grace of 5 minutes. Put the base ping URL in the mode-`0600` config file:
+
+   ```json
+   "healthchecksPingUrl": "https://hc-ping.com/<uuid>"
+   ```
+
+   An empty value disables pings. The URL is a secret: keep it in that file or in `AQM_HEALTHCHECKS_PING_URL`, and do not commit it. The collector POSTs `/start` when it binds and a success ping every `healthchecksIntervalSeconds` (default 60, clamped to 30–3600). A dead process is the missed ping.
 
 ---
 

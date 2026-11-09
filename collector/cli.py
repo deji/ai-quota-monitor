@@ -5,7 +5,15 @@ import os
 import secrets
 import sys
 
-from collector.config import DEFAULT_CONFIG_FILE, get_tailscale_ip, init_config, load_config, save_config
+from collector.config import (
+    DEFAULT_CONFIG_FILE,
+    TAILSCALE_WAIT_SECONDS,
+    init_config,
+    load_config,
+    resolve_listen_host,
+    save_config,
+)
+from collector.launchd_agent import display_path, install_launch_agent
 from collector.crypto_relay import encrypt_snapshot, publish_to_gist
 from collector.providers import collect_all_quotas
 from collector.server import QuotaHTTPServer
@@ -50,6 +58,11 @@ def main() -> None:
     launchd_parser.add_argument("--plist-path", type=str, default=None, help="Destination plist path")
     launchd_parser.add_argument("--python-path", type=str, default=None, help="Python executable path")
     launchd_parser.add_argument("--dry-run", action="store_true", help="Print plist without writing")
+    launchd_parser.add_argument(
+        "--no-load",
+        action="store_true",
+        help="Write the plist without bootstrapping launchd",
+    )
 
     args = parser.parse_args()
 
@@ -59,62 +72,38 @@ def main() -> None:
         return
 
     if args.command == "install-launchd":
-        target_path = os.path.expanduser(args.plist_path or "~/Library/LaunchAgents/com.aiquotamonitor.collector.plist")
+        target_path = os.path.expanduser(
+            args.plist_path or "~/Library/LaunchAgents/com.aiquotamonitor.collector.plist"
+        )
         py_bin = args.python_path or sys.executable or "/usr/bin/python3"
         repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        plist_template_path = os.path.join(os.path.dirname(__file__), "com.aiquotamonitor.collector.plist")
-        if os.path.exists(plist_template_path):
-            with open(plist_template_path, "r", encoding="utf-8") as f:
-                template_str = f.read()
-            plist_content = template_str.replace("__REPO_ROOT__", repo_root).replace("/usr/bin/python3", py_bin)
-        else:
-            plist_content = f"""<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>com.aiquotamonitor.collector</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>{py_bin}</string>
-        <string>-m</string>
-        <string>collector</string>
-        <string>serve</string>
-    </array>
-    <key>WorkingDirectory</key>
-    <string>{repo_root}</string>
-    <key>EnvironmentVariables</key>
-    <dict>
-        <key>PYTHONPATH</key>
-        <string>{repo_root}</string>
-    </dict>
-    <key>RunAtLoad</key>
-    <true/>
-    <key>KeepAlive</key>
-    <true/>
-    <key>StandardOutPath</key>
-    <string>/tmp/ai_quota_monitor_collector.log</string>
-    <key>StandardErrorPath</key>
-    <string>/tmp/ai_quota_monitor_collector.err</string>
-</dict>
-</plist>
-"""
+        plist_content = install_launch_agent(
+            target_path=target_path,
+            python_bin=py_bin,
+            repo_root=repo_root,
+            dry_run=args.dry_run,
+            load=not args.no_load,
+        )
+        shown = display_path(target_path)
         if args.dry_run:
-            print(f"Dry-run target: {target_path}")
+            print(f"Dry-run target: {shown}")
             print(plist_content)
             return
-
-        parent = os.path.dirname(target_path)
-        if parent and not os.path.exists(parent):
-            os.makedirs(parent, mode=0o755, exist_ok=True)
-
-        temp_target = f"{target_path}.tmp.{secrets.token_hex(4)}"
-        with open(temp_target, "w", encoding="utf-8") as f:
-            f.write(plist_content)
-        os.chmod(temp_target, 0o644)
-        os.replace(temp_target, target_path)
-        print(f"Installed launchd daemon to {target_path}")
-        print(f"To activate: launchctl load {target_path}")
+        print(f"Installed launchd agent at {shown}")
+        in_launch_agents = os.path.realpath(os.path.dirname(os.path.abspath(target_path))) == os.path.realpath(
+            os.path.expanduser("~/Library/LaunchAgents")
+        )
+        if args.no_load:
+            print("Bootstrap skipped (--no-load).")
+        elif in_launch_agents:
+            print("Bootstrapped com.aiquotamonitor.collector for this login session.")
+            print("It starts again at the next login. Logs: ~/Library/Logs/ai-quota-monitor/")
+        else:
+            print("Bootstrap skipped because the plist is outside ~/Library/LaunchAgents.")
+        print(
+            "Healthchecks pings stay off until healthchecksPingUrl is set in "
+            "~/.config/ai-quota-monitor/config.json."
+        )
         return
 
     config_path = getattr(args, "config", None)
@@ -145,9 +134,29 @@ def main() -> None:
         print(json.dumps(snapshot, indent=2))
 
     elif args.command == "serve":
-        host = args.host or cfg.get("host", "127.0.0.1")
-        if host == "tailscale":
-            host = get_tailscale_ip() or "127.0.0.1"
+        requested_host = args.host or cfg.get("host") or "127.0.0.1"
+        announced = {"waiting": False}
+
+        def _on_wait() -> None:
+            if not announced["waiting"]:
+                print("Waiting for Tailscale IPv4 before binding...", file=sys.stderr)
+                announced["waiting"] = True
+
+        wait_seconds = TAILSCALE_WAIT_SECONDS if requested_host == "tailscale" else 0
+        try:
+            host = resolve_listen_host(
+                requested_host,
+                wait_seconds=wait_seconds,
+                on_wait=_on_wait,
+            )
+        except KeyboardInterrupt:
+            raise SystemExit(130)
+        if not host:
+            print(
+                "Tailscale IPv4 is not available yet. Exiting so launchd can retry.",
+                file=sys.stderr,
+            )
+            raise SystemExit(75)
         port = args.port or cfg.get("port", 8741)
         db_path = args.db_path or cfg.get("dbPath")
         storage = QuotaStorage(db_path=db_path)

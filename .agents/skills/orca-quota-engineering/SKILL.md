@@ -121,6 +121,10 @@ All non-trivial work in this repository uses three distinct agent roles and **th
     - **`SyncHubSheet` stays a bounded `verticalScroll`, never a `LazyColumn`**, so `ConnectionSettingsForm`, text-field focus/drafts, `rememberSaveable` `isEditExpanded`, and the 30s age ticker stay composed (`APP-UX1` / `APP-SYNC1`).
     - **`APP-UX2` invariants survive the restructure**: `onTogglePin` calls only `onSetPinnedBucket(null)` / `onSetPinnedBucket(id)`, and screen `BackHandler` order (`selectedBucket` → `showSyncHub` → `showFilterSheet`) is untouched.
     - **`AQM-LINT-011`**: `collector/tests/test_repo_hygiene.py` asserts the three sheets never put `verticalScroll` on the root content child, always bound the scroll body with `weight(1f, fill = false)`, and apply `sheetContentNestedScroll` immediately before `verticalScroll`. Lock the gesture contract with `SheetScrollGuardTest` and the layout with `ModelFilterSheetScrollTest`.
+14. **Login LaunchAgent, Tailscale wait, and Healthchecks ping (`COL-H7` / Issue #11)**:
+    - `install-launchd` bootstraps `gui/$UID/com.aiquotamonitor.collector` when the plist destination is `~/Library/LaunchAgents`. The agent runs `collector serve --host tailscale` with `RunAtLoad`, `KeepAlive`, and `ThrottleInterval` 10, and logs under `~/Library/Logs/ai-quota-monitor/` (never `/tmp`, which a reboot clears). It starts at user login.
+    - `load_config` keeps the `tailscale` sentinel. `resolve_listen_host` waits up to 120s and probes `/opt/homebrew/bin/tailscale`, `/usr/local/bin/tailscale`, and the Tailscale.app binary before `PATH`. It must not bind `127.0.0.1` when the requested host is `tailscale`; exit 75 so launchd retries.
+    - `healthchecksPingUrl` / `AQM_HEALTHCHECKS_PING_URL` accepts only `https://hc-ping.com/<uuid>`. POST `/start` once the socket is bound and a success ping every `healthchecksIntervalSeconds` (default 60, clamp 30–3600). Never log the URL. An empty URL disables pings.
 
 ---
 
