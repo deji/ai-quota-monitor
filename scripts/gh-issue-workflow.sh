@@ -40,6 +40,7 @@ ui_changes_since_clean() {
   {
     git -C "$EVIDENCE_ROOT" diff --name-only
     git -C "$EVIDENCE_ROOT" diff --cached --name-only
+    git -C "$EVIDENCE_ROOT" ls-files --others --exclude-standard
     base="$(git -C "$EVIDENCE_ROOT" merge-base HEAD main 2>/dev/null || git -C "$EVIDENCE_ROOT" merge-base HEAD master 2>/dev/null || true)"
     if [[ -n "$base" ]]; then
       git -C "$EVIDENCE_ROOT" diff --name-only "$base" HEAD
@@ -132,6 +133,10 @@ case "$CMD" in
     BODY="${3:-}"
     if [[ -z "$ISSUE_NUM" || -z "$STAGE_RAW" || -z "$BODY" ]]; then
       usage
+    fi
+    if ! [[ "$ISSUE_NUM" =~ ^[0-9]+$ ]]; then
+      echo "ERROR: Invalid issue number '$ISSUE_NUM' (expected digits only)." >&2
+      exit 1
     fi
     if [[ "$BODY" == @* ]]; then
       BODY="$(cat "${BODY#@}")"
@@ -248,32 +253,35 @@ case "$CMD" in
       ATTACH_FLAGS+=("${OTHER_FLAGS[@]}")
     fi
     if [[ "$STAGE_UPPER" == "TESTING" ]]; then
-      if printf '%s\n' "$BODY" | grep -Eiq 'emulator|screencap|screenshot|pixel_8|home screen|home-screen|launcher'; then
+      receipt="$EVIDENCE_ROOT/.aqm-ui-evidence/$ISSUE_NUM/receipt"
+      plan_text="$(latest_plan_text "$ISSUE_NUM" 2>/dev/null || true)"
+      evidence_mode="$(plan_evidence_mode "$plan_text" || true)"
+      if [[ -z "$evidence_mode" && -f "$receipt" ]]; then
+        evidence_mode="$(grep '^mode=' "$receipt" | head -n 1 | cut -d= -f2- || true)"
+      fi
+      if [[ "$evidence_mode" == "before-and-after" ]]; then
+        if printf '%s\n' "$BODY" | grep -Fq 'No emulator UI was exercised.'; then
+          echo "ERROR: The plan requires 'UI evidence: before-and-after'; collector-only opt-out is not permitted." >&2
+          exit 1
+        fi
+        if [[ ${#BEFORE_FLAGS[@]} -lt 2 || ${#AFTER_FLAGS[@]} -lt 2 ]]; then
+          echo "ERROR: The plan requires a Before screenshot and an After screenshot. Capture the before shot with before-shot before editing UI files, then attach both on this testing comment." >&2
+          exit 1
+        fi
+        if [[ ! -f "$receipt" ]]; then
+          echo "ERROR: No before-shot receipt for issue $ISSUE_NUM. Run before-shot before editing UI files." >&2
+          exit 1
+        fi
+        want_sha="$(grep '^sha256=' "$receipt" | head -n 1 | cut -d= -f2- || true)"
+        got_sha="$(python3 -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$BEFORE_SOURCE")"
+        if [[ "$got_sha" != "$want_sha" ]]; then
+          echo "ERROR: The Before screenshot does not match the one registered before the UI change." >&2
+          exit 1
+        fi
+      elif printf '%s\n' "$BODY" | grep -Eiq 'emulator|screencap|screenshot|pixel_8|home screen|home-screen|launcher'; then
         if ! printf '%s\n' "$BODY" | grep -Fq 'No emulator UI was exercised.'; then
-          receipt="$EVIDENCE_ROOT/.aqm-ui-evidence/$ISSUE_NUM/receipt"
-          evidence_mode=""
-          if [[ -f "$receipt" ]]; then
-            evidence_mode="$(grep '^mode=' "$receipt" | head -n 1 | cut -d= -f2-)"
-          elif [[ -n "${AQM_UI_EVIDENCE_PLAN:-}" ]]; then
-            evidence_mode="$(plan_evidence_mode "$AQM_UI_EVIDENCE_PLAN" || true)"
-          fi
           if [[ "$evidence_mode" == "none" ]]; then
             :
-          elif [[ "$evidence_mode" == "before-and-after" ]]; then
-            if [[ ${#BEFORE_FLAGS[@]} -lt 2 || ${#AFTER_FLAGS[@]} -lt 2 ]]; then
-              echo "ERROR: The plan requires a Before screenshot and an After screenshot. Capture the before shot with before-shot before editing UI files, then attach both on this testing comment." >&2
-              exit 1
-            fi
-            if [[ ! -f "$receipt" ]]; then
-              echo "ERROR: No before-shot receipt for issue $ISSUE_NUM. Run before-shot before editing UI files." >&2
-              exit 1
-            fi
-            want_sha="$(grep '^sha256=' "$receipt" | head -n 1 | cut -d= -f2-)"
-            got_sha="$(python3 -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$BEFORE_SOURCE")"
-            if [[ "$got_sha" != "$want_sha" ]]; then
-              echo "ERROR: The Before screenshot does not match the one registered before the UI change." >&2
-              exit 1
-            fi
           else
             echo "ERROR: Emulator evidence is not registered. The plan must say 'UI evidence: before-and-after' or 'UI evidence: none', and a before-and-after change must run before-shot before any UI edit." >&2
             exit 1
@@ -295,6 +303,10 @@ case "$CMD" in
     ISSUE_NUM="${1:-}"
     if [[ -z "$ISSUE_NUM" ]]; then
       usage
+    fi
+    if ! [[ "$ISSUE_NUM" =~ ^[0-9]+$ ]]; then
+      echo "ERROR: Invalid issue number '$ISSUE_NUM' (expected digits only)." >&2
+      exit 1
     fi
     shift
     src_path=""
@@ -379,6 +391,10 @@ case "$CMD" in
     if [[ -z "$ISSUE_NUM" ]]; then
       usage
     fi
+    if ! [[ "$ISSUE_NUM" =~ ^[0-9]+$ ]]; then
+      echo "ERROR: Invalid issue number '$ISSUE_NUM' (expected digits only)." >&2
+      exit 1
+    fi
     ISSUE_JSON="$(gh issue view "$ISSUE_NUM" --json number,title,state,comments)"
     python3 - "$ISSUE_NUM" "$ISSUE_JSON" <<'PY'
 import json
@@ -412,6 +428,10 @@ PY
     ISSUE_NUM="${1:-}"
     if [[ -z "$ISSUE_NUM" ]]; then
       usage
+    fi
+    if ! [[ "$ISSUE_NUM" =~ ^[0-9]+$ ]]; then
+      echo "ERROR: Invalid issue number '$ISSUE_NUM' (expected digits only)." >&2
+      exit 1
     fi
     "$0" verify "$ISSUE_NUM"
     gh issue close "$ISSUE_NUM"

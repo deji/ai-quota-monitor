@@ -33,12 +33,20 @@ if [ -n "$emails" ]; then
   done
 fi
 
+# Only a real in-progress Git merge (MERGE_HEAD present) is a merge commit.
+# A message that merely starts with "Merge " is not: it must still carry an issue
+# reference and must still satisfy the UI before-shot receipt check.
+is_merge_commit=0
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1 && [ -e "$(git rev-parse --git-path MERGE_HEAD 2>/dev/null || true)" ]; then
+  is_merge_commit=1
+fi
+
 # 3. Enforce GitHub Issue reference (#<number>) when GitHub remote origin is configured or AQM_REQUIRE_ISSUE_REF=1
 if [ "${AQM_SKIP_ISSUE_REF:-0}" != "1" ]; then
   msg_content=$(grep -v '^#' "$msg_file" || true)
   has_origin=$(git remote get-url origin 2>/dev/null || true)
   if [ -n "$has_origin" ] || [ "${AQM_REQUIRE_ISSUE_REF:-0}" = "1" ]; then
-    if ! printf '%s\n' "$msg_content" | grep -Eq '(^Merge |#[0-9]+)'; then
+    if [ "$is_merge_commit" -eq 0 ] && ! printf '%s\n' "$msg_content" | grep -Eq '#[0-9]+'; then
       echo "commit-msg: missing GitHub Issue reference (#<number>)." >&2
       echo "All bugs and features must be documented as a GitHub Issue first (./scripts/gh-issue-workflow.sh create ...)." >&2
       exit 1
@@ -48,8 +56,9 @@ fi
 
 # 4. A UI commit is rejected until before-shot registered the pre-change screenshot.
 #    Skipped when this hook is reused to scrub a GitHub comment (AQM_SKIP_ISSUE_REF=1).
-#    A merge commit is not a new UI edit; the branch commits were checked when they were made.
-if [ "${AQM_SKIP_ISSUE_REF:-0}" != "1" ] && git rev-parse --is-inside-work-tree >/dev/null 2>&1 && [ ! -e "$(git rev-parse --git-path MERGE_HEAD)" ] && ! printf '%s\n' "$raw_content" | grep -Eq '^Merge '; then
+#    A real merge commit (MERGE_HEAD present) is not a new UI edit; the branch commits
+#    were checked when they were made.
+if [ "${AQM_SKIP_ISSUE_REF:-0}" != "1" ] && git rev-parse --is-inside-work-tree >/dev/null 2>&1 && [ "$is_merge_commit" -eq 0 ]; then
   ui_staged=$(git diff --cached --name-only | grep -E '^(app/src/main/res/|app/src/main/java/com/aiquotamonitor/ui/|app/src/main/java/com/aiquotamonitor/widget/)' || true)
   if [ -n "$ui_staged" ]; then
     issue=$(printf '%s\n' "$raw_content" | grep -Eo '#[0-9]+' | head -n 1 | tr -d '#')
@@ -72,12 +81,37 @@ if [ "${AQM_SKIP_ISSUE_REF:-0}" != "1" ] && git rev-parse --is-inside-work-tree 
         head_sha=$(grep '^head=' "$receipt" | head -n 1 | cut -d= -f2-)
         current=$(git rev-parse HEAD)
         image_rel=$(grep '^image=' "$receipt" | head -n 1 | cut -d= -f2-)
+        if ! printf '%s' "$issue" | grep -Eq '^[0-9]+$'; then
+          echo "commit-msg: the issue number for the before-shot receipt is invalid." >&2
+          exit 1
+        fi
+        case "$image_rel" in
+          ".aqm-ui-evidence/$issue/before."*)
+            suffix="${image_rel#.aqm-ui-evidence/$issue/before.}"
+            case "$suffix" in
+              ""|*/*|*..*)
+                echo "commit-msg: the before-shot receipt image path is invalid." >&2
+                exit 1
+                ;;
+            esac
+            ;;
+          *)
+            echo "commit-msg: the before-shot receipt image path is invalid." >&2
+            exit 1
+            ;;
+        esac
         if [ "$head_sha" != "$current" ] && ! git merge-base --is-ancestor "$head_sha" "$current"; then
           echo "commit-msg: the before screenshot is not from this change's starting commit." >&2
           exit 1
         fi
         if [ ! -f "$root/$image_rel" ]; then
           echo "commit-msg: the registered before screenshot file is missing." >&2
+          exit 1
+        fi
+        want_sha=$(grep '^sha256=' "$receipt" | head -n 1 | cut -d= -f2-)
+        got_sha=$(python3 -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$root/$image_rel")
+        if [ -z "$want_sha" ] || [ "$got_sha" != "$want_sha" ]; then
+          echo "commit-msg: the registered before screenshot sha256 does not match the receipt." >&2
           exit 1
         fi
         ;;

@@ -103,7 +103,9 @@ data class QuotaSnapshot(
             if (pinned != null) return pinned
         }
         return visibleBuckets(hiddenBucketIds).minWithOrNull(
-            compareBy<QuotaBucket> { it.remainingPercent }.thenBy { it.id }
+            compareBy<QuotaBucket> { it.remainingPercent }
+                .thenBy { it.id == "grok-bot-weekly" }
+                .thenBy { it.id }
         )
     }
 
@@ -112,7 +114,9 @@ data class QuotaSnapshot(
      */
     val bottleneckBucket: QuotaBucket?
         get() = providers.flatMap { it.buckets }.minWithOrNull(
-            compareBy<QuotaBucket> { it.remainingPercent }.thenBy { it.id }
+            compareBy<QuotaBucket> { it.remainingPercent }
+                .thenBy { it.id == "grok-bot-weekly" }
+                .thenBy { it.id }
         )
 
     /**
@@ -162,7 +166,11 @@ data class QuotaSnapshot(
         hiddenBucketIds: Set<String> = emptySet()
     ): List<WidgetQuotaItem> {
         val visiblePool = visibleBuckets(hiddenBucketIds)
-            .sortedWith(compareBy<QuotaBucket> { it.remainingPercent }.thenBy { it.id })
+            .sortedWith(
+                compareBy<QuotaBucket> { it.remainingPercent }
+                    .thenBy { it.id == "grok-bot-weekly" }
+                    .thenBy { it.id }
+            )
         val sanitizedIds = wideBucketIds
             .map { it.trim() }
             .filter { it.isNotEmpty() }

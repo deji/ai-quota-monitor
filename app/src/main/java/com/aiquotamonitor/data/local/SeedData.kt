@@ -111,12 +111,12 @@ object SeedData {
         val openCodeProvider = ProviderQuota(
             id = "opencode_go",
             displayName = "OpenCode Go",
-            subtitle = "DeepSeek 4.1 Flash High-Throughput",
+            subtitle = "5h, Weekly & Monthly",
             status = "ok",
             buckets = listOf(
                 QuotaBucket(
                     id = "opencode-rolling",
-                    group = "DeepSeek 4.1 Flash",
+                    group = "OpenCode Go",
                     label = "5-Hour Rolling",
                     windowType = "rolling",
                     windowDurationHours = 5,
@@ -131,8 +131,8 @@ object SeedData {
                 ),
                 QuotaBucket(
                     id = "opencode-weekly",
-                    group = "DeepSeek 4.1 Flash",
-                    label = "Weekly Budget",
+                    group = "OpenCode Go",
+                    label = "Weekly Pool",
                     windowType = "weekly",
                     windowDurationHours = 168,
                     remainingPercent = 98.0,
@@ -146,8 +146,8 @@ object SeedData {
                 ),
                 QuotaBucket(
                     id = "opencode-monthly",
-                    group = "DeepSeek 4.1 Flash",
-                    label = "Monthly Cap",
+                    group = "OpenCode Go",
+                    label = "Monthly Pool",
                     windowType = "monthly",
                     windowDurationHours = 720,
                     remainingPercent = 99.0,
@@ -165,7 +165,7 @@ object SeedData {
         val grokProvider = ProviderQuota(
             id = "grok",
             displayName = "Grok Build CLI",
-            subtitle = "Grok 4.7 Weekly Unified Credits",
+            subtitle = "Build & Bot Weekly",
             status = "ok",
             buckets = listOf(
                 QuotaBucket(
@@ -182,6 +182,21 @@ object SeedData {
                     burnRatePerHour = 0.04,
                     projectedRemainingAtReset = 93.1,
                     status = "primed"
+                ),
+                QuotaBucket(
+                    id = "grok-bot-weekly",
+                    group = "Grok Bot",
+                    label = "Grok Bot Weekly",
+                    windowType = "weekly",
+                    windowDurationHours = 168,
+                    remainingPercent = 100.0,
+                    usedPercent = 0.0,
+                    resetsAt = "2026-04-16T03:54:51Z",
+                    elapsedPercent = 42.0,
+                    paceDeltaPercent = 18.0,
+                    burnRatePerHour = 0.0,
+                    projectedRemainingAtReset = 100.0,
+                    status = "healthy"
                 )
             )
         )
@@ -219,6 +234,7 @@ object SeedData {
             val gemini5hVal = 100.0 - (fraction * 1.0)
             val openCodeWeeklyVal = 100.0 - (fraction * 2.0)
             val grokVal = 100.0 - (fraction * 3.0)
+            val grokBotVal = 100.0
             val threePWeeklyVal = 65.0 - (fraction * 23.3)
 
             HistoryPoint(
@@ -231,6 +247,7 @@ object SeedData {
                     "opencode-weekly" to openCodeWeeklyVal,
                     "opencode-monthly" to 99.0,
                     "grok-weekly-credits" to grokVal,
+                    "grok-bot-weekly" to grokBotVal,
                     "3p-5h" to 100.0,
                     "3p-weekly" to threePWeeklyVal
                 )

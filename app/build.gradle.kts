@@ -4,6 +4,15 @@ plugins {
   alias(libs.plugins.kotlin.serialization)
 }
 
+val gitShortHashProvider = providers.exec {
+  workingDir = rootProject.projectDir
+  commandLine("git", "rev-parse", "--short=4", "HEAD")
+  isIgnoreExitValue = true
+}.standardOutput.asText.map { output ->
+  val hash = output.trim().lowercase()
+  if (hash.matches(Regex("^[0-9a-f]{4,}$"))) hash.take(4) else "0000"
+}
+
 android {
   namespace = "com.aiquotamonitor"
   compileSdk = 36
@@ -13,7 +22,7 @@ android {
     minSdk = 34
     targetSdk = 36
     versionCode = 2
-    versionName = "1.1.0"
+    versionName = "1.1.0-${gitShortHashProvider.get()}"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
