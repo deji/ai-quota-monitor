@@ -110,5 +110,9 @@ fi
 
 sh "$REPO_ROOT/.githooks/pre-commit"
 if [ -d "$REPO_ROOT/collector/tests" ]; then
-  PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s collector/tests -p "test_repo_hygiene.py"
+  # git push exports GIT_DIR into this hook. Leave it set and the hygiene
+  # fixtures commit and diff the real repository instead of their temp repos.
+  env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_PREFIX \
+    -u GIT_OBJECT_DIRECTORY -u GIT_COMMON_DIR -u GIT_NAMESPACE \
+    PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s collector/tests -p "test_repo_hygiene.py"
 fi
