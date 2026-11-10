@@ -1,6 +1,6 @@
 ---
 name: orca-quota-engineering
-description: Project-specific architecture, multi-agent Orca orchestration workflow (agy Argon Medium planner + quota-aware opencode2/Flash implementer + grok 4.7 reviewer), cross-language AES-256-GCM relay invariants, provider wire parsing rules, and verification gates for ai-quota-monitor. Use whenever planning, implementing, testing, or reviewing changes in this repository.
+description: Project-specific architecture, multi-agent Orca orchestration workflow (coordinator gate in AGENTS.md, quota-routed planner, opencode2 implementer, and the other expensive planner as reviewer), cross-language AES-256-GCM relay invariants, provider wire parsing rules, and verification gates for ai-quota-monitor. Use whenever planning, implementing, testing, or reviewing changes in this repository.
 ---
 
 # Orca Quota Engineering Skill (`ai-quota-monitor`)
@@ -9,13 +9,15 @@ Use this skill whenever planning, modifying, testing, or reviewing `collector/`,
 
 ## 1. Mandatory 3-Gate Orca Orchestration Workflow
 
-All non-trivial work in this repository uses three distinct agent roles and **three mandatory review gates**:
+All non-trivial work in this repository goes through the coordinator gate in [`AGENTS.md`](../../../AGENTS.md) and the global `orca-cheap-workers` skill. The open pane is the coordinator. It checks quota and dispatches workers. It does not edit the repo.
 
-| Role | Agent / CLI | Model & Effort | Responsibility |
-| :--- | :--- | :--- | :--- |
-| **Planner & Coordinator** | `agy` (`antigravity`; CLI `--agent antigravity`) | `gemini-4-argon-medium` (`medium`) | Architecture, Stitch UI/UX prototyping, task specs, worker supervision, and integration. Quota fallback per `orca-cheap-workers`: Argon Medium → `grok-4.7` medium → `gemini-3.8-flash-high` → `opencode2`. |
-| **Implementer & Tester** | Quota-aware routing (`orca-cheap-workers`) | Primary `opencode2` (`opencode-go/deepseek-v4.1-flash`, no flags); fallback `gemini-3.8-flash-high` (`high`) | Feature implementation, unit/UI tests, Gradle builds, and emulator/device verification. |
-| **Plan & Code Reviewer** | `grok` (Grok Build CLI) | `grok-4.7` (`--effort medium`) | Read-only review of plans, worktree diffs, and cross-system contracts. Gate 1 and Gate 2 always use `grok-4.7` medium as the project specialization of `orca-cheap-workers`'s "other expensive planner" rule. |
+| Stage | Worker | Responsibility |
+| :--- | :--- | :--- |
+| **Plan** | Argon Medium, else Grok, else Gemini 3.8 Flash, else opencode2 | Architecture, Stitch UI/UX prototyping, and the task spec. `--agent antigravity --model gemini-4-argon-medium` takes no `--effort`. |
+| **Implement** | opencode2, else Gemini 3.8 Flash | Feature implementation, unit/UI tests, Gradle builds, and emulator/device verification. Pass neither `--model` nor `--effort` to `--agent opencode2`. |
+| **Review** | The other expensive planner | Read-only review of the plan and the worktree diff. Argon planned, so Grok reviews. Grok planned, so Argon reviews. If that window is low, use a cheap worker that did not implement. |
+
+`--agent grok` does not take `--model` or `--effort`. It reads `~/.grok/config.toml` (`grok-4.7`, medium). A window is available when `orca account list --json` shows `status` `ok` and `usedPercent` under 80.
 
 ### The GitHub Issue-First Lifecycle (`scripts/gh-issue-workflow.sh`) & 3 Review Gates (`scripts/review-plan-and-code.sh`)
 0. **Gate 0 — GitHub Issue Creation & Plan Comment (Mandatory Before Code)**:
@@ -27,7 +29,7 @@ All non-trivial work in this repository uses three distinct agent roles and **th
    # or UI evidence: none.
    ```
 1. **Gate 1 — Plan Review (Pre-Implementation, Mandatory on Every Feature/UX Issue)**:
-   Before dispatching implementation workers for a new feature, UX change, or architectural change, run a supervised `grok-4.7` (`--effort medium`) Plan Review against the task spec and `docs/plan.md` + `docs/providers.md`, and post the review to `## [PLAN]`:
+   Before dispatching implementation workers for a new feature, UX change, or architectural change, run the review worker from the coordinator gate against the task spec and `docs/plan.md` + `docs/providers.md`, and post the review to `## [PLAN]`. The sample below is the command when that worker is Grok:
    ```bash
    # Via supervised Orca worker (after pre-trusting the worktree in ~/.grok/trusted_folders.toml):
    orca orchestration worker-start --task-title "Issue #<n>: Gate 1 Plan Review" --spec "<prompt>" --worktree "<worktreeSelector>" --agent grok --json
@@ -37,7 +39,7 @@ All non-trivial work in this repository uses three distinct agent roles and **th
    - **Grok Orca Worker Rule**: `orca orchestration worker-start --agent grok` reads `default = "grok-4.7"` and `default_reasoning_effort = "medium"` from `~/.grok/config.toml` (it does **not** accept `--model` or `--effort` CLI flags) and requires `[folders."<worktreePath>"]\ntrusted = true` in `~/.grok/trusted_folders.toml` so newly created worktrees never block on interactive TUI folder trust (`agent-trust-workspace`).
    - **Follow-Up Worker Dispatch Rule**: When sending Gate 1 review findings or follow-up instructions to a running worker terminal via `orca orchestration send`, always pass `--type dispatch` (valid types: `status, dispatch, worker_done, merge_ready, escalation, handoff, decision_gate, question, heartbeat`; `--type steer` is invalid).
 2. **Gate 2 — Worktree Implementation, Testing & Review Comments**:
-   Every commit must reference `#<issue-number>` (enforced by `.githooks/commit-msg`). After a quota-routed implementer worker (`opencode2` primary, fallback `--agent antigravity --model gemini-3.8-flash-high --effort high`, never `--agent agy`) finishes and passes unit/hygiene tests, post the `## [IMPLEMENTATION]` and `## [TESTING]` comments, release its worker terminal, and run `grok` against its worktree with `--issue <issue-number>` to post `## [REVIEW]`:
+   Every commit must reference `#<issue-number>` (enforced by `.githooks/commit-msg`). After the implementer worker (`opencode2`, or `gemini-3.8-flash-high` when that quota is low or the launch fails; never `--agent agy`) finishes and passes unit/hygiene tests, post the `## [IMPLEMENTATION]` and `## [TESTING]` comments, release its worker terminal, and run the review worker against that worktree to post `## [REVIEW]`. `./scripts/review-plan-and-code.sh` is the Grok path:
    ```bash
    # Before editing UI files, when the plan says UI evidence: before-and-after:
    ./scripts/gh-issue-workflow.sh before-shot <issue-number> --attach "$TMPDIR/before.png#Before: previous screen"
@@ -147,7 +149,7 @@ This executes 5 automated gates:
 
 ## 4. Mandatory Unprompted End-of-Task Closeout Protocol
 
-**Never wait for the user to ask you to update docs, record lessons, or update skills/scripts.** At the end of every task, bug fix, or `grok-4.7` review cycle, execute this checklist before reporting completion:
+**Never wait for the user to ask you to update docs, record lessons, or update skills/scripts.** The implementer worker does this before it finishes. The coordinator checks that it happened and does not edit the repo itself. At the end of every task, bug fix, or review cycle, execute this checklist before reporting completion:
 
 1. **Capture Learnings (`docs/lessons.md`)**: Record every non-obvious root cause, Compose/Android quirk, wire-protocol edge case, or review finding in [`docs/lessons.md`](../../../docs/lessons.md) (both in the thematic section and the §5 Historical Bug Ledger).
 2. **Sync Defect & Status Trackers (`docs/bugs/index.md`, `docs/status.md`)**: Ensure every defect ID (`COL-*`, `APP-*`, `SYS-*`) is logged in [`docs/bugs/index.md`](../../../docs/bugs/index.md) and cross-referenced in `docs/lessons.md`.

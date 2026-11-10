@@ -6,13 +6,15 @@ Playbook for coordinating planning, implementation, testing, and code reviews in
 
 ## 1. Role & Model Matrix
 
-Per the project's orchestration rules, every stage uses a dedicated agent, model, and effort level:
+Who plans, implements, and reviews is the coordinator gate in [`AGENTS.md`](../AGENTS.md) and the global `orca-cheap-workers` skill. The pane a person opens is the coordinator, including a Grok chat. It checks `orca account list --json` and dispatches workers. It does not edit the repo. A window is available when `status` is `ok` and `usedPercent` is under 80.
 
-| Stage / Role | Agent | Model ID | Effort | Invocation Policy |
-| :--- | :--- | :--- | :--- | :--- |
-| **Planner & Coordinator** | `agy` (Antigravity) | `gemini-4-argon-medium` | `medium` | Runs in the primary coordinator session. Owns architecture, Stitch prototyping, task specs, dispatch, and final verification. Quota fallback per `orca-cheap-workers`: `gemini-4-argon-medium` → `grok-4.7` medium → `gemini-3.8-flash-high` → `opencode2`. |
-| **Implementer & Tester** | Quota-aware routing (`orca-cheap-workers`) | Primary `opencode2` (`opencode-go/deepseek-v4.1-flash`); fallback `gemini-3.8-flash-high` | Primary: no flags; fallback: `high` | Dispatched as supervised Orca workers per task/module. Primary `--agent opencode2` (pass neither `--model` nor `--effort`); fall back to `--agent antigravity --model gemini-3.8-flash-high --effort high` when OpenCode Go quota is `>= 80%` used or unavailable. Owns code edits, unit/UI tests, Gradle builds, and emulator/device verification. |
-| **Code Reviewer** | `grok` (Grok Build CLI) | `grok-4.7` | `medium` | Dispatched read-only on the diff/worktree after implementation and green tests. Must never modify files or commit. Gate 1 and Gate 2 always use `grok-4.7` medium as the project specialization of `orca-cheap-workers`'s "other expensive planner" rule. |
+| Stage | Worker | Invocation |
+| :--- | :--- | :--- |
+| **Plan** | Argon Medium, else Grok, else Gemini 3.8 Flash, else opencode2 | `--agent antigravity --model gemini-4-argon-medium` with no `--effort` while the Antigravity bucket `Gemini 4 Argon` is available. Then `--agent grok` while `grok.weekly` is available. Then `--agent antigravity --model gemini-3.8-flash-high`. Then `--agent opencode2`. |
+| **Implement** | opencode2, else Gemini 3.8 Flash | `--agent opencode2` while `opencodeGo.session` and `opencodeGo.weekly` are available. If that quota is low or the launch fails, `--agent antigravity --model gemini-3.8-flash-high`. |
+| **Review** | The other expensive planner | Argon planned, so review with Grok. Grok planned, so review with Argon. If that window is low, use a cheap worker that did not implement. If the only remaining reviewer is the author, say so. Review is read-only. |
+
+`--agent grok` and `--agent opencode2` do not take `--model` or `--effort` on `worker-start`. Grok uses `~/.grok/config.toml` (`grok-4.7`, medium). A planner worker does not start the other workers. The command samples below are what to run when the gate selects that agent. They are not a fixed assignment of Grok to every review.
 
 ---
 
@@ -41,7 +43,8 @@ Every bug or feature follows the **GitHub Issue-First Workflow** enforced by [`s
 orca status --json
 orca orchestration run-create --objective "AI Quota Monitor - Issue #<issue-number>" --json
 
-# 2. Gate 1 — Dispatch a supervised Grok 4.7 Medium reviewer worker for Plan Review BEFORE implementation
+# 2. Gate 1 — Plan review BEFORE implementation, using the review worker from AGENTS.md.
+# This sample is the command when that worker is Grok.
 # (Ensure the target worktree is marked trusted = true in ~/.grok/trusted_folders.toml first)
 orca orchestration worker-start \
   --task-title "Issue #<issue-number>: Gate 1 Plan Review (grok-4.7 medium)" \
@@ -80,9 +83,9 @@ orca orchestration check --wait --types "worker_done,escalation,question" --time
   --attach "$TMPDIR/after.png#After: screen after the change"
 ```
 
-### Dispatching the Read-Only Reviewer (`grok` with `grok-4.7` Medium) & Posting `## [REVIEW]`
+### Dispatching the Read-Only Reviewer & Posting `## [REVIEW]`
 
-For **Gate 1 (Plan Review)** and **Gate 2 (Worktree Review)**, dispatch `grok` as a supervised Orca orchestration worker (`--agent grok`, which launches with `default = "grok-4.7"` and `default_reasoning_effort = "medium"` from `~/.grok/config.toml` once the target worktree path is marked `trusted = true` in `~/.grok/trusted_folders.toml`), and post its `## [REVIEW]` verdict to the GitHub Issue:
+Use the review worker from the coordinator gate in [`AGENTS.md`](../AGENTS.md). When that worker is Grok, dispatch `--agent grok`. It launches with `default = "grok-4.7"` and `default_reasoning_effort = "medium"` from `~/.grok/config.toml` once the target worktree path is marked `trusted = true` in `~/.grok/trusted_folders.toml`. Post its verdict to the GitHub Issue. When the reviewer is Antigravity, use that agent in `worker-start` instead of the Grok sample.
 
 ```bash
 # 1. Dispatch a supervised Grok 4.7 Medium reviewer worker via Orca Orchestration

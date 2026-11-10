@@ -7,17 +7,23 @@ This repository is intended to be hosted publicly on GitHub: **never** put token
 
 A native Android application (Kotlin + Jetpack Compose, Material 3 Expressive, zero WebViews) and companion quota-collection layer for monitoring AI model subscription quotas, reset windows, and burn-rate trends across multiple coding-agent and model subscriptions (`agy` / Antigravity, `opencode go`, `grok` Build, and future providers) on a Pixel 8 Pro (Android 16/17).
 
-## Multi-Agent Orca Orchestration Roles
+## Coordinator gate
 
-All work in this repository is coordinated through **Orca Orchestration** (`orca orchestration ...`):
+Every session in this repo goes through Orca orchestration. Follow the global `orca-cheap-workers` skill for who plans, implements, and reviews. If this file and [`docs/workers.md`](docs/workers.md) disagree on that routing, this file and `orca-cheap-workers` win.
 
-| Role | Agent / CLI | Model & Effort | Responsibilities |
-| :--- | :--- | :--- | :--- |
-| **Planner & Coordinator** | `agy` (Antigravity; CLI `--agent antigravity`) | `gemini-4-argon-medium` (`Gemini 4 Argon (Medium)`, `medium` effort) | Architecture, Stitch UI/UX prototype design & alignment, task decomposition, Orca dispatch & supervision, integration sign-off. Quota fallback per `orca-cheap-workers`: Argon Medium → `grok-4.7` medium → `gemini-3.8-flash-high` → `opencode2`. |
-| **Implementer & Tester** | Quota-aware routing (`orca-cheap-workers`) | Primary `opencode2` (`opencode-go/deepseek-v4.1-flash`); fallback `--agent antigravity --model gemini-3.8-flash-high --effort high` (product nickname `agy`, never `--agent agy`) | Feature implementation, unit/UI/screenshot tests, Gradle builds, emulator/device verification via `orca-emulator-android` / `android` CLI. |
-| **Code & Plan Reviewer** | `grok` (Grok Build CLI) | `grok-4.7` (`--effort medium`) | Read-only plan, diff, cross-system contract, security/secret-hygiene, and Compose performance review before implementation and before merge. Gate 1 & Gate 2 always use `grok-4.7` medium in this repository. |
+The pane a person opens is the coordinator, including a Grok chat. A prompt with a Dispatch ID is a worker and does only that spec. The coordinator loads `orca-cli`, `orchestration`, and `orca-cheap-workers`, then runs `orca skills get` for those guides before the first `orca` command. It checks `orca account list --json` and reads `result.rateLimits`. A window is available when `status` is `ok` and `usedPercent` is under 80. It dispatches the workers, then ends the turn. It does not edit the repo and does not commit.
 
-See [`docs/workers.md`](docs/workers.md), [`docs/lessons.md`](docs/lessons.md), and [`.agents/skills/orca-quota-engineering/SKILL.md`](.agents/skills/orca-quota-engineering/SKILL.md) for the exact 3-gate Orca workflow and verification scripts (`./scripts/verify-all.sh` and `./scripts/review-plan-and-code.sh`).
+Opening the chat in Grok does not choose the planner. Plan with `--agent antigravity --model gemini-4-argon-medium` and no `--effort` while the Antigravity bucket `Gemini 4 Argon` is available. Otherwise `--agent grok` while `grok.weekly` is available. Otherwise `--agent antigravity --model gemini-3.8-flash-high`. Otherwise `--agent opencode2`. Implement with `--agent opencode2` while `opencodeGo.session` and `opencodeGo.weekly` are available. If that quota is low or the launch fails, use `--agent antigravity --model gemini-3.8-flash-high`. Review with the other expensive planner: Argon planned, so review with Grok; Grok planned, so review with Argon. If that window is low, use a cheap worker that did not implement. If the only remaining reviewer is the author, say so.
+
+`--agent grok` and `--agent opencode2` do not take `--model` or `--effort` on `worker-start`. Grok uses `~/.grok/config.toml` (`grok-4.7`, medium). One worktree per issue. Do not run two writers in it. A planner worker does not start the other workers.
+
+| Stage | Worker |
+| :--- | :--- |
+| Plan | Argon Medium, else Grok, else Gemini 3.8 Flash, else opencode2 |
+| Implement | opencode2, else Gemini 3.8 Flash |
+| Review | The other expensive planner, as above |
+
+Issue comments, specs, and repo invariants stay in [`docs/workers.md`](docs/workers.md) and [`.agents/skills/orca-quota-engineering/SKILL.md`](.agents/skills/orca-quota-engineering/SKILL.md). Verification scripts: `./scripts/verify-all.sh` and `./scripts/review-plan-and-code.sh`.
 
 ## Layout
 
@@ -48,9 +54,9 @@ skills-lock.json         Locked skill versions installed via npx skills
     1. `## [PLAN]` — Architectural plan & files in scope.
     2. `## [IMPLEMENTATION]` — Summary of code changes & commits (`Refs #<issue>`).
     3. `## [TESTING]` — Unit test, Gradle lint/build, and emulator/device verification output. The plan comment chooses `UI evidence: before-and-after` or `UI evidence: none`. For a before-and-after change, run `./scripts/gh-issue-workflow.sh before-shot <issue> --attach <file-outside-the-repo>#Before: <old screen>` before editing UI files. The commit hook rejects the UI commit until that shot is registered. The testing comment then attaches that same before shot and `--attach <file>#After: <new screen>`. Do not commit the captures. Collector-only results that never opened the UI must say `No emulator UI was exercised.`
-    4. `## [REVIEW]` — `grok-4.7` (`--effort medium`) review verdict (`./scripts/review-plan-and-code.sh worktree <path> --issue <issue-number>`).
+    4. `## [REVIEW]` — Verdict from the review worker chosen above (`./scripts/review-plan-and-code.sh worktree <path> --issue <issue-number>` when that worker is Grok).
   - `.githooks/commit-msg` enforces that commits reference `#<issue-number>` when `origin` is configured, and `./scripts/gh-issue-workflow.sh close <issue-number>` refuses to close an issue unless all four `[PLAN]`, `[IMPLEMENTATION]`, `[TESTING]`, and `[REVIEW]` comments exist.
-- **Update docs & codify learnings in the same change (unprompted)**: Before finishing any task, bug fix, or review cycle—and **without waiting for the user to ask**—you MUST update [`docs/lessons.md`](docs/lessons.md), [`docs/bugs/index.md`](docs/bugs/index.md), [`docs/status.md`](docs/status.md), [`README.md`](README.md) (for any run/test/deploy workflow change), and [`.agents/skills/orca-quota-engineering/SKILL.md`](.agents/skills/orca-quota-engineering/SKILL.md) with all new lessons, edge cases, and reviewer findings. Run `./scripts/verify-all.sh` to enforce the automated documentation & lessons sync check.
+- **Update docs & codify learnings in the same change (unprompted)**: The implementer worker, before it finishes, updates [`docs/lessons.md`](docs/lessons.md), [`docs/bugs/index.md`](docs/bugs/index.md), [`docs/status.md`](docs/status.md), [`README.md`](README.md) (for any run/test/deploy workflow change), and [`.agents/skills/orca-quota-engineering/SKILL.md`](.agents/skills/orca-quota-engineering/SKILL.md), then runs `./scripts/verify-all.sh`. The coordinator checks that this happened. The coordinator does not do the edit itself.
 - **Keep `AGENTS.md` a signpost, never a running log**: Record progress in [`docs/status.md`](docs/status.md), design details in [`docs/design/`](docs/design/README.md), and defects in [`docs/bugs/`](docs/bugs/README.md).
 
 ## Documentation map (progressive discovery)
@@ -60,7 +66,7 @@ skills-lock.json         Locked skill versions installed via npx skills
 | Architecture, options analysis, & phased build plan | [`docs/plan.md`](docs/plan.md) |
 | Provider quota wire specs (`agy`, `opencode go`, `grok`) & normalization schema | [`docs/providers.md`](docs/providers.md) |
 | Stitch UI/UX workflow, `DESIGN.md`, screen inventory, & Compose mapping | [`docs/design/README.md`](docs/design/README.md) |
-| Orca orchestration playbook (`agy` planner/implementer + `grok` reviewer) | [`docs/workers.md`](docs/workers.md) |
+| Orca orchestration playbook (issue comments and specs; routing is the coordinator gate above) | [`docs/workers.md`](docs/workers.md) |
 | Architectural lessons, invariants, & historical bug post-mortems | [`docs/lessons.md`](docs/lessons.md), [`.agents/skills/orca-quota-engineering/SKILL.md`](.agents/skills/orca-quota-engineering/SKILL.md) |
 | Current project state, installed skills, & open decision gates | [`docs/status.md`](docs/status.md) |
 | Bug tracker lifecycle, filing template, & defect registry | [`docs/bugs/README.md`](docs/bugs/README.md), [`docs/bugs/index.md`](docs/bugs/index.md) |
