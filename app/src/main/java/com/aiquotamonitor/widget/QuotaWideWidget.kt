@@ -249,29 +249,42 @@ private fun WideBucketBlock(
         includeMinutesUnderDay = true
     )
 
-    Row(
-        modifier = GlanceModifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+    Column(modifier = GlanceModifier.fillMaxWidth()) {
+        // Two-line micro-header: the label owns the full column width so provider
+        // bucket names never collide with the reset countdown.
         Text(
             text = item.shortWideRowLabel,
             maxLines = 1,
-            modifier = GlanceModifier.defaultWeight(),
             style = TextStyle(
                 color = ColorProvider(Color(0xFFE2E8F0)),
                 fontSize = 9.sp,
                 fontWeight = FontWeight.Medium
             )
         )
-        Text(
-            text = if (resetText.isBlank()) pctText else "$pctText · $resetText",
-            maxLines = 1,
-            style = TextStyle(
-                color = ColorProvider(healthColor),
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Bold
+        Row(
+            modifier = GlanceModifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = pctText,
+                maxLines = 1,
+                modifier = GlanceModifier.defaultWeight(),
+                style = TextStyle(
+                    color = ColorProvider(healthColor),
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold
+                )
             )
-        )
+            Text(
+                text = resetText.ifBlank { "—" },
+                maxLines = 1,
+                style = TextStyle(
+                    color = ColorProvider(healthColor),
+                    fontSize = 8.5.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            )
+        }
     }
 
     Spacer(modifier = GlanceModifier.height(2.dp))

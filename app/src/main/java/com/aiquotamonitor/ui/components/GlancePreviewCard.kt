@@ -479,28 +479,39 @@ private fun WideBucketRowPreview(
         includeMinutesUnderDay = true
     )
 
+    // Two-line micro-header: the label owns the full column width so provider
+    // bucket names never collide with the reset countdown.
+    Text(
+        text = item.shortWideRowLabel,
+        style = MaterialTheme.typography.labelSmall,
+        fontSize = 8.5.sp,
+        fontWeight = FontWeight.Medium,
+        color = Color(0xFFE2E8F0),
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis
+    )
+
     Row(
         modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = item.shortWideRowLabel,
+            text = pctText,
             style = MaterialTheme.typography.labelSmall,
-            fontSize = 9.sp,
-            fontWeight = FontWeight.Medium,
-            color = Color(0xFFE2E8F0),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f)
-        )
-        Spacer(modifier = Modifier.width(2.dp))
-        Text(
-            text = if (resetText.isBlank()) pctText else "$pctText · $resetText",
-            style = MaterialTheme.typography.labelSmall,
-            fontSize = 9.sp,
+            fontSize = 9.5.sp,
             fontWeight = FontWeight.Bold,
             color = healthColor,
             maxLines = 1
+        )
+        Text(
+            text = resetText.ifBlank { "—" },
+            style = MaterialTheme.typography.labelSmall,
+            fontSize = 8.5.sp,
+            fontWeight = FontWeight.Bold,
+            color = healthColor,
+            maxLines = 1,
+            softWrap = false
         )
     }
 
