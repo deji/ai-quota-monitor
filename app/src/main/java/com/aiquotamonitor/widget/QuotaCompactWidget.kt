@@ -1,11 +1,14 @@
 package com.aiquotamonitor.widget
 
 import android.content.Context
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
+import androidx.glance.Image
+import androidx.glance.ImageProvider
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
@@ -22,7 +25,6 @@ import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
-import androidx.glance.layout.size
 import androidx.glance.layout.width
 import androidx.glance.GlanceTheme
 import androidx.glance.text.FontWeight
@@ -33,17 +35,23 @@ import com.aiquotamonitor.data.local.PreferencesStore
 import com.aiquotamonitor.data.local.SeedData
 import com.aiquotamonitor.domain.model.QuotaPolarity
 import com.aiquotamonitor.domain.model.QuotaSnapshot
+import com.aiquotamonitor.domain.model.WidgetQuotaItem
 import com.aiquotamonitor.ui.MainActivity
+import kotlin.math.roundToInt
 import kotlinx.serialization.json.Json
 
 private val widgetJson = Json { ignoreUnknownKeys = true }
 
+/**
+ * 2x2 Quad Micro-Bento grid: the four most critical quota pools, one micro-card
+ * per cell, each with a reset countdown and a polarity-aware health micro-bar.
+ */
 class QuotaCompactWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         provideContent {
-            // Read preferences and resolve inside provideContent so updateAll() during an
-            // active Glance session re-evaluates the selection instead of reusing stale values.
+            // Read preferences inside provideContent so updateAll() during an active
+            // Glance session re-evaluates the selection instead of reusing stale values.
             val prefs = PreferencesStore(context)
             val polarity = prefs.getPolarity()
             val cachedJson = prefs.getCachedSnapshotJson()
@@ -60,19 +68,18 @@ class QuotaCompactWidget : GlanceAppWidget() {
                 SeedData.createSeedSnapshot()
             }
 
-            val hiddenBucketIds = prefs.getHiddenBucketIds()
-            val pinnedBucketId = prefs.getPinnedBucketId()
-            val item = snapshot.resolveCompactWidgetItem(
-                compactBucketId = prefs.getCompactWidgetBucketId(),
-                hiddenBucketIds = hiddenBucketIds,
-                pinnedBucketId = pinnedBucketId
+            val nowEpochMs = System.currentTimeMillis()
+            val items = snapshot.resolveCompactCriticalBuckets(
+                hiddenBucketIds = prefs.getHiddenBucketIds(),
+                pinnedBucketId = prefs.getPinnedBucketId(),
+                compactBucketId = prefs.getCompactWidgetBucketId()
             )
-            val displayPercent = item?.displayPercent(polarity)
-            val polaritySuffix = if (polarity == QuotaPolarity.REMAINING) "Left" else "Used"
-            val pace = item?.paceDeltaPercent ?: 0.0
+
             val polarityTag = if (polarity == QuotaPolarity.REMAINING) "REM" else "USED"
-            val headerText = if (isDemo) "AI QUOTA • $polarityTag • DEMO" else "AI QUOTA • $polarityTag"
-            val dotColor = if (isDemo) Color(0xFFFFB951) else Color(0xFF5CE196)
+            val sourceSuffix = if (isDemo) " • DEMO" else ""
+            val ageLabel = snapshot.formatAgeShort(nowEpochMs).ifBlank { "LIVE" }
+            val ageColor = if (snapshot.isStale) Color(0xFFF59E0B) else Color(0xFF5CE196)
+            val hasCachedSnapshot = !cachedJson.isNullOrBlank()
 
             GlanceTheme {
                 Box(
@@ -80,130 +87,76 @@ class QuotaCompactWidget : GlanceAppWidget() {
                         .fillMaxSize()
                         .cornerRadius(24.dp)
                         .background(ColorProvider(Color(0xFF11161A)))
-                        .padding(14.dp)
+                        .padding(12.dp)
                         .clickable(actionStartActivity<MainActivity>()),
                     contentAlignment = Alignment.TopStart
                 ) {
-                    Column(
-                        modifier = GlanceModifier.fillMaxSize(),
-                        verticalAlignment = Alignment.Top,
-                        horizontalAlignment = Alignment.Start
-                    ) {
-                        // Header
+                    Column(modifier = GlanceModifier.fillMaxSize()) {
                         Row(
                             modifier = GlanceModifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = headerText,
+                                text = "CRITICAL POOLS • $polarityTag$sourceSuffix",
+                                maxLines = 1,
+                                modifier = GlanceModifier.defaultWeight(),
                                 style = TextStyle(
-                                    color = ColorProvider(Color(0xFF80D4DC)),
-                                    fontSize = 10.sp,
+                                    color = ColorProvider(Color(0xFF94A3B8)),
+                                    fontSize = 9.sp,
                                     fontWeight = FontWeight.Bold
                                 )
                             )
-                            Spacer(modifier = GlanceModifier.defaultWeight())
-                            Box(
-                                modifier = GlanceModifier
-                                    .size(8.dp)
-                                    .cornerRadius(4.dp)
-                                    .background(ColorProvider(dotColor))
-                            ) {}
+                            Text(
+                                text = ageLabel,
+                                maxLines = 1,
+                                style = TextStyle(
+                                    color = ColorProvider(ageColor),
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            )
                         }
 
-                        Spacer(modifier = GlanceModifier.height(10.dp))
+                        Spacer(modifier = GlanceModifier.height(6.dp))
 
-                        if (item == null) {
-                            Text(
-                                text = "--",
-                                style = TextStyle(
-                                    color = ColorProvider(Color(0xFF94A3B8)),
-                                    fontSize = 36.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
+                        if (items.isEmpty()) {
+                            CompactEmptyState(
+                                message = if (hasCachedSnapshot) "All models hidden" else "Tap to sync quotas"
                             )
-                            Text(
-                                text = "All models hidden",
-                                maxLines = 1,
-                                style = TextStyle(
-                                    color = ColorProvider(Color(0xFF94A3B8)),
-                                    fontSize = 11.sp
-                                )
-                            )
-                            Spacer(modifier = GlanceModifier.defaultWeight())
-                            Row(
-                                modifier = GlanceModifier
-                                    .fillMaxWidth()
-                                    .cornerRadius(8.dp)
-                                    .background(ColorProvider(Color(0xFF1E252B)))
-                                    .padding(horizontal = 6.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "Tap to configure",
-                                    style = TextStyle(
-                                        color = ColorProvider(Color(0xFF80D4DC)),
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                )
-                            }
                         } else {
-                            if (item.isFallback) {
-                                Text(
-                                    text = "FALLBACK • ${item.categoryLabel}",
-                                    maxLines = 1,
-                                    style = TextStyle(
-                                        color = ColorProvider(Color(0xFFFFB951)),
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.Bold
+                            Column(
+                                modifier = GlanceModifier.fillMaxSize(),
+                                verticalAlignment = Alignment.Top
+                            ) {
+                                Row(modifier = GlanceModifier.fillMaxWidth().defaultWeight()) {
+                                    CompactBentoCell(
+                                        item = items.getOrNull(0),
+                                        polarity = polarity,
+                                        nowEpochMs = nowEpochMs,
+                                        modifier = GlanceModifier.defaultWeight()
                                     )
-                                )
-                                Spacer(modifier = GlanceModifier.height(2.dp))
-                            }
-
-                            // Large percentage
-                            Text(
-                                text = if (displayPercent == null || displayPercent.isNaN()) {
-                                    "--"
-                                } else {
-                                    "${displayPercent.toInt()}%"
-                                },
-                                style = TextStyle(
-                                    color = ColorProvider(Color(0xFFE2E8F0)),
-                                    fontSize = 36.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            )
-
-                            Text(
-                                text = "${item.titleLabel} $polaritySuffix",
-                                maxLines = 1,
-                                style = TextStyle(
-                                    color = ColorProvider(Color(0xFF94A3B8)),
-                                    fontSize = 11.sp
-                                )
-                            )
-
-                            Spacer(modifier = GlanceModifier.defaultWeight())
-
-                            // Bottom Pace Status (hidden for NaN placeholders)
-                            if (displayPercent != null && !displayPercent.isNaN()) {
-                                Row(
-                                    modifier = GlanceModifier
-                                        .fillMaxWidth()
-                                        .cornerRadius(8.dp)
-                                        .background(ColorProvider(Color(0xFF1E252B)))
-                                        .padding(horizontal = 6.dp, vertical = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = if (pace <= 0) "Ahead: ${pace}%" else "Burn: +${pace}%",
-                                        style = TextStyle(
-                                            color = ColorProvider(if (pace <= 0) Color(0xFF5CE196) else Color(0xFFFFB951)),
-                                            fontSize = 9.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
+                                    Spacer(modifier = GlanceModifier.width(4.dp))
+                                    CompactBentoCell(
+                                        item = items.getOrNull(1),
+                                        polarity = polarity,
+                                        nowEpochMs = nowEpochMs,
+                                        modifier = GlanceModifier.defaultWeight()
+                                    )
+                                }
+                                Spacer(modifier = GlanceModifier.height(4.dp))
+                                Row(modifier = GlanceModifier.fillMaxWidth().defaultWeight()) {
+                                    CompactBentoCell(
+                                        item = items.getOrNull(2),
+                                        polarity = polarity,
+                                        nowEpochMs = nowEpochMs,
+                                        modifier = GlanceModifier.defaultWeight()
+                                    )
+                                    Spacer(modifier = GlanceModifier.width(4.dp))
+                                    CompactBentoCell(
+                                        item = items.getOrNull(3),
+                                        polarity = polarity,
+                                        nowEpochMs = nowEpochMs,
+                                        modifier = GlanceModifier.defaultWeight()
                                     )
                                 }
                             }
@@ -212,6 +165,112 @@ class QuotaCompactWidget : GlanceAppWidget() {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun CompactEmptyState(message: String) {
+    Column(modifier = GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = "--",
+            style = TextStyle(
+                color = ColorProvider(Color(0xFF94A3B8)),
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Bold
+            )
+        )
+        Text(
+            text = message,
+            maxLines = 1,
+            style = TextStyle(
+                color = ColorProvider(Color(0xFF94A3B8)),
+                fontSize = 9.sp
+            )
+        )
+    }
+}
+
+@Composable
+private fun CompactBentoCell(
+    item: WidgetQuotaItem?,
+    polarity: QuotaPolarity,
+    nowEpochMs: Long,
+    modifier: GlanceModifier
+) {
+    val displayPercent = item?.displayPercent(polarity) ?: Double.NaN
+    val isUnavailable = displayPercent.isNaN()
+    val healthColor = widgetHealthColor(displayPercent, polarity)
+    val countdown = item
+        ?.formatResetCountdown(nowEpochMs = nowEpochMs, includeMinutesUnderDay = false)
+        ?.ifBlank { "—" }
+        ?: "—"
+    val pctText = if (isUnavailable) "--%" else "${displayPercent.roundToInt()}%"
+
+    Column(
+        modifier = modifier
+            .cornerRadius(10.dp)
+            .background(ColorProvider(Color(0xFF1A252A)))
+            .padding(6.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Row(
+            modifier = GlanceModifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = item?.shortHeaderLabel ?: "--",
+                maxLines = 1,
+                modifier = GlanceModifier.defaultWeight(),
+                style = TextStyle(
+                    color = ColorProvider(Color(0xFF94A3B8)),
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            )
+            Text(
+                text = countdown,
+                maxLines = 1,
+                style = TextStyle(
+                    color = ColorProvider(healthColor),
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            )
+        }
+
+        Spacer(modifier = GlanceModifier.height(1.dp))
+
+        Row(
+            modifier = GlanceModifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = pctText,
+                maxLines = 1,
+                style = TextStyle(
+                    color = ColorProvider(healthColor),
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            )
+            Spacer(modifier = GlanceModifier.defaultWeight())
+            Text(
+                text = item?.shortWindowLabel.orEmpty(),
+                maxLines = 1,
+                style = TextStyle(
+                    color = ColorProvider(Color(0xFF64748B)),
+                    fontSize = 8.sp
+                )
+            )
+        }
+
+        Spacer(modifier = GlanceModifier.height(3.dp))
+
+        Image(
+            provider = ImageProvider(createProgressBarBitmap(displayPercent, healthColor)),
+            contentDescription = null,
+            modifier = GlanceModifier.fillMaxWidth().height(4.dp)
+        )
     }
 }
 

@@ -31,8 +31,6 @@ import com.aiquotamonitor.domain.model.QuotaPolarity
 import com.aiquotamonitor.ui.theme.QuotaAmber
 import com.aiquotamonitor.ui.theme.QuotaCoral
 import com.aiquotamonitor.ui.theme.QuotaEmerald
-import java.time.Duration
-import java.time.Instant
 
 @Composable
 fun HeroBottleneckCard(
@@ -47,22 +45,8 @@ fun HeroBottleneckCard(
     val displayPercent = bucket.displayPercent(polarity)
     val subtitle = if (polarity == QuotaPolarity.REMAINING) "Remaining" else "Consumed"
 
-    // Format remaining time to reset
-    val resetCountdown = bucket.resetsAt?.let { at ->
-        try {
-            val resetInstant = Instant.parse(at)
-            val now = Instant.now()
-            val duration = Duration.between(now, resetInstant)
-            if (duration.isNegative) "Resetting now"
-            else {
-                val hours = duration.toHours()
-                val minutes = duration.toMinutes() % 60
-                "${hours}h ${minutes}m"
-            }
-        } catch (_: Exception) {
-            null
-        }
-    } ?: "3h 22m"
+    // Shared truncation-only countdown: "5d 19h", "3h 22m", "23h", "59m", or "Now".
+    val resetDisplay = bucket.formatResetCountdown().ifBlank { "N/A" }
 
     val paceColor = if (bucket.paceDeltaPercent <= 0) QuotaEmerald else QuotaAmber
     val paceText = if (bucket.paceDeltaPercent <= 0) {
@@ -180,7 +164,7 @@ fun HeroBottleneckCard(
             ) {
                 TelemetryItem(
                     label = "RESETS IN",
-                    value = resetCountdown
+                    value = resetDisplay
                 )
 
                 TelemetryItem(

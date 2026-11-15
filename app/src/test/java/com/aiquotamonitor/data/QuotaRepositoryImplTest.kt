@@ -1,5 +1,6 @@
 package com.aiquotamonitor.data
 
+import androidx.compose.ui.graphics.Color
 import com.aiquotamonitor.data.local.PreferencesStore
 import com.aiquotamonitor.data.local.SeedData
 import com.aiquotamonitor.data.remote.GistRelayClient
@@ -7,8 +8,12 @@ import com.aiquotamonitor.data.remote.TailscaleApiClient
 import com.aiquotamonitor.data.repository.ConnectionState
 import com.aiquotamonitor.data.repository.QuotaRepositoryImpl
 import com.aiquotamonitor.data.repository.SyncSettings
+import com.aiquotamonitor.domain.model.ProviderQuota
+import com.aiquotamonitor.domain.model.QuotaBucket
+import com.aiquotamonitor.domain.model.QuotaPolarity
 import com.aiquotamonitor.domain.model.QuotaSnapshot
 import com.aiquotamonitor.domain.model.SmartPrimeStatus
+import com.aiquotamonitor.widget.widgetHealthColor
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CompletableDeferred
@@ -1376,5 +1381,274 @@ class QuotaRepositoryImplTest {
 
         assertEquals("gemini-5h", repository.compactWidgetBucketIdFlow.value)
         assertEquals(listOf("gemini-argon-wtu-weekly", "gemini-5h"), repository.wideWidgetBucketIdsFlow.value)
+    }
+
+    // ---- Concept B bento widgets (Issue #13 / APP-UX6) ----
+
+    private val defaultHidden = PreferencesStore.DEFAULT_HIDDEN_BUCKET_IDS
+
+    private fun compactIds(
+        snapshot: QuotaSnapshot,
+        hidden: Set<String> = defaultHidden,
+        pinned: String? = null,
+        compact: String? = null
+    ): List<String> = snapshot
+        .resolveCompactCriticalBuckets(
+            hiddenBucketIds = hidden,
+            pinnedBucketId = pinned,
+            compactBucketId = compact
+        )
+        .map { it.id }
+
+    private fun grokLeaseLabel(seconds: Long?, primed: Boolean): String? =
+        SeedData.createSeedSnapshot()
+            .copy(
+                smartPrime = SmartPrimeStatus(
+                    grokTokenRemainingSeconds = seconds,
+                    primed = primed
+                )
+            )
+            .resolveWideProviderGroups(defaultHidden)
+            .single { it.providerId == "grok" }
+            .oauthLeaseLabel
+
+    @Test
+    fun testResolveCompactCriticalBucketsPicksOneTopPoolPerProvider() {
+        val snapshot = SeedData.createSeedSnapshot()
+
+        assertEquals(
+            listOf("gemini-argon-wtu-weekly", "opencode-rolling", "grok-weekly-credits", "gemini-5h"),
+            compactIds(snapshot)
+        )
+    }
+
+    @Test
+    fun testResolveCompactCriticalBucketsBackfillsWhenProviderPoolIsHidden() {
+        val snapshot = SeedData.createSeedSnapshot()
+
+        assertEquals(
+            listOf("gemini-argon-wtu-weekly", "opencode-rolling", "grok-bot-weekly", "gemini-5h"),
+            compactIds(snapshot, hidden = defaultHidden + "grok-weekly-credits")
+        )
+    }
+
+    @Test
+    fun testResolveCompactCriticalBucketsRoleSlotCarriesPrimaryResetMetadata() {
+        val snapshot = SeedData.createSeedSnapshot()
+        val primary = requireNotNull(snapshot.findBucket("gemini-argon-wtu-weekly"))
+
+        val items = snapshot.resolveCompactCriticalBuckets(
+            hiddenBucketIds = defaultHidden,
+            pinnedBucketId = null,
+            compactBucketId = "role:planner"
+        )
+
+        assertEquals(
+            listOf("role:PLANNER", "gemini-5h", "opencode-rolling", "grok-weekly-credits"),
+            items.map { it.id }
+        )
+        val role = items.first()
+        assertEquals(primary.resetsAt, role.resetsAt)
+        assertEquals(primary.windowDurationHours, role.windowDurationHours)
+        assertEquals("7d Wk", role.shortWindowLabel)
+        assertFalse(role.isFallback)
+    }
+
+    @Test
+    fun testResolveCompactCriticalBucketsHiddenOrUnknownSelectionNeverFallsBackToPin() {
+        val snapshot = SeedData.createSeedSnapshot()
+
+        // Hidden concrete selection: the pin must be ignored and nothing is flagged fallback.
+        val hiddenSelection = snapshot.resolveCompactCriticalBuckets(
+            hiddenBucketIds = defaultHidden,
+            pinnedBucketId = "gemini-5h",
+            compactBucketId = "3p-weekly"
+        )
+        assertEquals("gemini-argon-wtu-weekly", hiddenSelection.first().id)
+        assertTrue(hiddenSelection.none { it.isFallback })
+
+        // Unknown concrete selection behaves the same way.
+        val unknownSelection = snapshot.resolveCompactCriticalBuckets(
+            hiddenBucketIds = defaultHidden,
+            pinnedBucketId = "gemini-5h",
+            compactBucketId = "missing-bucket-id"
+        )
+        assertEquals("gemini-argon-wtu-weekly", unknownSelection.first().id)
+        assertTrue(unknownSelection.none { it.isFallback })
+    }
+
+    @Test
+    fun testResolveCompactCriticalBucketsHiddenPinFallsThroughToDefaultQuad() {
+        val snapshot = SeedData.createSeedSnapshot()
+
+        assertEquals(
+            listOf("gemini-argon-wtu-weekly", "opencode-rolling", "grok-weekly-credits", "gemini-5h"),
+            compactIds(snapshot, hidden = defaultHidden, pinned = "3p-5h", compact = null)
+        )
+    }
+
+    @Test
+    fun testResolveCompactCriticalBucketsCompactSelectionPrecedesPin() {
+        val snapshot = SeedData.createSeedSnapshot()
+
+        val ids = compactIds(
+            snapshot,
+            hidden = defaultHidden,
+            pinned = "gemini-argon-wtu-weekly",
+            compact = "gemini-5h"
+        )
+
+        assertEquals("gemini-5h", ids[0])
+        assertEquals("gemini-argon-wtu-weekly", ids[1])
+    }
+
+    @Test
+    fun testResolveCompactCriticalBucketsReturnsEmptyWhenEverythingIsHidden() {
+        val snapshot = SeedData.createSeedSnapshot()
+        val allIds = snapshot.providers.flatMap { it.buckets }.map { it.id }.toSet()
+
+        assertTrue(snapshot.resolveCompactCriticalBuckets(hiddenBucketIds = allIds).isEmpty())
+    }
+
+    @Test
+    fun testResolveCompactCriticalBucketsTieBreaksEqualGrokPercents() {
+        val base = SeedData.createSeedSnapshot()
+        val equalGrok = base.copy(
+            providers = base.providers.map { provider ->
+                if (provider.id == "grok") {
+                    provider.copy(
+                        buckets = provider.buckets.map {
+                            it.copy(remainingPercent = 100.0, usedPercent = 0.0)
+                        }
+                    )
+                } else {
+                    provider
+                }
+            }
+        )
+        val onlyGrokVisible = setOf(
+            "gemini-argon-wtu-weekly",
+            "gemini-5h",
+            "gemini-weekly",
+            "3p-5h",
+            "3p-weekly",
+            "opencode-rolling",
+            "opencode-weekly",
+            "opencode-monthly"
+        )
+
+        // COL-P5: grok-weekly-credits always wins the equal-percent tie.
+        assertEquals(
+            listOf("grok-weekly-credits", "grok-bot-weekly"),
+            compactIds(equalGrok, hidden = onlyGrokVisible)
+        )
+    }
+
+    @Test
+    fun testWidgetItemShortLabelsForKnownAndUnknownBuckets() {
+        val snapshot = SeedData.createSeedSnapshot()
+
+        val flash = snapshot.resolveCompactCriticalBuckets(
+            hiddenBucketIds = defaultHidden,
+            compactBucketId = "gemini-5h"
+        ).first()
+        assertEquals("gemini-5h", flash.id)
+        assertEquals("AGY FLASH", flash.shortHeaderLabel)
+        assertEquals("5h Roll", flash.shortWindowLabel)
+        assertEquals("Gemini 5h Roll", flash.shortWideRowLabel)
+
+        val customSnapshot = snapshot.copy(
+            providers = listOf(
+                ProviderQuota(
+                    id = "custom",
+                    displayName = "Custom Vendor",
+                    subtitle = "Unknown wire",
+                    status = "ok",
+                    buckets = listOf(
+                        QuotaBucket(
+                            id = "custom-window",
+                            group = "Custom",
+                            label = "Custom Window",
+                            windowType = "rolling",
+                            windowDurationHours = 12,
+                            remainingPercent = 55.0,
+                            usedPercent = 45.0
+                        )
+                    )
+                )
+            ),
+            orcaRoles = emptyList()
+        )
+        val customItem = customSnapshot.resolveWideProviderGroups(emptySet()).single().items.single()
+        assertEquals("CUSTOM", customItem.shortHeaderLabel)
+        assertEquals("12h", customItem.shortWindowLabel)
+        assertEquals("Custom Window", customItem.shortWideRowLabel)
+    }
+
+    @Test
+    fun testResolveWideProviderGroupsOrdersProvidersAndBucketsCanonically() {
+        val groups = SeedData.createSeedSnapshot().resolveWideProviderGroups(defaultHidden)
+
+        assertEquals(listOf("ANTIGRAVITY", "OPENCODE GO", "GROK BUILD"), groups.map { it.title })
+        assertEquals(
+            listOf("gemini-argon-wtu-weekly", "gemini-5h", "gemini-weekly"),
+            groups[0].items.map { it.id }
+        )
+        assertEquals(
+            listOf("opencode-rolling", "opencode-weekly", "opencode-monthly"),
+            groups[1].items.map { it.id }
+        )
+        assertEquals(
+            listOf("grok-weekly-credits", "grok-bot-weekly"),
+            groups[2].items.map { it.id }
+        )
+        assertEquals("Argon Weekly", groups[0].items.first().shortWideRowLabel)
+        assertEquals("350m TTL", groups[2].oauthLeaseLabel)
+        assertNull(groups[0].oauthLeaseLabel)
+    }
+
+    @Test
+    fun testResolveWideProviderGroupsOmitsProvidersWithNoVisibleBuckets() {
+        val snapshot = SeedData.createSeedSnapshot()
+        val agyBucketIds = snapshot.providers
+            .first { it.id == "agy" }
+            .buckets
+            .map { it.id }
+            .toSet()
+
+        val groups = snapshot.resolveWideProviderGroups(defaultHidden + agyBucketIds)
+
+        assertEquals(listOf("OPENCODE GO", "GROK BUILD"), groups.map { it.title })
+    }
+
+    @Test
+    fun testGrokOAuthLeaseLabelTruthTable() {
+        assertNull(grokLeaseLabel(seconds = null, primed = false))
+        assertNull(grokLeaseLabel(seconds = null, primed = true))
+        assertEquals("PRIMED", grokLeaseLabel(seconds = 0L, primed = true))
+        assertEquals("EXPIRED", grokLeaseLabel(seconds = 0L, primed = false))
+        assertEquals("EXPIRED", grokLeaseLabel(seconds = -30L, primed = false))
+        assertEquals("1m TTL", grokLeaseLabel(seconds = 45L, primed = false))
+        assertEquals("88m TTL", grokLeaseLabel(seconds = 5280L, primed = false))
+        assertEquals("350m TTL", grokLeaseLabel(seconds = 21054L, primed = true))
+    }
+
+    @Test
+    fun testWidgetHealthColorGuardsNaNFirstThenInvertsForUsedPolarity() {
+        val slate = Color(0xFF94A3B8)
+        val coral = Color(0xFFFFB4AB)
+        val amber = Color(0xFFFFB951)
+        val emerald = Color(0xFF5CE196)
+
+        assertEquals(slate, widgetHealthColor(Double.NaN, QuotaPolarity.REMAINING))
+        assertEquals(slate, widgetHealthColor(Double.NaN, QuotaPolarity.USED))
+
+        assertEquals(coral, widgetHealthColor(15.0, QuotaPolarity.REMAINING))
+        assertEquals(amber, widgetHealthColor(35.0, QuotaPolarity.REMAINING))
+        assertEquals(emerald, widgetHealthColor(85.0, QuotaPolarity.REMAINING))
+
+        assertEquals(coral, widgetHealthColor(85.0, QuotaPolarity.USED))
+        assertEquals(amber, widgetHealthColor(65.0, QuotaPolarity.USED))
+        assertEquals(emerald, widgetHealthColor(15.0, QuotaPolarity.USED))
     }
 }

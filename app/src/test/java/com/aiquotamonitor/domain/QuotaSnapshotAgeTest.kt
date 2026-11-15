@@ -1,6 +1,8 @@
 package com.aiquotamonitor.domain
 
+import com.aiquotamonitor.domain.model.QuotaBucket
 import com.aiquotamonitor.domain.model.QuotaSnapshot
+import com.aiquotamonitor.domain.model.formatResetCountdownFromIso
 import java.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -71,5 +73,88 @@ class QuotaSnapshotAgeTest {
 
         assertEquals(120L, snapshot.ageSeconds(nowEpochMs))
         assertEquals(180L, snapshot.ageSeconds(nowEpochMs + 60_000L))
+    }
+
+    // ---- Shared reset countdown (Issue #13 / APP-UX6) ----
+
+    private fun resetsInSeconds(seconds: Long): String =
+        Instant.ofEpochMilli(nowEpochMs).plusSeconds(seconds).toString()
+
+    private fun seedBucket(resetsAt: String?): com.aiquotamonitor.domain.model.QuotaBucket =
+        QuotaBucket(
+            id = "gemini-5h",
+            group = "Gemini Models",
+            label = "Gemini 3.8 Flash 5h Rolling",
+            windowType = "rolling",
+            windowDurationHours = 5,
+            remainingPercent = 99.0,
+            usedPercent = 1.0,
+            resetsAt = resetsAt
+        )
+
+    @Test
+    fun testCountdownIsBlankForMissingBlankOrMalformedResetsAt() {
+        assertEquals("", formatResetCountdownFromIso(null, nowEpochMs))
+        assertEquals("", formatResetCountdownFromIso("   ", nowEpochMs))
+        assertEquals("", formatResetCountdownFromIso("not-a-timestamp", nowEpochMs))
+        assertEquals("", seedBucket(null).formatResetCountdown(nowEpochMs))
+        assertEquals("", seedBucket("13/11/2026").formatResetCountdown(nowEpochMs))
+    }
+
+    @Test
+    fun testCountdownShowsNowOnceElapsed() {
+        assertEquals("Now", formatResetCountdownFromIso(resetsInSeconds(0), nowEpochMs))
+        assertEquals("Now", formatResetCountdownFromIso(resetsInSeconds(-90), nowEpochMs))
+    }
+
+    @Test
+    fun testCountdownTruncatesSubMinuteAndSubHourWithoutCarry() {
+        assertEquals("1m", formatResetCountdownFromIso(resetsInSeconds(30), nowEpochMs))
+        // 59m 1s must never round up to "1h".
+        assertEquals("59m", formatResetCountdownFromIso(resetsInSeconds(3541), nowEpochMs))
+    }
+
+    @Test
+    fun testCountdownSubDayNeverEmitsZeroDays() {
+        val twentyThreeHoursFiftyNineMinutesOneSecond = 23L * 3600L + 59L * 60L + 1L
+        assertEquals(
+            "23h 59m",
+            formatResetCountdownFromIso(resetsInSeconds(twentyThreeHoursFiftyNineMinutesOneSecond), nowEpochMs)
+        )
+        assertEquals(
+            "23h",
+            formatResetCountdownFromIso(
+                resetsInSeconds(twentyThreeHoursFiftyNineMinutesOneSecond),
+                nowEpochMs,
+                includeMinutesUnderDay = false
+            )
+        )
+        assertEquals("4h", formatResetCountdownFromIso(resetsInSeconds(4L * 3600L), nowEpochMs))
+    }
+
+    @Test
+    fun testCountdownWholeDaysNeverEmitZeroHours() {
+        assertEquals("1d", formatResetCountdownFromIso(resetsInSeconds(24L * 3600L), nowEpochMs))
+        // 24h 59m still truncates to a bare day, never "1d 0h".
+        assertEquals("1d", formatResetCountdownFromIso(resetsInSeconds(24L * 3600L + 3540L), nowEpochMs))
+        assertEquals("27d", formatResetCountdownFromIso(resetsInSeconds(27L * 86400L), nowEpochMs))
+    }
+
+    @Test
+    fun testCountdownMultiDayKeepsHoursAndDropsMinutes() {
+        val fiveDaysNineteenHoursFortyFiveMinutes =
+            5L * 86400L + 19L * 3600L + 45L * 60L
+        assertEquals(
+            "5d 19h",
+            formatResetCountdownFromIso(resetsInSeconds(fiveDaysNineteenHoursFortyFiveMinutes), nowEpochMs)
+        )
+        assertEquals(
+            "5d 19h",
+            formatResetCountdownFromIso(
+                resetsInSeconds(fiveDaysNineteenHoursFortyFiveMinutes),
+                nowEpochMs,
+                includeMinutesUnderDay = false
+            )
+        )
     }
 }

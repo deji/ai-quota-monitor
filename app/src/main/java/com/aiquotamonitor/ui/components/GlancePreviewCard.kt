@@ -9,10 +9,12 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilterChip
@@ -26,26 +28,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aiquotamonitor.domain.model.ProviderQuota
+import com.aiquotamonitor.domain.model.ProviderWidgetGroup
 import com.aiquotamonitor.domain.model.QuotaBucket
 import com.aiquotamonitor.domain.model.QuotaPolarity
 import com.aiquotamonitor.domain.model.QuotaSnapshot
 import com.aiquotamonitor.domain.model.WidgetQuotaItem
-import com.aiquotamonitor.ui.theme.QuotaCyan
 import com.aiquotamonitor.ui.theme.QuotaEmerald
-
-private val ORCA_CORE_TRIO_IDS = listOf(
-    "gemini-argon-wtu-weekly",
-    "opencode-rolling",
-    "grok-weekly-credits"
-)
+import com.aiquotamonitor.widget.widgetHealthColor
+import kotlin.math.roundToInt
 
 private val SLATE = Color(0xFF94A3B8)
-private val AMBER = Color(0xFFFFB951)
 private val EMERALD = Color(0xFF5CE196)
-private val CORAL = Color(0xFFFFB4AB)
+private val BENTO_CARD = Color(0xFF1A252A)
+private val BENTO_TRACK = Color(0xFF243338)
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -61,16 +60,16 @@ fun GlancePreviewCard(
     onSetWideBuckets: (List<String>) -> Unit = {},
     onToggleWideBucket: (String) -> Unit = {}
 ) {
-    val compactItem = snapshot.resolveCompactWidgetItem(
-        compactBucketId = compactWidgetBucketId,
+    val nowEpochMs = System.currentTimeMillis()
+    val compactItems = snapshot.resolveCompactCriticalBuckets(
         hiddenBucketIds = hiddenBucketIds,
-        pinnedBucketId = pinnedBucketId
+        pinnedBucketId = pinnedBucketId,
+        compactBucketId = compactWidgetBucketId
     )
-    val wideItems = snapshot.resolveWideWidgetItems(
-        wideBucketIds = wideWidgetBucketIds,
-        hiddenBucketIds = hiddenBucketIds
-    )
-    val polaritySuffix = if (polarity == QuotaPolarity.REMAINING) "Left" else "Used"
+    val wideGroups = snapshot.resolveWideProviderGroups(hiddenBucketIds)
+    val activePoolCount = wideGroups.sumOf { it.items.size }
+    // The preview clock only changes once per recomposition, so the countdown renders
+    // from the same instant as the resolved items.
     val polarityTag = if (polarity == QuotaPolarity.REMAINING) "REM" else "USED"
 
     Box(
@@ -93,9 +92,9 @@ fun GlancePreviewCard(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // 1. 2x2 Compact Widget In-App Preview
+            // 1. 2x2 Compact Widget In-App Preview (Quad Micro-Bento Grid)
             Text(
-                text = "Compact Widget (2x2 Launcher Tile)",
+                text = "Compact Widget (2x2 Quad Micro-Bento)",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 11.sp
@@ -105,25 +104,22 @@ fun GlancePreviewCard(
 
             Box(
                 modifier = Modifier
-                    .size(width = 160.dp, height = 150.dp)
+                    .size(width = 196.dp, height = 196.dp)
                     .clip(RoundedCornerShape(20.dp))
-                    .background(Color(0xFF141A1E))
+                    .background(Color(0xFF11161A))
                     .border(1.dp, Color(0xFF2E3940), RoundedCornerShape(20.dp))
-                    .padding(14.dp)
+                    .padding(10.dp)
             ) {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.SpaceBetween
-                ) {
+                Column(modifier = Modifier.fillMaxSize()) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "AI QUOTA • $polarityTag",
+                            text = "CRITICAL POOLS • $polarityTag",
                             style = MaterialTheme.typography.labelSmall,
-                            color = QuotaCyan,
+                            color = SLATE,
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -135,8 +131,10 @@ fun GlancePreviewCard(
                         )
                     }
 
-                    if (compactItem == null) {
-                        Column {
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    if (compactItems.isEmpty()) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
                             Text(
                                 text = "--",
                                 style = MaterialTheme.typography.displaySmall,
@@ -150,21 +148,45 @@ fun GlancePreviewCard(
                                 color = SLATE,
                                 fontSize = 10.sp
                             )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = "Tap to configure",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = QuotaCyan,
-                                fontSize = 8.sp,
-                                fontWeight = FontWeight.Bold
-                            )
                         }
                     } else {
-                        CompactPreviewBody(
-                            item = compactItem,
-                            polarity = polarity,
-                            polaritySuffix = polaritySuffix
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth().weight(1f),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            CompactBentoPreviewCell(
+                                item = compactItems.getOrNull(0),
+                                polarity = polarity,
+                                nowEpochMs = nowEpochMs,
+                                modifier = Modifier.weight(1f).fillMaxWidth()
+                            )
+                            CompactBentoPreviewCell(
+                                item = compactItems.getOrNull(1),
+                                polarity = polarity,
+                                nowEpochMs = nowEpochMs,
+                                modifier = Modifier.weight(1f).fillMaxWidth()
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth().weight(1f),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            CompactBentoPreviewCell(
+                                item = compactItems.getOrNull(2),
+                                polarity = polarity,
+                                nowEpochMs = nowEpochMs,
+                                modifier = Modifier.weight(1f).fillMaxWidth()
+                            )
+                            CompactBentoPreviewCell(
+                                item = compactItems.getOrNull(3),
+                                polarity = polarity,
+                                nowEpochMs = nowEpochMs,
+                                modifier = Modifier.weight(1f).fillMaxWidth()
+                            )
+                        }
                     }
                 }
             }
@@ -179,7 +201,7 @@ fun GlancePreviewCard(
                 FilterChip(
                     selected = compactWidgetBucketId == null,
                     onClick = { onSelectCompactBucket(null) },
-                    label = { Text("Auto (Hero Spotlight)") },
+                    label = { Text("Auto (Fastest Draining)") },
                     colors = filterChipColors()
                 )
 
@@ -207,9 +229,9 @@ fun GlancePreviewCard(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // 2. 4x2 Wide Orca Stage Deck In-App Preview
+            // 2. 4x3 Wide Provider Bento Deck In-App Preview
             Text(
-                text = "Orca Stage Deck (4x2 Responsive Span)",
+                text = "Provider Quota Deck (4x3 Three-Column Bento)",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 11.sp
@@ -221,9 +243,9 @@ fun GlancePreviewCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(22.dp))
-                    .background(Color(0xFF141A1E))
+                    .background(Color(0xFF11161A))
                     .border(1.dp, Color(0xFF2E3940), RoundedCornerShape(22.dp))
-                    .padding(14.dp)
+                    .padding(10.dp)
             ) {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     Row(
@@ -232,33 +254,52 @@ fun GlancePreviewCard(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "ORCA STAGE DECK • $polarityTag",
+                            text = "PROVIDER QUOTA DECK • $polarityTag",
                             style = MaterialTheme.typography.labelSmall,
-                            color = QuotaCyan,
+                            color = SLATE,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 0.5.sp
                         )
                         Text(
-                            text = "Pixel 8 Pro Live",
+                            text = "$activePoolCount Active Pools",
                             style = MaterialTheme.typography.labelSmall,
-                            color = SLATE,
-                            fontSize = 9.sp
+                            color = QuotaEmerald,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        wideItems.forEach { item ->
-                            WidePreviewCell(
-                                item = item,
-                                polarity = polarity,
-                                modifier = Modifier.weight(1f)
+                    if (wideGroups.isEmpty()) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = "--",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = SLATE
                             )
+                            Text(
+                                text = "All models hidden",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = SLATE,
+                                fontSize = 10.sp
+                            )
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            wideGroups.forEach { group ->
+                                WideProviderColumnPreview(
+                                    group = group,
+                                    polarity = polarity,
+                                    nowEpochMs = nowEpochMs,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
                         }
                     }
                 }
@@ -266,160 +307,216 @@ fun GlancePreviewCard(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                FilterChip(
-                    selected = wideWidgetBucketIds.isEmpty(),
-                    onClick = { onSetWideBuckets(emptyList()) },
-                    label = { Text("Orca Roles (Default)") },
-                    colors = filterChipColors()
-                )
-                FilterChip(
-                    selected = wideWidgetBucketIds == ORCA_CORE_TRIO_IDS,
-                    onClick = { onSetWideBuckets(ORCA_CORE_TRIO_IDS) },
-                    label = { Text("Orca Core Trio") },
-                    colors = filterChipColors()
-                )
-
-                snapshot.orcaRoles.forEach { role ->
-                    val token = "role:${role.role}"
-                    val slot = wideWidgetBucketIds.indexOf(token)
-                    val base = "Role: ${role.role.lowercase().replaceFirstChar { it.uppercase() }}"
-                    FilterChip(
-                        selected = slot >= 0,
-                        onClick = { onToggleWideBucket(token) },
-                        label = { Text(if (slot >= 0) "$base #${slot + 1}" else base) },
-                        colors = filterChipColors()
-                    )
-                }
-
-                snapshot.providers.forEach { provider ->
-                    provider.buckets.forEach { bucket ->
-                        val slot = wideWidgetBucketIds.indexOf(bucket.id)
-                        val base = compactChipLabel(provider, bucket)
-                        FilterChip(
-                            selected = slot >= 0,
-                            onClick = { onToggleWideBucket(bucket.id) },
-                            label = { Text(if (slot >= 0) "$base #${slot + 1}" else base) },
-                            colors = filterChipColors()
-                        )
-                    }
-                }
-            }
+            Text(
+                text = "The Wide Provider Deck automatically displays every visible bucket " +
+                    "across all providers. Configure which models appear with the " +
+                    "dashboard's Model Filter.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 10.sp
+            )
         }
     }
 }
 
 @Composable
-private fun CompactPreviewBody(
-    item: WidgetQuotaItem,
+private fun CompactBentoPreviewCell(
+    item: WidgetQuotaItem?,
     polarity: QuotaPolarity,
-    polaritySuffix: String
+    nowEpochMs: Long,
+    modifier: Modifier = Modifier
 ) {
-    val displayPercent = item.displayPercent(polarity)
+    val displayPercent = item?.displayPercent(polarity) ?: Double.NaN
     val isUnavailable = displayPercent.isNaN()
+    val healthColor = widgetHealthColor(displayPercent, polarity)
+    val countdown = item
+        ?.formatResetCountdown(nowEpochMs = nowEpochMs, includeMinutesUnderDay = false)
+        ?.ifBlank { "—" }
+        ?: "—"
 
-    Column {
-        if (item.isFallback && !isUnavailable) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(BENTO_CARD)
+            .padding(6.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Text(
-                text = "FALLBACK • ${item.categoryLabel}",
+                text = item?.shortHeaderLabel ?: "--",
                 style = MaterialTheme.typography.labelSmall,
-                color = AMBER,
+                fontSize = 9.sp,
                 fontWeight = FontWeight.Bold,
-                fontSize = 8.sp
+                color = SLATE,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            Spacer(modifier = Modifier.width(2.dp))
+            Text(
+                text = countdown,
+                style = MaterialTheme.typography.labelSmall,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                color = healthColor,
+                maxLines = 1
             )
         }
-        Text(
-            text = if (isUnavailable) "--" else "${displayPercent.toInt()}%",
-            style = MaterialTheme.typography.displaySmall,
-            fontWeight = FontWeight.ExtraBold,
-            color = if (isUnavailable) SLATE else Color(0xFFE2E8F0),
-            fontSize = 32.sp
-        )
-        Text(
-            text = "${item.titleLabel} $polaritySuffix",
-            style = MaterialTheme.typography.bodySmall,
-            color = SLATE,
-            fontSize = 10.sp,
-            maxLines = 1
-        )
-    }
 
-    if (!isUnavailable) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = if (isUnavailable) "--%" else "${displayPercent.roundToInt()}%",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = healthColor,
+                maxLines = 1
+            )
+            Text(
+                text = item?.shortWindowLabel.orEmpty(),
+                style = MaterialTheme.typography.labelSmall,
+                fontSize = 8.sp,
+                color = Color(0xFF64748B),
+                maxLines = 1
+            )
+        }
+
+        Spacer(modifier = Modifier.height(3.dp))
+
         LinearProgressIndicator(
-            progress = { (displayPercent / 100f).toFloat().coerceIn(0f, 1f) },
+            progress = {
+                if (isUnavailable) 0f else (displayPercent / 100.0).toFloat().coerceIn(0f, 1f)
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(4.dp)
                 .clip(RoundedCornerShape(2.dp)),
-            color = QuotaCyan,
-            trackColor = Color(0xFF263238)
+            color = healthColor,
+            trackColor = BENTO_TRACK
         )
     }
 }
 
 @Composable
-private fun WidePreviewCell(
-    item: WidgetQuotaItem,
+private fun WideProviderColumnPreview(
+    group: ProviderWidgetGroup,
     polarity: QuotaPolarity,
+    nowEpochMs: Long,
     modifier: Modifier = Modifier
 ) {
-    val displayPercent = item.displayPercent(polarity)
-    val isUnavailable = displayPercent.isNaN()
-    val percentColor = when {
-        isUnavailable -> SLATE
-        displayPercent <= 20.0 -> CORAL
-        displayPercent <= 40.0 -> AMBER
-        else -> EMERALD
+    val titleColor = when (group.providerId.lowercase()) {
+        "agy" -> Color(0xFF38BDF8)
+        "opencode", "opencode_go" -> Color(0xFFA78BFA)
+        "grok" -> EMERALD
+        else -> SLATE
     }
-    val showFallbackCue = item.isFallback && !isUnavailable
-    val headerColor = if (showFallbackCue) AMBER else SLATE
-    val header = if (showFallbackCue) "FALLBACK • ${item.categoryLabel}" else item.categoryLabel
-    val pace = item.paceDeltaPercent
 
-    Box(
+    Column(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFF1B2329))
-            .padding(8.dp)
+            .background(BENTO_CARD)
+            .padding(6.dp)
     ) {
-        Column {
-            Text(
-                text = header,
-                style = MaterialTheme.typography.labelSmall,
-                fontSize = 8.sp,
-                fontWeight = FontWeight.Bold,
-                color = headerColor,
-                maxLines = 1
-            )
-            Text(
-                text = if (isUnavailable) "--" else "${displayPercent.toInt()}%",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = percentColor
-            )
-            Text(
-                text = item.titleLabel,
-                style = MaterialTheme.typography.bodySmall,
-                fontSize = 9.sp,
-                color = Color(0xFFE2E8F0),
-                maxLines = 1
-            )
-            if (!isUnavailable && pace != 0.0) {
+        Text(
+            text = group.title,
+            style = MaterialTheme.typography.labelSmall,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Bold,
+            color = titleColor,
+            maxLines = 1
+        )
+
+        group.items.forEach { item ->
+            Spacer(modifier = Modifier.height(3.dp))
+            WideBucketRowPreview(item = item, polarity = polarity, nowEpochMs = nowEpochMs)
+        }
+
+        val leaseLabel = group.oauthLeaseLabel
+        if (leaseLabel != null) {
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
-                    text = if (pace <= 0) "Ahead: ${pace}%" else "Burn: +${pace}%",
+                    text = "OAuth Lease",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontSize = 8.sp,
+                    color = Color(0xFF64748B),
+                    maxLines = 1
+                )
+                Text(
+                    text = leaseLabel,
                     style = MaterialTheme.typography.labelSmall,
                     fontSize = 8.sp,
                     fontWeight = FontWeight.Bold,
-                    color = if (pace <= 0) EMERALD else AMBER,
+                    color = EMERALD,
                     maxLines = 1
                 )
             }
         }
     }
+}
+
+@Composable
+private fun WideBucketRowPreview(
+    item: WidgetQuotaItem,
+    polarity: QuotaPolarity,
+    nowEpochMs: Long
+) {
+    val displayPercent = item.displayPercent(polarity)
+    val isUnavailable = displayPercent.isNaN()
+    val healthColor = widgetHealthColor(displayPercent, polarity)
+    val pctText = if (isUnavailable) "--%" else "${displayPercent.roundToInt()}%"
+    val resetText = item.formatResetCountdown(
+        nowEpochMs = nowEpochMs,
+        includeMinutesUnderDay = true
+    )
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = item.shortWideRowLabel,
+            style = MaterialTheme.typography.labelSmall,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Medium,
+            color = Color(0xFFE2E8F0),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+        Spacer(modifier = Modifier.width(2.dp))
+        Text(
+            text = if (resetText.isBlank()) pctText else "$pctText · $resetText",
+            style = MaterialTheme.typography.labelSmall,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Bold,
+            color = healthColor,
+            maxLines = 1
+        )
+    }
+
+    Spacer(modifier = Modifier.height(2.dp))
+
+    LinearProgressIndicator(
+        progress = {
+            if (isUnavailable) 0f else (displayPercent / 100.0).toFloat().coerceIn(0f, 1f)
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(4.dp)
+            .clip(RoundedCornerShape(2.dp)),
+        color = healthColor,
+        trackColor = BENTO_TRACK
+    )
 }
 
 @Composable

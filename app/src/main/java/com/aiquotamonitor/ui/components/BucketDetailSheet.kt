@@ -49,8 +49,6 @@ import com.aiquotamonitor.ui.theme.QuotaAmber
 import com.aiquotamonitor.ui.theme.QuotaCoral
 import com.aiquotamonitor.ui.theme.QuotaCyan
 import com.aiquotamonitor.ui.theme.QuotaEmerald
-import java.time.Duration
-import java.time.Instant
 import java.util.Locale
 
 /**
@@ -241,16 +239,8 @@ fun BucketDetailSheet(
             }
 
             // Section 2: Reset Window & Exhaustion Projection
-            val resetTimeFormatted = bucket.resetsAt?.let { at ->
-                try {
-                    val resetInstant = Instant.parse(at)
-                    val duration = Duration.between(Instant.now(), resetInstant)
-                    if (duration.isNegative) "Resetting now"
-                    else "${duration.toHours()}h ${duration.toMinutes() % 60}m"
-                } catch (_: Exception) {
-                    null
-                }
-            } ?: bucket.hoursUntilReset?.let { String.format(Locale.US, "%.1fh", it) } ?: "N/A"
+            // Shared truncation-only countdown; never rounds up across a boundary.
+            val resetCountdown = bucket.formatResetCountdown().ifBlank { "N/A" }
 
             val exhaustionText = if (bucket.burnRatePerHour > 0.0) {
                 val hoursToZero = bucket.remainingPercent / bucket.burnRatePerHour
@@ -293,7 +283,7 @@ fun BucketDetailSheet(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = resetTimeFormatted,
+                            text = resetCountdown,
                             style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
