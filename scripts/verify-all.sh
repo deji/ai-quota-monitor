@@ -18,7 +18,7 @@ echo "==> [2/5] Running Mac Collector & Repo Hygiene Test Suite..."
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s collector/tests -v
 
 echo "==> [3/5] Running Android Lint, JUnit Tests, and Debug APK Build..."
-./gradlew lintDebug testDebugUnitTest assembleDebug
+./gradlew --no-daemon lintDebug testDebugUnitTest assembleDebug
 
 echo "==> [4/5] Verifying Built APK Artifact..."
 ls -lh app/build/outputs/apk/debug/app-debug.apk

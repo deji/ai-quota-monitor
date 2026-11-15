@@ -42,6 +42,8 @@ Runs the pre-commit secret guard, all Python collector + repo-hygiene unit tests
 ./scripts/verify-all.sh
 ```
 
+Gate 3 runs `./gradlew --no-daemon lintDebug testDebugUnitTest assembleDebug` internally, so piping the script's output (`./scripts/verify-all.sh 2>&1 | tail -60`) returns as soon as the build finishes instead of hanging on a `GradleDaemon` that inherited the pipe.
+
 Or run individual test suites directly:
 
 ```bash
@@ -124,6 +126,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s collector/tests -v
      adb devices -l
      ```
    *(Tip: You can also run `./scripts/deploy-pixel8pro.sh --wireless` for an interactive prompt that pairs, connects, installs, and launches the app in one go.)*
+   *If `adb devices` stays empty while the phone is reachable over Tailscale/LAN, `./scripts/deploy-pixel8pro.sh` checks `${TMPDIR%/}/adb.$(id -u).log` for `SSLV3_ALERT_CERTIFICATE_UNKNOWN` and tells you the pairing expired — redo the 6-digit `adb pair` step above.*
 
 #### Option B: Connect via USB-C Cable
 

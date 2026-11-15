@@ -106,6 +106,16 @@ orca orchestration worker-start \
 
 Note: In Orca `worker-start`, `--agent grok` reads its model (`grok-4.7`) and effort (`medium`) from `~/.grok/config.toml` rather than CLI flags, and requires `[folders."<worktreePath>"]\ntrusted = true` in `~/.grok/trusted_folders.toml` so newly created worktrees do not block on interactive TUI folder trust (`agent-trust-workspace`).
 
+### Stage 4 — Final Gate 2 Review & Closeout
+
+Once the Gate 2 review returns `APPROVED` and `./scripts/verify-all.sh` plus the emulator evidence are green with high confidence, the coordinator finishes the issue in the same turn. Do not wait for the owner to nudge it:
+
+1. `./scripts/gh-issue-workflow.sh verify <issue-number>` then `./scripts/gh-issue-workflow.sh close <issue-number>`.
+2. Merge the issue worktree and push to `origin/main`.
+3. Deploy the verified APK to the physical Pixel 8 Pro with `./scripts/deploy-pixel8pro.sh`.
+
+The only acceptable pause is a genuinely blocked deploy: when `./scripts/deploy-pixel8pro.sh` reports `SSLV3_ALERT_CERTIFICATE_UNKNOWN`, Wireless Debugging pairing has expired and the owner must tap **Pair device with pairing code** and supply the 6-digit code. Ask for that code; do not fall back to the emulator as a stand-in for the owner's device.
+
 ---
 
 ## 4. Task-Spec Contract (Required in Every Brief)
@@ -119,7 +129,7 @@ Every worker brief must be self-contained (<80 lines) and explicitly state:
    - Zero secrets, tokens, or personal paths (`/Users/...`).
 4. **Ownership**: Exact files the worker may create or edit, and whether committing is authorized.
 5. **Observable Acceptance Gates (`./scripts/verify-all.sh`)**:
-   - `./gradlew lintDebug testDebugUnitTest assembleDebug`
+   - `./gradlew --no-daemon lintDebug testDebugUnitTest assembleDebug` (the `--no-daemon` flag is inside `verify-all.sh`, so a piped `verify-all.sh | tail` never hangs on a daemon that inherited the pipe's file descriptors)
    - `python3 -m unittest discover -s collector/tests -v` (including `test_learnings_and_docs_sync_gate`)
    - Pre-commit secret hygiene check (`.githooks/pre-commit`)
    - **Unprompted End-of-Task Learnings & Doc-Sync Check**: Update `docs/lessons.md`, `docs/bugs/index.md`, `docs/status.md`, `README.md`, and `.agents/skills/orca-quota-engineering/SKILL.md` in the same change before reporting `worker_done` or task completion.

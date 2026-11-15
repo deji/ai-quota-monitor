@@ -56,6 +56,24 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# Detect an expired Wireless ADB TLS pairing: the endpoint still accepts TCP (so it
+# looks "reachable"), but the device no longer trusts this Mac's ADB key and adb
+# logs SSLV3_ALERT_CERTIFICATE_UNKNOWN. Silently retrying `adb connect` never fixes it.
+warn_if_wireless_tls_pairing_expired() {
+  local ep="${1:-}"
+  local adb_log="${TMPDIR%/}/adb.$(id -u).log"
+  if [[ ! -f "$adb_log" ]]; then
+    adb_log="/tmp/adb.$(id -u).log"
+  fi
+  if [[ ! -f "$adb_log" ]]; then
+    return 0
+  fi
+  if tail -n 25 "$adb_log" 2>/dev/null | grep -q "SSLV3_ALERT_CERTIFICATE_UNKNOWN"; then
+    echo "==> NOTE: Pixel 8 Pro is reachable at $ep, but Wireless ADB TLS certificate failed (SSLV3_ALERT_CERTIFICATE_UNKNOWN — pairing expired)."
+    echo "==> Tap 'Pair device with pairing code' in Developer Options -> Wireless debugging and run: adb pair <ip>:<pairing-port> <6-digit-code>"
+  fi
+}
+
 auto_connect_wireless_adb() {
   if ! command -v dns-sd >/dev/null 2>&1; then
     return 1
@@ -127,6 +145,9 @@ PY
         break
       fi
     done
+  fi
+  if ! adb devices | grep -qE '[[:space:]]device$'; then
+    warn_if_wireless_tls_pairing_expired "${ep:-}"
   fi
 }
 

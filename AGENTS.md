@@ -25,6 +25,8 @@ Opening the chat in Grok does not choose the planner. Plan with `--agent antigra
 
 Issue comments, specs, and repo invariants stay in [`docs/workers.md`](docs/workers.md) and [`.agents/skills/orca-quota-engineering/SKILL.md`](.agents/skills/orca-quota-engineering/SKILL.md). Verification scripts: `./scripts/verify-all.sh` and `./scripts/review-plan-and-code.sh`.
 
+Closeout is proactive, not nudged. Once Gate 2 review is `APPROVED` and `./scripts/verify-all.sh` plus the emulator evidence pass with high confidence, the coordinator closes the GitHub Issue, merges and pushes to `origin/main`, and deploys the verified APK to the owner's Pixel 8 Pro with `./scripts/deploy-pixel8pro.sh` in the same turn, without waiting for the owner to ask; it prompts the owner only when `SSLV3_ALERT_CERTIFICATE_UNKNOWN` means a 6-digit pairing code is required.
+
 ## Layout
 
 ```text
