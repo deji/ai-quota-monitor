@@ -61,7 +61,6 @@ private val criticalBucketComparator = compareBy<QuotaBucket>(
     { if (it.remainingPercent <= 50.0) 0 else 1 },
     { if (it.remainingPercent <= 50.0) it.remainingPercent else it.windowDurationHours.toDouble() },
     { it.remainingPercent },
-    { it.windowDurationHours },
     { it.id == "grok-bot-weekly" },
     { it.id }
 )
@@ -323,8 +322,7 @@ data class QuotaSnapshot(
         if (cleanCompact != null) {
             if (cleanCompact.startsWith("role:", ignoreCase = true)) {
                 val roleName = cleanCompact
-                    .removePrefix("role:")
-                    .removePrefix("ROLE:")
+                    .substringAfter(":")
                     .trim()
                     .uppercase()
                 val role = orcaRoles.firstOrNull { it.role.equals(roleName, ignoreCase = true) }

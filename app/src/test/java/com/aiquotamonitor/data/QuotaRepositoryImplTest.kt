@@ -1647,8 +1647,20 @@ class QuotaRepositoryImplTest {
         assertEquals(amber, widgetHealthColor(35.0, QuotaPolarity.REMAINING))
         assertEquals(emerald, widgetHealthColor(85.0, QuotaPolarity.REMAINING))
 
+        // Exact REMAINING cuts: coral at <= 20, amber at <= 50, emerald above.
+        assertEquals(coral, widgetHealthColor(20.0, QuotaPolarity.REMAINING))
+        assertEquals(amber, widgetHealthColor(20.001, QuotaPolarity.REMAINING))
+        assertEquals(amber, widgetHealthColor(50.0, QuotaPolarity.REMAINING))
+        assertEquals(emerald, widgetHealthColor(50.001, QuotaPolarity.REMAINING))
+
         assertEquals(coral, widgetHealthColor(85.0, QuotaPolarity.USED))
         assertEquals(amber, widgetHealthColor(65.0, QuotaPolarity.USED))
         assertEquals(emerald, widgetHealthColor(15.0, QuotaPolarity.USED))
+
+        // Exact USED cuts: coral at >= 80, amber at >= 50, emerald below.
+        assertEquals(coral, widgetHealthColor(80.0, QuotaPolarity.USED))
+        assertEquals(amber, widgetHealthColor(79.999, QuotaPolarity.USED))
+        assertEquals(amber, widgetHealthColor(50.0, QuotaPolarity.USED))
+        assertEquals(emerald, widgetHealthColor(49.999, QuotaPolarity.USED))
     }
 }
