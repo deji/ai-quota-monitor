@@ -92,7 +92,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s collector/tests -v
    "healthchecksPingUrl": "https://hc-ping.com/<uuid>"
    ```
 
-   An empty value disables pings. The URL is a secret: keep it in that file or in `AQM_HEALTHCHECKS_PING_URL`, and do not commit it. The collector POSTs `/start` when it binds and a success ping every `healthchecksIntervalSeconds` (default 60, clamped to 30–3600). A dead process is the missed ping.
+   An empty value disables pings. The URL is a secret: keep it in that file or in `AQM_HEALTHCHECKS_PING_URL`, and do not commit it. The collector POSTs `/start` when it binds and a success ping every `healthchecksIntervalSeconds` (default 60, clamped to 30–3600). A dead process is the missed ping. Collector unit tests refuse to write this file, and a save merges onto the existing JSON so it never blanks `bearerToken`, `relayKeyHex`, `gistId`, or `healthchecksPingUrl`. The login config has been restored and the collector is working; restart the agent after you change this value so the ping thread picks it up.
 
 ---
 

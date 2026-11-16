@@ -669,6 +669,18 @@ class TestHTTPServer(unittest.TestCase):
 
         cls.bearer_token = "synthetic_test_bearer_token_abc123"
         cls.storage = QuotaStorage(db_path=":memory:")
+        cls._config_dir = tempfile.TemporaryDirectory()
+        cls._config_path = os.path.join(cls._config_dir.name, "config.json")
+        cls._config = {
+            "bearerToken": cls.bearer_token,
+            "relayKeyHex": "cd" * 32,
+            "gistId": "gist_test",
+            "healthchecksPingUrl": "",
+            "activeHoursStart": "00:00",
+            "activeHoursEnd": "23:59",
+        }
+        with open(cls._config_path, "w", encoding="utf-8") as handle:
+            json.dump(cls._config, handle)
 
         # Hermetic mocks: stub all subprocess and network calls so test finishes in <1s
         cls.patches = [
@@ -688,7 +700,8 @@ class TestHTTPServer(unittest.TestCase):
             port=cls.port,
             bearer_token=cls.bearer_token,
             storage=cls.storage,
-            config={"activeHoursStart": "00:00", "activeHoursEnd": "23:59"},
+            config=dict(cls._config),
+            config_path=cls._config_path,
         )
         cls.thread = threading.Thread(target=cls.server.serve_forever, daemon=True)
         cls.thread.start()
@@ -699,6 +712,9 @@ class TestHTTPServer(unittest.TestCase):
         cls.server.shutdown()
         for p in reversed(cls.patches):
             p.stop()
+        config_dir = getattr(cls, "_config_dir", None)
+        if config_dir is not None:
+            config_dir.cleanup()
 
     def test_health_endpoint(self):
         url = f"http://127.0.0.1:{self.port}/v1/health"
@@ -774,6 +790,14 @@ class TestHTTPServer(unittest.TestCase):
             self.assertEqual(data["schemaVersion"], 1)
             self.assertEqual(data["smartPrime"]["activeHoursStart"], "07:30")
             self.assertEqual(data["smartPrime"]["activeHoursEnd"], "21:45")
+
+        with open(self._config_path, "r", encoding="utf-8") as handle:
+            saved = json.load(handle)
+        self.assertEqual(saved["activeHoursStart"], "07:30")
+        self.assertEqual(saved["activeHoursEnd"], "21:45")
+        self.assertEqual(saved["bearerToken"], self.bearer_token)
+        self.assertEqual(saved["relayKeyHex"], "cd" * 32)
+        self.assertEqual(saved["gistId"], "gist_test")
 
         # Invalid format fails with 400
         bad_req = urllib.request.Request(
@@ -880,6 +904,113 @@ class TestCLIAndConfig(unittest.TestCase):
 
             loaded = load_config(cfg_path)
             self.assertEqual(loaded["bearerToken"], cfg["bearerToken"])
+
+    def test_partial_save_keeps_secrets_and_updates_hours(self):
+        from collector.config import save_config
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cfg_path = os.path.join(tmpdir, "config.json")
+            save_config(
+                {
+                    "bearerToken": "a" * 64,
+                    "relayKeyHex": "b" * 64,
+                    "gistId": "gist_keep",
+                    "healthchecksPingUrl": _HC_BASE,
+                    "activeHoursStart": "08:00",
+                    "activeHoursEnd": "22:00",
+                },
+                cfg_path,
+            )
+            save_config(
+                {
+                    "activeHoursStart": "07:30",
+                    "activeHoursEnd": "21:45",
+                    "bearerToken": "",
+                    "relayKeyHex": " ",
+                    "gistId": "",
+                    "healthchecksPingUrl": "",
+                },
+                cfg_path,
+            )
+            with open(cfg_path, "r", encoding="utf-8") as handle:
+                saved = json.load(handle)
+            self.assertEqual(saved["bearerToken"], "a" * 64)
+            self.assertEqual(saved["relayKeyHex"], "b" * 64)
+            self.assertEqual(saved["gistId"], "gist_keep")
+            self.assertEqual(saved["healthchecksPingUrl"], _HC_BASE)
+            self.assertEqual(saved["activeHoursStart"], "07:30")
+            self.assertEqual(saved["activeHoursEnd"], "21:45")
+
+    def test_tests_refuse_to_write_the_live_user_config(self):
+        import hashlib
+
+        from collector.config import save_config
+
+        user_path = os.path.expanduser("~/.config/ai-quota-monitor/config.json")
+        before = None
+        if os.path.exists(user_path):
+            with open(user_path, "rb") as handle:
+                before = hashlib.sha256(handle.read()).hexdigest()
+        with self.assertRaises(RuntimeError):
+            save_config({"activeHoursStart": "07:30", "activeHoursEnd": "21:45"})
+        if before is None:
+            self.assertFalse(os.path.exists(user_path))
+        else:
+            with open(user_path, "rb") as handle:
+                self.assertEqual(hashlib.sha256(handle.read()).hexdigest(), before)
+
+    def test_active_hours_without_config_path_does_not_save(self):
+        import hashlib
+
+        from collector.server import QuotaHTTPServer
+        from collector.storage import QuotaStorage
+
+        user_path = os.path.expanduser("~/.config/ai-quota-monitor/config.json")
+        before = None
+        if os.path.exists(user_path):
+            with open(user_path, "rb") as handle:
+                before = hashlib.sha256(handle.read()).hexdigest()
+
+        probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+        probe.close()
+        server = QuotaHTTPServer(
+            host="127.0.0.1",
+            port=port,
+            bearer_token="synthetic_test_bearer_token_abc123",
+            storage=QuotaStorage(db_path=":memory:"),
+            config={"activeHoursStart": "00:00", "activeHoursEnd": "23:59"},
+            config_path=None,
+        )
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        time.sleep(0.01)
+        try:
+            payload = json.dumps({"activeHoursStart": "07:30", "activeHoursEnd": "21:45"}).encode("utf-8")
+            req = urllib.request.Request(
+                f"http://127.0.0.1:{port}/v1/config/active-hours",
+                data=payload,
+                headers={
+                    "Authorization": "Bearer synthetic_test_bearer_token_abc123",
+                    "Content-Type": "application/json",
+                },
+                method="POST",
+            )
+            with patch("collector.server.save_config") as save, patch(
+                "collector.server.collect_all_quotas",
+                return_value={"schemaVersion": 1, "smartPrime": {}},
+            ):
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    self.assertEqual(resp.status, 200)
+            save.assert_not_called()
+        finally:
+            server.shutdown()
+        if before is None:
+            self.assertFalse(os.path.exists(user_path))
+        else:
+            with open(user_path, "rb") as handle:
+                self.assertEqual(hashlib.sha256(handle.read()).hexdigest(), before)
 
     def test_default_host_is_loopback(self):
         """Medium 5: default host must be 127.0.0.1, not 0.0.0.0."""

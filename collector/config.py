@@ -5,12 +5,15 @@ import re
 import secrets
 import shutil
 import subprocess
+import sys
 import time
 from typing import Any, Callable, Dict, Optional
 
 DEFAULT_CONFIG_DIR = os.path.expanduser("~/.config/ai-quota-monitor")
 DEFAULT_CONFIG_FILE = os.path.join(DEFAULT_CONFIG_DIR, "config.json")
 DEFAULT_DB_PATH = os.path.expanduser("~/.local/share/ai-quota-monitor/history.db")
+# Partial writes must not blank these. Empty-to-empty is fine; non-empty to empty is not.
+_PRESERVED_SECRET_KEYS = ("bearerToken", "relayKeyHex", "gistId", "healthchecksPingUrl")
 TAILSCALE_WAIT_SECONDS = 120
 TAILSCALE_POLL_SECONDS = 2.0
 
@@ -167,16 +170,64 @@ def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
     return cfg
 
 
+def live_user_config_path() -> str:
+    """The on-disk collector config for this user, independent of test monkeypatches."""
+    return os.path.realpath(
+        os.path.join(os.path.expanduser("~"), ".config", "ai-quota-monitor", "config.json")
+    )
+
+
+def _refuse_live_config_write_from_tests(path: str) -> None:
+    """Unit tests must never replace the login collector's config."""
+    if "unittest" not in sys.modules and not os.environ.get("PYTEST_CURRENT_TEST"):
+        return
+    try:
+        writing_live_file = os.path.realpath(path) == live_user_config_path()
+    except OSError:
+        return
+    if writing_live_file:
+        raise RuntimeError("Refusing to write the user collector config from a test")
+
+
+def _merge_preserving_secrets(cfg: Dict[str, Any], existing: Dict[str, Any]) -> Dict[str, Any]:
+    """Overlay cfg onto existing. Never replace a non-empty secret with a blank."""
+    merged = dict(existing)
+    merged.update(cfg)
+    for key in _PRESERVED_SECRET_KEYS:
+        if key not in cfg:
+            continue
+        incoming = cfg.get(key)
+        previous = existing.get(key)
+        incoming_blank = incoming is None or not str(incoming).strip()
+        if incoming_blank and str(previous or "").strip():
+            merged[key] = previous
+    return merged
+
+
 def save_config(cfg: Dict[str, Any], config_path: Optional[str] = None) -> None:
-    """Atomically save configuration to JSON file with 0600 permissions."""
+    """Atomically save configuration to JSON file with 0600 permissions.
+
+    An existing file is the base. Keys in cfg overlay it. bearerToken, relayKeyHex,
+    gistId, and healthchecksPingUrl are kept when the incoming value is blank.
+    """
     path = config_path or os.environ.get("AQM_CONFIG_PATH") or DEFAULT_CONFIG_FILE
+    _refuse_live_config_write_from_tests(path)
+    to_write: Dict[str, Any] = dict(cfg)
+    if os.path.exists(path):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                existing = json.load(f)
+        except Exception as exc:
+            raise RuntimeError("Refusing to replace an unreadable collector config") from exc
+        if isinstance(existing, dict):
+            to_write = _merge_preserving_secrets(cfg, existing)
     parent_dir = os.path.dirname(path)
     if parent_dir and not os.path.exists(parent_dir):
         os.makedirs(parent_dir, mode=0o700, exist_ok=True)
 
     temp_path = f"{path}.tmp.{secrets.token_hex(4)}"
     with open(temp_path, "w", encoding="utf-8") as f:
-        json.dump(cfg, f, indent=2)
+        json.dump(to_write, f, indent=2)
     os.chmod(temp_path, 0o600)
     os.replace(temp_path, path)
 

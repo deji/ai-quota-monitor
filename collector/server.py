@@ -166,23 +166,30 @@ class ScrubbedHTTPHandler(BaseHTTPRequestHandler):
                 with lock:
                     self.config["activeHoursStart"] = start_hhmm
                     self.config["activeHoursEnd"] = end_hhmm
-                    try:
-                        save_config(self.config, self.config_path)
-                    except Exception as e:
-                        logger.warning("Failed to persist updated active hours to config: %s", type(e).__name__)
+                    self._persist_active_hours()
             else:
                 self.config["activeHoursStart"] = start_hhmm
                 self.config["activeHoursEnd"] = end_hhmm
-                try:
-                    save_config(self.config, self.config_path)
-                except Exception as e:
-                    logger.warning("Failed to persist updated active hours to config: %s", type(e).__name__)
+                self._persist_active_hours()
 
             snapshot = self._refresh_quota(publish_relay=True, manual_refresh=False, force_prime=False)
             self._send_json_response(200, snapshot)
             return
 
         self._send_json_response(404, {"error": "Not Found"})
+
+    def _persist_active_hours(self) -> None:
+        """Write active hours only when this server was given an explicit config file.
+
+        A missing path used to fall through to the login user's config and replace it
+        with the in-memory dict, which dropped the bearer token and Healthchecks URL.
+        """
+        if not self.config_path:
+            return
+        try:
+            save_config(self.config, self.config_path)
+        except Exception as e:
+            logger.warning("Failed to persist updated active hours to config: %s", type(e).__name__)
 
     def _refresh_quota(
         self,
