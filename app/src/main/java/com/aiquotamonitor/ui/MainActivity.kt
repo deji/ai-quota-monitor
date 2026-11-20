@@ -35,14 +35,14 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
-import com.aiquotamonitor.data.local.PreferencesStore
-import com.aiquotamonitor.data.repository.QuotaRepositoryImpl
+import com.aiquotamonitor.data.repository.QuotaRepositoryProvider
 import com.aiquotamonitor.ui.screens.BurnVelocityScreen
 import com.aiquotamonitor.ui.screens.DashboardScreen
 import com.aiquotamonitor.ui.screens.WidgetsAndSyncScreen
 import com.aiquotamonitor.ui.theme.AIQuotaMonitorTheme
 import com.aiquotamonitor.ui.theme.QuotaCyan
 import com.aiquotamonitor.ui.viewmodel.QuotaViewModel
+import com.aiquotamonitor.widget.WidgetSyncScheduler
 
 enum class AppDestination(val label: String, val icon: ImageVector) {
     DASHBOARD("Dashboard", Icons.Default.Speed),
@@ -53,14 +53,17 @@ enum class AppDestination(val label: String, val icon: ImageVector) {
 class MainActivity : ComponentActivity() {
 
     private val viewModel: QuotaViewModel by viewModels {
-        val prefs = PreferencesStore(applicationContext)
-        val repo = QuotaRepositoryImpl(prefs, context = applicationContext)
+        val prefs = QuotaRepositoryProvider.getPreferencesStore(applicationContext)
+        val repo = QuotaRepositoryProvider.getRepository(applicationContext)
         QuotaViewModel.Factory(repo, prefs, applicationContext)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+
+        // On app upgrade, align background widget sync with widgets already on the launcher.
+        WidgetSyncScheduler.syncScheduleWithInstalledWidgets(applicationContext)
 
         setContent {
             AIQuotaMonitorTheme {

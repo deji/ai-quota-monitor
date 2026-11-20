@@ -1,7 +1,6 @@
 package com.aiquotamonitor.data.repository
 
 import android.content.Context
-import androidx.glance.appwidget.updateAll
 import com.aiquotamonitor.data.local.PreferencesStore
 import com.aiquotamonitor.data.local.SeedData
 import com.aiquotamonitor.data.remote.GistRelayClient
@@ -9,8 +8,7 @@ import com.aiquotamonitor.data.remote.TailscaleApiClient
 import com.aiquotamonitor.domain.model.MAX_WIDE_WIDGET_SLOTS
 import com.aiquotamonitor.domain.model.QuotaSnapshot
 import com.aiquotamonitor.domain.model.SmartPrimeStatus
-import com.aiquotamonitor.widget.QuotaCompactWidget
-import com.aiquotamonitor.widget.QuotaWideWidget
+import com.aiquotamonitor.widget.WidgetUpdater
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -80,7 +78,23 @@ class QuotaRepositoryImpl(
         snapshotFlow = _snapshotFlow.asStateFlow()
     }
 
-    override suspend fun refresh(forceTailscale: Boolean, isManual: Boolean): Result<QuotaSnapshot> = withContext(Dispatchers.IO) {
+    override suspend fun refresh(forceTailscale: Boolean, isManual: Boolean): Result<QuotaSnapshot> =
+        refreshInternal(forceTailscale = forceTailscale, isManual = isManual, notifyWidgets = true)
+
+    /**
+     * Background refresh entry point used by `WidgetSyncWorker`. Shares [syncMutex] and
+     * [syncGeneration] with the foreground activity while suppressing the unmanaged
+     * fire-and-forget widget broadcast so the worker awaits `WidgetUpdater.updateAllWidgets`
+     * deterministically before `doWork()` returns.
+     */
+    suspend fun refreshForWidget(): Result<QuotaSnapshot> =
+        refreshInternal(forceTailscale = false, isManual = false, notifyWidgets = false)
+
+    private suspend fun refreshInternal(
+        forceTailscale: Boolean,
+        isManual: Boolean,
+        notifyWidgets: Boolean
+    ): Result<QuotaSnapshot> = withContext(Dispatchers.IO) {
         // Background ticks skip immediately rather than queueing behind an in-flight
         // manual operation (or another auto-sync tick). `tryLock` makes the skip
         // decision and the acquisition a single atomic operation, so a manual refresh
@@ -103,7 +117,7 @@ class QuotaRepositoryImpl(
                 _isAutoSyncingFlow.value = true
             }
             try {
-                performRefreshLocked(forceTailscale, isManual, generation)
+                performRefreshLocked(forceTailscale, isManual, generation, notifyWidgets)
             } finally {
                 if (!isManual) {
                     _isAutoSyncingFlow.value = false
@@ -117,7 +131,8 @@ class QuotaRepositoryImpl(
     private suspend fun performRefreshLocked(
         forceTailscale: Boolean,
         isManual: Boolean,
-        generation: Long
+        generation: Long,
+        notifyWidgets: Boolean = true
     ): Result<QuotaSnapshot> {
         val settings = settingsFlow.value
         var tailscaleError: String? = null
@@ -138,7 +153,7 @@ class QuotaRepositoryImpl(
                     )
                 }
                 _syncErrorFlow.value = null
-                applyNewSnapshot(liveSnapshot, ConnectionState.TAILSCALE_LIVE, generation)
+                applyNewSnapshot(liveSnapshot, ConnectionState.TAILSCALE_LIVE, generation, notifyWidgets)
                 return Result.success(liveSnapshot)
             } catch (e: Exception) {
                 tailscaleError = e.message ?: "Connection failed"
@@ -160,7 +175,7 @@ class QuotaRepositoryImpl(
                     githubToken = settings.githubToken.ifBlank { null }
                 )
                 _syncErrorFlow.value = null
-                applyNewSnapshot(relaySnapshot, ConnectionState.CLOUD_RELAY_SYNCED, generation)
+                applyNewSnapshot(relaySnapshot, ConnectionState.CLOUD_RELAY_SYNCED, generation, notifyWidgets)
                 return Result.success(relaySnapshot)
             } catch (e: Exception) {
                 gistError = e.message ?: "Decryption or network error"
@@ -184,13 +199,13 @@ class QuotaRepositoryImpl(
         val cached = loadValidCachedSnapshot()
         if (cached != null) {
             _syncErrorFlow.value = "$failureReason. Using cached snapshot."
-            applyNewSnapshot(cached, ConnectionState.OFFLINE, generation)
+            applyNewSnapshot(cached, ConnectionState.OFFLINE, generation, notifyWidgets)
             return Result.success(cached)
         }
 
         val seed = SeedData.createSeedSnapshot()
         _syncErrorFlow.value = "$failureReason. Showing demo simulation data."
-        applyNewSnapshot(seed, ConnectionState.DEMO_SEED, generation)
+        applyNewSnapshot(seed, ConnectionState.DEMO_SEED, generation, notifyWidgets)
         return Result.success(seed)
     }
 
@@ -505,7 +520,12 @@ class QuotaRepositoryImpl(
         }
     }
 
-    private fun applyNewSnapshot(snapshot: QuotaSnapshot, state: ConnectionState, generation: Long? = null) {
+    private fun applyNewSnapshot(
+        snapshot: QuotaSnapshot,
+        state: ConnectionState,
+        generation: Long? = null,
+        notifyWidgets: Boolean = true
+    ) {
         // Never let an older in-flight response overwrite a newer committed snapshot.
         if (generation != null && generation != syncGeneration) return
         baseSnapshot = snapshot
@@ -517,17 +537,48 @@ class QuotaRepositoryImpl(
             } catch (_: Exception) {}
         }
 
-        triggerWidgetUpdates()
+        if (notifyWidgets) {
+            triggerWidgetUpdates()
+        }
     }
 
     private fun triggerWidgetUpdates() {
         context?.let { ctx ->
             try {
                 kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
-                    QuotaCompactWidget().updateAll(ctx)
-                    QuotaWideWidget().updateAll(ctx)
+                    WidgetUpdater.updateAllWidgets(ctx)
                 }
             } catch (_: Exception) {}
+        }
+    }
+}
+
+/**
+ * Process-scoped holder ensuring `MainActivity` and `WidgetSyncWorker` share the same
+ * `PreferencesStore` and `QuotaRepositoryImpl` instance (and therefore the same
+ * `syncMutex`, `settingsMutex`, and monotonic `syncGeneration` counter).
+ */
+object QuotaRepositoryProvider {
+    @Volatile
+    private var preferencesStore: PreferencesStore? = null
+
+    @Volatile
+    private var repository: QuotaRepositoryImpl? = null
+
+    fun getPreferencesStore(context: Context): PreferencesStore {
+        val appContext = context.applicationContext
+        return preferencesStore ?: synchronized(this) {
+            preferencesStore ?: PreferencesStore(appContext).also { preferencesStore = it }
+        }
+    }
+
+    fun getRepository(context: Context): QuotaRepositoryImpl {
+        val appContext = context.applicationContext
+        return repository ?: synchronized(this) {
+            repository ?: QuotaRepositoryImpl(
+                preferencesStore = getPreferencesStore(appContext),
+                context = appContext
+            ).also { repository = it }
         }
     }
 }

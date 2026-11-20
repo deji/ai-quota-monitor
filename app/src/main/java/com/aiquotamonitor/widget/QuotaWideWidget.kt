@@ -1,5 +1,6 @@
 package com.aiquotamonitor.widget
 
+import android.appwidget.AppWidgetManager
 import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
@@ -298,4 +299,24 @@ private fun WideBucketBlock(
 
 class QuotaWideWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = QuotaWideWidget()
+
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        WidgetSyncScheduler.ensurePeriodicSync(context)
+    }
+
+    override fun onUpdate(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetIds: IntArray
+    ) {
+        super.onUpdate(context, appWidgetManager, appWidgetIds)
+        // Only the periodic request belongs here; a one-time enqueue would retrigger onUpdate.
+        WidgetSyncScheduler.ensurePeriodicSync(context)
+    }
+
+    override fun onDisabled(context: Context) {
+        super.onDisabled(context)
+        WidgetSyncScheduler.cancelPeriodicSyncIfNoWidgets(context)
+    }
 }

@@ -1,7 +1,13 @@
 # Jetpack Glance ActionCallback and AppWidgetProvider
 -keep class * implements androidx.glance.appwidget.action.ActionCallback {
-    <init>();
+    public <init>();
 }
 -keep class * extends androidx.glance.appwidget.GlanceAppWidgetReceiver {
-    <init>();
+    public <init>();
+}
+
+# WorkManager instantiates workers by class name through reflection.
+-keep class * extends androidx.work.CoroutineWorker {
+    public <init>();
+    public <init>(...);
 }
