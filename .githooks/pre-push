@@ -59,7 +59,7 @@ check_range() {
         esac
         lower_em=$(printf '%s' "$em" | tr '[:upper:]' '[:lower:]')
         case "$lower_em" in
-          *@example.com|*@example.org|*@example.net|noreply@github.com|*@users.noreply.github.com)
+          *@example.com|*@example.org|*@example.net|*@example.test|*@example.invalid|*@bots.invalid|noreply@github.com|*@users.noreply.github.com)
             ;;
           *)
             echo "pre-push: detected non-synthetic email address in commits ($range): $em" >&2
@@ -75,7 +75,7 @@ check_range() {
   if [ -n "$commit_msgs" ]; then
     tmp_msg=$(mktemp)
     printf '%s\n' "$commit_msgs" > "$tmp_msg"
-    if ! AQM_SKIP_ISSUE_REF=1 sh "$REPO_ROOT/.githooks/commit-msg" "$tmp_msg"; then
+    if ! AQM_SKIP_ISSUE_REF=1 AQM_SKIP_ATTRIBUTION=1 sh "$REPO_ROOT/.githooks/commit-msg" "$tmp_msg"; then
       rm -f "$tmp_msg"
       exit 1
     fi

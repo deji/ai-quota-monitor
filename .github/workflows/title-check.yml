@@ -1,0 +1,34 @@
+name: title-check
+
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - synchronize
+      - reopened
+  issues:
+    types:
+      - opened
+      - edited
+      - reopened
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+
+jobs:
+  title:
+    name: agent title
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # The full history is needed only for a pull request: the check inspects
+      # `base..head` for bot-authored commits and GitHub auto-closing keywords.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '1' }}
+          persist-credentials: false
+      - name: Check title and no auto-closing keywords
+        run: ./scripts/check-title.sh

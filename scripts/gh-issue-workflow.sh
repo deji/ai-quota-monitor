@@ -3,24 +3,34 @@ set -euo pipefail
 
 # Enforce the GitHub Issue-First Workflow for ai-quota-monitor:
 # 1. Every bug or feature MUST be created as a GitHub Issue first.
-# 2. All 4 lifecycle stages MUST be posted as structured comments on the issue:
+# 2. All 4 lifecycle stages MUST be posted as attributed comments on the issue:
 #    - ## [PLAN]
 #    - ## [IMPLEMENTATION]
 #    - ## [TESTING]
 #    - ## [REVIEW]
-# 3. Every outgoing issue body/comment is scrubbed by .githooks/commit-msg before
-#    calling `gh` so secrets, tokens, or /Users/... paths can never be posted publicly.
+# 3. Every outgoing issue title/body/comment is scrubbed by .githooks/commit-msg
+#    before calling `gh` so secrets, tokens, or /Users/... paths can never be
+#    posted publicly. GitHub auto-closing keywords are rejected there too: an
+#    issue closes only through `close`, after `verify` sees all four stages.
+#
+# Attribution defaults come from AQM_AGENT, AQM_MODEL and AQM_EFFORT; `--human`
+# records a human contribution instead. Agent-opened issue titles are checked by
+# scripts/check-title.sh.
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
+CHECK_TITLE="$REPO_ROOT/scripts/check-title.sh"
+
 check_hygiene_text() {
   local text="$1"
   local tmp_file
+  local status=0
   tmp_file="$(mktemp)"
-  trap 'rm -f "$tmp_file"' RETURN
   printf '%s\n' "$text" > "$tmp_file"
-  AQM_SKIP_ISSUE_REF=1 sh "$REPO_ROOT/.githooks/commit-msg" "$tmp_file"
+  AQM_SKIP_ISSUE_REF=1 AQM_SKIP_ATTRIBUTION=1 sh "$REPO_ROOT/.githooks/commit-msg" "$tmp_file" || status=$?
+  rm -f "$tmp_file"
+  return "$status"
 }
 
 EVIDENCE_ROOT="${AQM_UI_EVIDENCE_ROOT:-$REPO_ROOT}"
@@ -80,9 +90,15 @@ usage() {
   cat >&2 <<'EOF'
 Usage:
   ./scripts/gh-issue-workflow.sh create "<title>" "<body>" [label1,label2]
-  ./scripts/gh-issue-workflow.sh comment <issue-number> <plan|implementation|testing|review> "<body-or-@filepath>" [--attach <image[#alt]>]...
+  ./scripts/gh-issue-workflow.sh comment <issue-number> <plan|implementation|testing|review> \
+      "<body-or-@filepath>" [--attach <image[#alt]>]... \
+      [--agent <slug> --model <model>] [--effort <low|medium|high|xhigh|default>] [--human]
+  ./scripts/gh-issue-workflow.sh before-shot <issue-number> --attach <image#Before: description>
   ./scripts/gh-issue-workflow.sh verify <issue-number>
   ./scripts/gh-issue-workflow.sh close <issue-number>
+
+Every stage comment is attributed. Pass --agent/--model/--effort (or set
+AQM_AGENT/AQM_MODEL/AQM_EFFORT), or --human for a human note.
 
 Every plan comment must contain exactly one of these lines:
   UI evidence: before-and-after
@@ -97,6 +113,10 @@ Save captures outside the repo. The local path is not posted. A plan of
 "UI evidence: none" does not require screenshots. Collector-only testing
 that never opened the UI must include this exact sentence instead:
   No emulator UI was exercised.
+
+Use 'Refs #<number>' in commits and comments. GitHub auto-closing keywords
+(Closes, Fixes, Resolves, ...) are rejected; the issue is closed only by
+`./scripts/gh-issue-workflow.sh close <number>` after verify passes.
 EOF
   exit 1
 }
@@ -120,6 +140,10 @@ case "$CMD" in
     fi
     check_hygiene_text "$TITLE"
     check_hygiene_text "$BODY"
+    if ! "$CHECK_TITLE" --event issues --title "$TITLE" --body "$BODY"; then
+      echo "ERROR: Refusing to create the issue: an agent-authored issue title must read '[<agent>] <summary>' or '[<agent> <model> <effort>] <summary>'." >&2
+      exit 1
+    fi
     if [[ -n "$LABELS" ]]; then
       gh issue create --title "$TITLE" --body "$BODY" --label "$LABELS"
     else
@@ -150,12 +174,6 @@ case "$CMD" in
         exit 1
         ;;
     esac
-    if [[ "$STAGE_UPPER" == "PLAN" ]]; then
-      if ! plan_evidence_mode "$BODY" >/dev/null; then
-        echo "ERROR: A plan comment must contain exactly one line, either 'UI evidence: before-and-after' or 'UI evidence: none'." >&2
-        exit 1
-      fi
-    fi
     shift 3
     ATTACH_FLAGS=()
     BEFORE_FLAGS=()
@@ -163,6 +181,10 @@ case "$CMD" in
     OTHER_FLAGS=()
     BEFORE_SOURCE=""
     EVIDENCE_DIR=""
+    HUMAN=0
+    AGENT=""
+    MODEL=""
+    EFFORT=""
     cleanup_evidence() {
       if [[ -n "$EVIDENCE_DIR" && -d "$EVIDENCE_DIR" ]]; then
         rm -rf "$EVIDENCE_DIR"
@@ -171,77 +193,121 @@ case "$CMD" in
     trap cleanup_evidence EXIT
     evidence_n=0
     while [[ $# -gt 0 ]]; do
-      if [[ "$1" != "--attach" ]]; then
-        echo "ERROR: Unexpected argument '$1'. Use --attach <image[#alt]>." >&2
-        exit 1
-      fi
-      if [[ -z "${2:-}" ]]; then
-        echo "ERROR: --attach requires an image path, optionally followed by #alt text." >&2
-        exit 1
-      fi
-      spec="$2"
-      shift 2
-      src_path="${spec%%#*}"
-      if [[ "$spec" == *"#"* ]]; then
-        alt_text="${spec#*#}"
-      else
-        alt_text="Emulator evidence"
-      fi
-      if [[ -z "$alt_text" ]]; then
-        echo "ERROR: --attach alt text is empty." >&2
-        exit 1
-      fi
-      if [[ ! -f "$src_path" ]]; then
-        echo "ERROR: Screenshot does not exist or is not a file." >&2
-        exit 1
-      fi
-      resolved="$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$src_path")"
-      case "$resolved" in
-        "$REPO_ROOT"/*)
-          echo "ERROR: Screenshots must be saved outside the repository so they are not committed. Write them under the system temp directory and pass that path to --attach." >&2
-          exit 1
+      case "$1" in
+        --human)
+          HUMAN=1
+          shift
           ;;
-      esac
-      ext="$(printf '%s' "${resolved##*.}" | tr '[:upper:]' '[:lower:]')"
-      case "$ext" in
-        png|jpg|jpeg|webp|gif)
+        --agent)
+          if [[ -z "${2:-}" ]]; then
+            echo "ERROR: --agent requires a value." >&2
+            exit 1
+          fi
+          AGENT="$2"
+          shift 2
+          ;;
+        --agent=*)
+          AGENT="${1#*=}"
+          shift
+          ;;
+        --model)
+          if [[ -z "${2:-}" ]]; then
+            echo "ERROR: --model requires a value." >&2
+            exit 1
+          fi
+          MODEL="$2"
+          shift 2
+          ;;
+        --model=*)
+          MODEL="${1#*=}"
+          shift
+          ;;
+        --effort)
+          if [[ -z "${2:-}" ]]; then
+            echo "ERROR: --effort requires a value." >&2
+            exit 1
+          fi
+          EFFORT="$2"
+          shift 2
+          ;;
+        --effort=*)
+          EFFORT="${1#*=}"
+          shift
+          ;;
+        --attach)
+          if [[ -z "${2:-}" ]]; then
+            echo "ERROR: --attach requires an image path, optionally followed by #alt text." >&2
+            exit 1
+          fi
+          spec="$2"
+          shift 2
+          src_path="${spec%%#*}"
+          if [[ "$spec" == *"#"* ]]; then
+            alt_text="${spec#*#}"
+          else
+            alt_text="Emulator evidence"
+          fi
+          if [[ -z "$alt_text" ]]; then
+            echo "ERROR: --attach alt text is empty." >&2
+            exit 1
+          fi
+          if [[ ! -f "$src_path" ]]; then
+            echo "ERROR: Screenshot does not exist or is not a file." >&2
+            exit 1
+          fi
+          resolved="$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$src_path")"
+          case "$resolved" in
+            "$REPO_ROOT"/*)
+              echo "ERROR: Screenshots must be saved outside the repository so they are not committed. Write them under the system temp directory and pass that path to --attach." >&2
+              exit 1
+              ;;
+          esac
+          ext="$(printf '%s' "${resolved##*.}" | tr '[:upper:]' '[:lower:]')"
+          case "$ext" in
+            png|jpg|jpeg|webp|gif)
+              ;;
+            *)
+              echo "ERROR: --attach accepts png, jpg, jpeg, webp, or gif screenshots." >&2
+              exit 1
+              ;;
+          esac
+          size="$(wc -c < "$resolved" | tr -d ' ')"
+          if [[ "$size" -eq 0 || "$size" -gt 10485760 ]]; then
+            echo "ERROR: Screenshot must be non-empty and at most 10 MB." >&2
+            exit 1
+          fi
+          check_hygiene_text "$alt_text"
+          if [[ -z "$EVIDENCE_DIR" ]]; then
+            EVIDENCE_DIR="$(mktemp -d)"
+          fi
+          evidence_n=$((evidence_n + 1))
+          safe_copy="$EVIDENCE_DIR/emulator-evidence-${evidence_n}.${ext}"
+          cp "$resolved" "$safe_copy"
+          lower_alt="$(printf '%s' "$alt_text" | tr '[:upper:]' '[:lower:]')"
+          is_before=0
+          is_after=0
+          case "$lower_alt" in
+            *before*) is_before=1 ;;
+          esac
+          case "$lower_alt" in
+            *after*) is_after=1 ;;
+          esac
+          if [[ "$is_before" -eq 1 && "$is_after" -eq 0 ]]; then
+            if [[ -z "$BEFORE_SOURCE" ]]; then
+              BEFORE_SOURCE="$resolved"
+            fi
+            BEFORE_FLAGS+=(--attach "${safe_copy}#${alt_text}")
+          elif [[ "$is_after" -eq 1 && "$is_before" -eq 0 ]]; then
+            AFTER_FLAGS+=(--attach "${safe_copy}#${alt_text}")
+          else
+            OTHER_FLAGS+=(--attach "${safe_copy}#${alt_text}")
+          fi
           ;;
         *)
-          echo "ERROR: --attach accepts png, jpg, jpeg, webp, or gif screenshots." >&2
+          echo "ERROR: Unexpected argument '$1'. Use --attach <image[#alt]>, --agent, --model, --effort, or --human." >&2
           exit 1
           ;;
       esac
-      size="$(wc -c < "$resolved" | tr -d ' ')"
-      if [[ "$size" -eq 0 || "$size" -gt 10485760 ]]; then
-        echo "ERROR: Screenshot must be non-empty and at most 10 MB." >&2
-        exit 1
-      fi
-      check_hygiene_text "$alt_text"
-      if [[ -z "$EVIDENCE_DIR" ]]; then
-        EVIDENCE_DIR="$(mktemp -d)"
-      fi
-      evidence_n=$((evidence_n + 1))
-      safe_copy="$EVIDENCE_DIR/emulator-evidence-${evidence_n}.${ext}"
-      cp "$resolved" "$safe_copy"
-      lower_alt="$(printf '%s' "$alt_text" | tr '[:upper:]' '[:lower:]')"
-      is_before=0
-      is_after=0
-      case "$lower_alt" in
-        *before*) is_before=1 ;;
-      esac
-      case "$lower_alt" in
-        *after*) is_after=1 ;;
-      esac
-      if [[ "$is_before" -eq 1 && "$is_after" -eq 0 ]]; then
-        if [[ -z "$BEFORE_SOURCE" ]]; then
-          BEFORE_SOURCE="$resolved"
-        fi
-        BEFORE_FLAGS+=(--attach "${safe_copy}#${alt_text}")
-      elif [[ "$is_after" -eq 1 && "$is_before" -eq 0 ]]; then
-        AFTER_FLAGS+=(--attach "${safe_copy}#${alt_text}")
-      else
-        OTHER_FLAGS+=(--attach "${safe_copy}#${alt_text}")
-      fi
     done
     if [[ ${#BEFORE_FLAGS[@]} -gt 0 ]]; then
       ATTACH_FLAGS+=("${BEFORE_FLAGS[@]}")
@@ -251,6 +317,52 @@ case "$CMD" in
     fi
     if [[ ${#OTHER_FLAGS[@]} -gt 0 ]]; then
       ATTACH_FLAGS+=("${OTHER_FLAGS[@]}")
+    fi
+    if [[ "$STAGE_UPPER" == "PLAN" ]]; then
+      if ! plan_evidence_mode "$BODY" >/dev/null; then
+        echo "ERROR: A plan comment must contain exactly one line, either 'UI evidence: before-and-after' or 'UI evidence: none'." >&2
+        exit 1
+      fi
+    fi
+    if [[ "$HUMAN" -eq 1 ]]; then
+      if [[ -n "$AGENT" || -n "$MODEL" || -n "$EFFORT" ]]; then
+        echo "ERROR: --human cannot be combined with --agent, --model, or --effort." >&2
+        exit 1
+      fi
+      CONTRIBUTOR='_Contributor: human_'
+    else
+      if [[ -z "$AGENT" ]]; then AGENT="${AQM_AGENT:-}"; fi
+      if [[ -z "$MODEL" ]]; then MODEL="${AQM_MODEL:-}"; fi
+      if [[ -z "$EFFORT" ]]; then EFFORT="${AQM_EFFORT:-}"; fi
+      if [[ -z "$AGENT" ]]; then
+        echo "ERROR: Agent attribution required: pass --agent <slug> --model <model> (or --human for a human comment)." >&2
+        exit 1
+      fi
+      if [[ -z "$MODEL" ]]; then
+        echo "ERROR: Agent attribution required: pass --model <model> (or --human for a human comment)." >&2
+        exit 1
+      fi
+      if ! printf '%s' "$AGENT" | grep -Eq '^[a-z0-9][a-z0-9-]*$'; then
+        echo "ERROR: --agent must match ^[a-z0-9][a-z0-9-]*$ (got: $AGENT)." >&2
+        exit 1
+      fi
+      if ! printf '%s' "$MODEL" | grep -Eq '^[a-z0-9][a-z0-9._/-]*$'; then
+        echo "ERROR: --model must match ^[a-z0-9][a-z0-9._/-]*$ (got: $MODEL)." >&2
+        exit 1
+      fi
+      if [[ -n "$EFFORT" ]]; then
+        case "$EFFORT" in
+          low|medium|high|xhigh|default)
+            ;;
+          *)
+            echo "ERROR: --effort must be one of: low, medium, high, xhigh, default." >&2
+            exit 1
+            ;;
+        esac
+        CONTRIBUTOR="_Contributor: \`${AGENT}\` (\`${MODEL}\`, effort: \`${EFFORT}\`)_"
+      else
+        CONTRIBUTOR="_Contributor: \`${AGENT}\` (\`${MODEL}\`)_"
+      fi
     fi
     if [[ "$STAGE_UPPER" == "TESTING" ]]; then
       receipt="$EVIDENCE_ROOT/.aqm-ui-evidence/$ISSUE_NUM/receipt"
@@ -289,7 +401,20 @@ case "$CMD" in
         fi
       fi
     fi
-    FULL_COMMENT="## [${STAGE_UPPER}]"$'\n\n'"${BODY}"
+    # Drop a leading "## [STAGE]" heading (and the blank lines under it) so a
+    # pasted body cannot duplicate the header this script composes.
+    BODY_CLEAN="$(printf '%s\n' "$BODY" | awk -v stage_upper="$STAGE_UPPER" '
+      BEGIN { skipping = 1 }
+      {
+        if (skipping) {
+          line = $0
+          if (toupper(line) ~ ("^## \\[" stage_upper "\\][[:space:]]*$")) { next }
+          if (line ~ /^[[:space:]]*$/) { next }
+          skipping = 0
+        }
+        print
+      }')"
+    FULL_COMMENT="## [${STAGE_UPPER}]"$'\n\n'"${CONTRIBUTOR}"$'\n\n'"${BODY_CLEAN}"
     check_hygiene_text "$FULL_COMMENT"
     # Bash 3.2 with `set -u` rejects an empty "${array[@]}".
     if [[ ${#ATTACH_FLAGS[@]} -eq 0 ]]; then
@@ -395,32 +520,75 @@ case "$CMD" in
       echo "ERROR: Invalid issue number '$ISSUE_NUM' (expected digits only)." >&2
       exit 1
     fi
-    ISSUE_JSON="$(gh issue view "$ISSUE_NUM" --json number,title,state,comments)"
-    python3 - "$ISSUE_NUM" "$ISSUE_JSON" <<'PY'
+    ISSUE_JSON_TMP="$(mktemp)"
+    cleanup_json() {
+      rm -f "$ISSUE_JSON_TMP"
+    }
+    trap cleanup_json EXIT
+    if ! gh issue view "$ISSUE_NUM" --json number,title,state,comments > "$ISSUE_JSON_TMP"; then
+      echo "ERROR: Cannot read GitHub Issue #$ISSUE_NUM." >&2
+      exit 1
+    fi
+    python3 - "$ISSUE_NUM" "$ISSUE_JSON_TMP" <<'PY'
 import json
+import re
 import sys
 
 issue_num = sys.argv[1]
-data = json.loads(sys.argv[2])
-comments = [c.get("body", "") for c in data.get("comments", [])]
-all_text = "\n".join(comments)
+with open(sys.argv[2], "r", encoding="utf-8") as fh:
+    raw = fh.read()
 
-required_headers = [
-    "## [PLAN]",
-    "## [IMPLEMENTATION]",
-    "## [TESTING]",
-    "## [REVIEW]",
-]
-missing = [h for h in required_headers if h not in all_text]
+try:
+    data = json.loads(raw)
+except ValueError:
+    print("ERROR: gh returned output that is not JSON", file=sys.stderr)
+    sys.exit(1)
+
+STAGES = ("PLAN", "IMPLEMENTATION", "TESTING", "REVIEW")
+HEADER_RE = re.compile(r"^## \[(PLAN|IMPLEMENTATION|TESTING|REVIEW)\][ \t]*$")
+CONTRIBUTOR_RE = re.compile(r"(?m)^_Contributor:[ \t]+.+_[ \t]*$")
+
+comments = data.get("comments") or []
+found = set()
+unattributed = set()
+for comment in comments:
+    body = (comment.get("body") or "").lstrip("\r\n")
+    if not body:
+        continue
+    first_line = body.splitlines()[0]
+    match = HEADER_RE.match(first_line)
+    if not match:
+        continue
+    stage = match.group(1)
+    if CONTRIBUTOR_RE.search(body):
+        found.add(stage)
+    else:
+        unattributed.add(stage)
+
+missing = [f"## [{s}]" for s in STAGES if s not in found]
 if missing:
     print(
-        f"ERROR: GitHub Issue #{issue_num} ('{data.get('title')}') is missing mandatory lifecycle comments: {missing}\n"
-        "Every issue must record ## [PLAN], ## [IMPLEMENTATION], ## [TESTING], and ## [REVIEW] comments before completion.",
+        "ERROR: GitHub Issue #%s ('%s') is missing required attributed lifecycle comments: %s"
+        % (data.get("number"), data.get("title"), ", ".join(missing)),
+        file=sys.stderr,
+    )
+    missing_attr = [f"## [{s}]" for s in STAGES if s in unattributed and s not in found]
+    if missing_attr:
+        print(
+            "ERROR: stage comment(s) found without a '_Contributor: ..._' line: %s"
+            % ", ".join(missing_attr),
+            file=sys.stderr,
+        )
+    print(
+        "Post each stage as its own comment with ./scripts/gh-issue-workflow.sh comment.",
         file=sys.stderr,
     )
     sys.exit(1)
 
-print(f"Verified GitHub Issue #{issue_num}: all 4 lifecycle stages ([PLAN], [IMPLEMENTATION], [TESTING], [REVIEW]) are documented.")
+print(
+    "Verified GitHub Issue #%s: all 4 attributed lifecycle stages ([PLAN], [IMPLEMENTATION], [TESTING], [REVIEW]) are documented."
+    % data.get("number")
+)
 PY
     ;;
 
@@ -433,7 +601,10 @@ PY
       echo "ERROR: Invalid issue number '$ISSUE_NUM' (expected digits only)." >&2
       exit 1
     fi
-    "$0" verify "$ISSUE_NUM"
+    if ! "$0" verify "$ISSUE_NUM"; then
+      echo "ERROR: Refusing to close issue #$ISSUE_NUM: verification failed (all four attributed stage comments must exist)." >&2
+      exit 1
+    fi
     gh issue close "$ISSUE_NUM"
     ;;
 

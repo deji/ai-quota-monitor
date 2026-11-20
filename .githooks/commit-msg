@@ -1,124 +1,316 @@
 #!/bin/sh
-set -e
+# .githooks/commit-msg — validate a commit message before Git records it.
+#
+# The message file in $1 is never modified: this hook only reads it and exits
+# non-zero on a violation.
+#
+# Four checks, in order:
+#   1. secret / personal-identifier / local-path hygiene   (always runs)
+#   2. no auto-closing keywords (always runs) + issue ref  (AQM_SKIP_ISSUE_REF=1 skips the ref only)
+#   3. bot (agent/model) attribution                       (AQM_SKIP_ATTRIBUTION=1 skips)
+#   4. UI before-shot receipt for a staged UI change       (AQM_SKIP_ISSUE_REF=1 or a real merge skips)
+#
+# The body is POSIX sh on purpose: scripts/gh-issue-workflow.sh and
+# scripts/agent-commit.sh reuse this hook as `sh .githooks/commit-msg <file>` to
+# scrub issue and comment text, and that must work where /bin/sh is dash as well
+# as macOS bash 3.2.
 
-msg_file="$1"
-if [ -z "$msg_file" ] || [ ! -f "$msg_file" ]; then
-  exit 0
+set -u
+
+message_file=${1:-}
+
+if [ -z "$message_file" ] || [ ! -f "$message_file" ]; then
+  echo "commit-msg: usage: commit-msg <commit-message-file>" >&2
+  exit 2
 fi
 
-raw_content=$(cat "$msg_file")
-if [ -z "$raw_content" ]; then
-  exit 0
+FAILED=0
+
+fail() {
+  printf 'commit-msg: %s\n' "$1" >&2
+  FAILED=1
+}
+
+# --------------------------------------------------------------------------
+# Check 1 — secret, personal-identifier and local-path hygiene.
+#
+# Every line is scanned, including Markdown # / ## headings: an issue or PR body
+# passes through here before it reaches GitHub. Never print key material back to
+# the terminal: the offending class is named, the value is not. Non-secret
+# classes (emails, UUIDs, paths) are echoed because the author already wrote them.
+# --------------------------------------------------------------------------
+
+has_pattern() {
+  grep -Eq -e "$1" "$message_file"
+}
+
+if has_pattern '-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----'; then
+  fail "private key block detected; never paste key material into a commit message"
 fi
 
-# 1. Scan ALL lines (including Markdown # / ## headings) for secrets, private keys, tokens, or local home paths (/Users/... or /home/...)
-if printf '%s\n' "$raw_content" | grep -Eq '(-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----|eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}|xai-[A-Za-z0-9_-]{16,}|AIza[0-9A-Za-z_-]{35}|sk-[A-Za-z0-9_-]{20,}|sk-ant-[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9_]{30,}|github_pat_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|ya29\.[A-Za-z0-9_-]{20,}|/Users/[a-zA-Z0-9][a-zA-Z0-9._-]*|/home/[a-zA-Z0-9][a-zA-Z0-9._-]*)'; then
-  echo "commit-msg: detected potential secret, token, or private local home path (/Users/... or /home/...) in message." >&2
-  exit 1
+if has_pattern 'eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}'; then
+  fail "JSON Web Token detected; never paste credentials into a commit message"
 fi
 
-# 2. Scan ALL lines for non-synthetic email addresses (only exact @example.com/.org/.net, noreply@github.com, and *@users.noreply.github.com are permitted)
-emails=$(printf '%s\n' "$raw_content" | grep -Eo '[A-Za-z0-9][A-Za-z0-9._%+-]*@[A-Za-z][A-Za-z0-9.-]*\.[A-Za-z]{2,}' || true)
-if [ -n "$emails" ]; then
-  for em in $emails; do
-    lower_em=$(printf '%s' "$em" | tr '[:upper:]' '[:lower:]')
-    case "$lower_em" in
-      *@example.com|*@example.org|*@example.net|noreply@github.com|*@users.noreply.github.com)
-        ;;
-      *)
-        echo "commit-msg: detected non-synthetic email address in message: $em" >&2
-        exit 1
-        ;;
-    esac
-  done
+if has_pattern 'sk_live_[A-Za-z0-9]{20,}'; then
+  fail "live API secret key detected (sk_live_ prefix)"
 fi
+
+if has_pattern '(AKIA|ASIA)[0-9A-Z]{16}'; then
+  fail "AWS access key ID pattern detected"
+fi
+
+if has_pattern 'gh[pousr]_[A-Za-z0-9_]{30,}'; then
+  fail "GitHub token pattern detected"
+fi
+
+if has_pattern 'github_pat_[A-Za-z0-9_]{20,}'; then
+  fail "GitHub fine-grained token pattern detected"
+fi
+
+if has_pattern 'xai-[A-Za-z0-9_-]{16,}'; then
+  fail "xAI API key pattern detected"
+fi
+
+if has_pattern 'AIza[0-9A-Za-z_-]{35}'; then
+  fail "Google API key pattern detected"
+fi
+
+if has_pattern 'sk-ant-[A-Za-z0-9_-]{20,}'; then
+  fail "Anthropic API key pattern detected"
+fi
+
+if has_pattern 'sk-[A-Za-z0-9_-]{20,}'; then
+  fail "API secret key pattern detected (sk- prefix)"
+fi
+
+if has_pattern 'glpat-[A-Za-z0-9_-]{20,}'; then
+  fail "GitLab token pattern detected"
+fi
+
+if has_pattern 'xox[baprs]-[A-Za-z0-9-]{10,}'; then
+  fail "Slack token pattern detected"
+fi
+
+if has_pattern 'ya29\.[A-Za-z0-9_-]{20,}'; then
+  fail "Google OAuth token pattern detected"
+fi
+
+local_paths=""
+for path in $(grep -Eo '/(Users|home)/[A-Za-z0-9][A-Za-z0-9._-]*' "$message_file" 2>/dev/null); do
+  local_paths="$local_paths $path"
+done
+if [ -n "$local_paths" ]; then
+  fail "local home path(s) in the commit message:$local_paths — use \$HOME or a documented placeholder such as ~/.config/ai-quota-monitor"
+fi
+
+bad_emails=""
+for addr in $(grep -Eo '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}' "$message_file" 2>/dev/null); do
+  lower=$(printf '%s' "$addr" | tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz')
+  case "$lower" in
+    *@example.com|*@example.org|*@example.net|*@example.test|*@example.invalid|*@bots.invalid) ;;
+    noreply@github.com) ;;
+    *@users.noreply.github.com) ;;
+    *) bad_emails="$bad_emails $addr" ;;
+  esac
+done
+if [ -n "$bad_emails" ]; then
+  fail "non-synthetic email address(es) in the commit message:$bad_emails — use *@example.test or *@bots.invalid"
+fi
+
+bad_uuids=""
+for uuid in $(grep -Eo '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}' "$message_file" 2>/dev/null); do
+  lower=$(printf '%s' "$uuid" | tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz')
+  case "$lower" in
+    00000000-0000-*) ;;
+    11111111-2222-3333-4444-555555555555) ;;
+    *) bad_uuids="$bad_uuids $uuid" ;;
+  esac
+done
+if [ -n "$bad_uuids" ]; then
+  fail "non-synthetic UUID(s) in the commit message:$bad_uuids — cite a document path or a synthetic 00000000-0000-… id instead"
+fi
+
+# --------------------------------------------------------------------------
+# Check 2 — no GitHub auto-closing keywords (always runs), and a GitHub Issue
+# reference (skipped for real merges and when AQM_SKIP_ISSUE_REF=1).
+#
+# Issues are closed by scripts/gh-issue-workflow.sh after the four stage
+# comments are verified; a commit message, merge commit, or comment that says
+# "Fixes #12" would close an issue nobody validated.
+# --------------------------------------------------------------------------
+
+if grep -Eqi '(^|[^A-Za-z0-9_])(close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved):?[[:space:]]+([A-Za-z0-9._-]+/[A-Za-z0-9._-]+)?#[0-9]+' "$message_file"; then
+  fail "GitHub auto-closing keyword on an issue number: use 'Refs #<number>' instead, so the issue is closed with ./scripts/gh-issue-workflow.sh close <number> after verification"
+fi
+
+stripped=$(git stripspace --strip-comments < "$message_file" 2>/dev/null || cat "$message_file")
 
 # Only a real in-progress Git merge (MERGE_HEAD present) is a merge commit.
-# A message that merely starts with "Merge " is not: it must still carry an issue
-# reference and must still satisfy the UI before-shot receipt check.
+# A message that merely starts with "Merge " is not: it must still carry an
+# issue reference and must still satisfy the UI before-shot receipt check.
 is_merge_commit=0
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1 && [ -e "$(git rev-parse --git-path MERGE_HEAD 2>/dev/null || true)" ]; then
   is_merge_commit=1
 fi
 
-# 3. Enforce GitHub Issue reference (#<number>) when GitHub remote origin is configured or AQM_REQUIRE_ISSUE_REF=1
-if [ "${AQM_SKIP_ISSUE_REF:-0}" != "1" ]; then
-  msg_content=$(grep -v '^#' "$msg_file" || true)
-  has_origin=$(git remote get-url origin 2>/dev/null || true)
-  if [ -n "$has_origin" ] || [ "${AQM_REQUIRE_ISSUE_REF:-0}" = "1" ]; then
-    if [ "$is_merge_commit" -eq 0 ] && ! printf '%s\n' "$msg_content" | grep -Eq '#[0-9]+'; then
-      echo "commit-msg: missing GitHub Issue reference (#<number>)." >&2
-      echo "All bugs and features must be documented as a GitHub Issue first (./scripts/gh-issue-workflow.sh create ...)." >&2
-      exit 1
+if [ "${AQM_SKIP_ISSUE_REF:-0}" != "1" ] && [ "$is_merge_commit" -eq 0 ]; then
+  has_ref=0
+  if printf '%s\n' "$stripped" | grep -Eq '#[0-9]+'; then
+    has_ref=1
+  fi
+
+  origin_url=$(git remote get-url origin 2>/dev/null || true)
+  if [ -n "$origin_url" ] || [ "${AQM_REQUIRE_ISSUE_REF:-0}" = "1" ]; then
+    if [ "$has_ref" -eq 0 ]; then
+      fail "missing GitHub Issue reference: add a 'Refs #<number>' line (open the issue with ./scripts/gh-issue-workflow.sh create)"
     fi
   fi
 fi
 
-# 4. A UI commit is rejected until before-shot registered the pre-change screenshot.
-#    Skipped when this hook is reused to scrub a GitHub comment (AQM_SKIP_ISSUE_REF=1).
-#    A real merge commit (MERGE_HEAD present) is not a new UI edit; the branch commits
-#    were checked when they were made.
+# --------------------------------------------------------------------------
+# Check 3 — bot (agent/model) attribution.
+#
+# A bot commit must say which human owns it: its identity lives in the reserved
+# `.invalid` TLD and the message carries a non-bot Co-authored-by trailer.
+# --------------------------------------------------------------------------
+
+is_bot_shaped() {
+  _bot_name=$(printf '%s' "$1" | tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz')
+  _bot_email=$(printf '%s' "$2" | tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz')
+
+  case "$_bot_email" in
+    *@bots.invalid) return 0 ;;
+    *'[bot]'*) return 0 ;;
+  esac
+  case "$_bot_name" in
+    *'[bot]'*|*'(bot)'*) return 0 ;;
+  esac
+  return 1
+}
+
+email_is_reserved() {
+  printf '%s' "$1" | grep -Eq '^[^<>[:space:]@]+@[^<>[:space:]@]+\.invalid$'
+}
+
+if [ "${AQM_SKIP_ATTRIBUTION:-0}" != "1" ]; then
+  author_ident=$(git var GIT_AUTHOR_IDENT 2>/dev/null || true)
+  author_name=$(printf '%s\n' "$author_ident" | sed -n 's/^\(.*\) <[^>]*>.*$/\1/p')
+  author_email=$(printf '%s\n' "$author_ident" | sed -n 's/^.* <\([^>]*\)>.*$/\1/p')
+  if [ -n "${GIT_AUTHOR_NAME:-}" ]; then author_name=$GIT_AUTHOR_NAME; fi
+  if [ -n "${GIT_AUTHOR_EMAIL:-}" ]; then author_email=$GIT_AUTHOR_EMAIL; fi
+
+  committer_ident=$(git var GIT_COMMITTER_IDENT 2>/dev/null || true)
+  committer_name=$(printf '%s\n' "$committer_ident" | sed -n 's/^\(.*\) <[^>]*>.*$/\1/p')
+  committer_email=$(printf '%s\n' "$committer_ident" | sed -n 's/^.* <\([^>]*\)>.*$/\1/p')
+  if [ -n "${GIT_COMMITTER_NAME:-}" ]; then committer_name=$GIT_COMMITTER_NAME; fi
+  if [ -n "${GIT_COMMITTER_EMAIL:-}" ]; then committer_email=$GIT_COMMITTER_EMAIL; fi
+
+  author_is_bot=0
+  committer_is_bot=0
+  if is_bot_shaped "$author_name" "$author_email"; then author_is_bot=1; fi
+  if is_bot_shaped "$committer_name" "$committer_email"; then committer_is_bot=1; fi
+
+  if [ "$author_is_bot" -eq 1 ] || [ "$committer_is_bot" -eq 1 ]; then
+    if [ "$author_is_bot" -eq 1 ] && ! email_is_reserved "$author_email"; then
+      fail "bot author email '$author_email' must live in the reserved .invalid TLD (for example <agent>@bots.invalid)"
+    fi
+    if [ "$committer_is_bot" -eq 1 ] && ! email_is_reserved "$committer_email"; then
+      fail "bot committer email '$committer_email' must live in the reserved .invalid TLD (for example <agent>@bots.invalid)"
+    fi
+
+    trailer_text=$(git stripspace --strip-comments < "$message_file" 2>/dev/null | git interpret-trailers --parse 2>/dev/null || true)
+
+    human_coauthor=0
+    while IFS= read -r trailer_line; do
+      case "$trailer_line" in
+        [Cc][Oo]-[Aa][Uu][Tt][Hh][Oo][Rr][Ee][Dd]-[Bb][Yy]:*)
+          trailer_value=${trailer_line#*:}
+          trailer_name=$(printf '%s\n' "$trailer_value" | sed -n 's/^[[:space:]]*\(.*[^[:space:]]\)[[:space:]]*<[^<>[:space:]]*@[^<>[:space:]]*>[[:space:]]*$/\1/p')
+          trailer_email=$(printf '%s\n' "$trailer_value" | sed -n 's/^[^<]*<\([^<>[:space:]]*@[^<>[:space:]]*\)>[[:space:]]*$/\1/p')
+          if [ -n "$trailer_name" ] && [ -n "$trailer_email" ] && ! is_bot_shaped "$trailer_name" "$trailer_email"; then
+            human_coauthor=1
+          fi
+          ;;
+      esac
+    done <<TRAILERS
+$trailer_text
+TRAILERS
+
+    if [ "$human_coauthor" -eq 0 ]; then
+      fail "bot-authored commit needs a non-bot 'Co-authored-by: Name <email>' trailer naming the human owner"
+    fi
+  fi
+fi
+
+# --------------------------------------------------------------------------
+# Check 4 — a UI commit is rejected until before-shot registered the pre-change
+# screenshot. Skipped when this hook is reused to scrub a GitHub comment
+# (AQM_SKIP_ISSUE_REF=1). A real merge commit (MERGE_HEAD present) is not a new
+# UI edit; the branch commits were checked when they were made.
+# --------------------------------------------------------------------------
+
 if [ "${AQM_SKIP_ISSUE_REF:-0}" != "1" ] && git rev-parse --is-inside-work-tree >/dev/null 2>&1 && [ "$is_merge_commit" -eq 0 ]; then
   ui_staged=$(git diff --cached --name-only | grep -E '^(app/src/main/res/|app/src/main/java/com/aiquotamonitor/ui/|app/src/main/java/com/aiquotamonitor/widget/)' || true)
   if [ -n "$ui_staged" ]; then
-    issue=$(printf '%s\n' "$raw_content" | grep -Eo '#[0-9]+' | head -n 1 | tr -d '#')
+    issue=$(grep -Eo '#[0-9]+' "$message_file" | head -n 1 | tr -d '#')
     if [ -z "$issue" ]; then
-      echo "commit-msg: a UI change needs an issue number so the before screenshot can be checked." >&2
-      exit 1
-    fi
-    root=$(git rev-parse --show-toplevel)
-    receipt="$root/.aqm-ui-evidence/$issue/receipt"
-    if [ ! -f "$receipt" ]; then
-      echo "commit-msg: capture the before screenshot before changing UI files." >&2
-      echo "Run: ./scripts/gh-issue-workflow.sh before-shot $issue --attach \"\$TMPDIR/before.png#Before: previous screen\"" >&2
-      exit 1
-    fi
-    mode=$(grep '^mode=' "$receipt" | head -n 1 | cut -d= -f2-)
-    case "$mode" in
-      none)
-        ;;
-      before-and-after)
-        head_sha=$(grep '^head=' "$receipt" | head -n 1 | cut -d= -f2-)
-        current=$(git rev-parse HEAD)
-        image_rel=$(grep '^image=' "$receipt" | head -n 1 | cut -d= -f2-)
-        if ! printf '%s' "$issue" | grep -Eq '^[0-9]+$'; then
-          echo "commit-msg: the issue number for the before-shot receipt is invalid." >&2
-          exit 1
-        fi
-        case "$image_rel" in
-          ".aqm-ui-evidence/$issue/before."*)
-            suffix="${image_rel#.aqm-ui-evidence/$issue/before.}"
-            case "$suffix" in
-              ""|*/*|*..*)
-                echo "commit-msg: the before-shot receipt image path is invalid." >&2
-                exit 1
+      fail "a UI change needs an issue number so the before screenshot can be checked"
+    elif ! printf '%s' "$issue" | grep -Eq '^[0-9]+$'; then
+      fail "the issue number for the before-shot receipt is invalid"
+    else
+      root=$(git rev-parse --show-toplevel)
+      receipt="$root/.aqm-ui-evidence/$issue/receipt"
+      if [ ! -f "$receipt" ]; then
+        fail "capture the before screenshot before changing UI files; run ./scripts/gh-issue-workflow.sh before-shot $issue --attach \"\$TMPDIR/before.png#Before: previous screen\""
+      else
+        mode=$(grep '^mode=' "$receipt" | head -n 1 | cut -d= -f2-)
+        case "$mode" in
+          none)
+            ;;
+          before-and-after)
+            head_sha=$(grep '^head=' "$receipt" | head -n 1 | cut -d= -f2-)
+            current=$(git rev-parse HEAD)
+            image_rel=$(grep '^image=' "$receipt" | head -n 1 | cut -d= -f2-)
+            valid_image_rel=0
+            case "$image_rel" in
+              ".aqm-ui-evidence/$issue/before."*)
+                suffix="${image_rel#.aqm-ui-evidence/$issue/before.}"
+                case "$suffix" in
+                  ""|*/*|*..*)
+                    fail "the before-shot receipt image path is invalid"
+                    ;;
+                  *)
+                    valid_image_rel=1
+                    ;;
+                esac
+                ;;
+              *)
+                fail "the before-shot receipt image path is invalid"
                 ;;
             esac
+            if [ "$valid_image_rel" -eq 1 ]; then
+              if [ "$head_sha" != "$current" ] && ! git merge-base --is-ancestor "$head_sha" "$current"; then
+                fail "the before screenshot is not from this change's starting commit"
+              fi
+              if [ ! -f "$root/$image_rel" ]; then
+                fail "the registered before screenshot file is missing"
+              else
+                want_sha=$(grep '^sha256=' "$receipt" | head -n 1 | cut -d= -f2-)
+                got_sha=$(python3 -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$root/$image_rel" 2>/dev/null || true)
+                if [ -z "$want_sha" ] || [ "$got_sha" != "$want_sha" ]; then
+                  fail "the registered before screenshot sha256 does not match the receipt"
+                fi
+              fi
+            fi
             ;;
           *)
-            echo "commit-msg: the before-shot receipt image path is invalid." >&2
-            exit 1
+            fail "the before-shot receipt is invalid"
             ;;
         esac
-        if [ "$head_sha" != "$current" ] && ! git merge-base --is-ancestor "$head_sha" "$current"; then
-          echo "commit-msg: the before screenshot is not from this change's starting commit." >&2
-          exit 1
-        fi
-        if [ ! -f "$root/$image_rel" ]; then
-          echo "commit-msg: the registered before screenshot file is missing." >&2
-          exit 1
-        fi
-        want_sha=$(grep '^sha256=' "$receipt" | head -n 1 | cut -d= -f2-)
-        got_sha=$(python3 -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$root/$image_rel")
-        if [ -z "$want_sha" ] || [ "$got_sha" != "$want_sha" ]; then
-          echo "commit-msg: the registered before screenshot sha256 does not match the receipt." >&2
-          exit 1
-        fi
-        ;;
-      *)
-        echo "commit-msg: the before-shot receipt is invalid." >&2
-        exit 1
-        ;;
-    esac
+      fi
+    fi
   fi
 fi
+
+exit "$FAILED"

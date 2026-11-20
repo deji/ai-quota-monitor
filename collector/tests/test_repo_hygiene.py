@@ -64,7 +64,15 @@ PATTERN_MAC_USER_PATH = re.compile(r"/" + r"Users" + r"/[a-zA-Z0-9][a-zA-Z0-9._-
 PATTERN_LINUX_HOME_PATH = re.compile(r"/" + r"home" + r"/[a-zA-Z0-9][a-zA-Z0-9._-]*")
 PATTERN_CONFLICT_MARKER = re.compile(r"^(?:<{7} |={7}$|>{7} )")
 PATTERN_EMAIL = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z][A-Za-z0-9.-]*\.[A-Za-z]{2,}\b")
-ALLOWED_EMAIL_DOMAINS = ("example.com", "example.org", "example.net", "users.noreply.github.com")
+ALLOWED_EMAIL_DOMAINS = (
+    "example.com",
+    "example.org",
+    "example.net",
+    "example.test",
+    "example.invalid",
+    "bots.invalid",
+    "users.noreply.github.com",
+)
 ALLOWED_EMAIL_EXACT = ("noreply@github.com",)
 
 
@@ -185,6 +193,30 @@ class TestRepoFreeOfSecretsAndPersonalIdentifiers(unittest.TestCase):
             [],
             f"Hygiene violations found:\n" + "\n".join(violations),
         )
+
+    def test_email_allowlist_rejects_lookalike_domains(self):
+        """Synthetic and attribution mailboxes are allowed; lookalike domains are not."""
+        allowed = [
+            "t3-code@bots.invalid",
+            "someone@example.test",
+            "someone@example.invalid",
+            "noreply@github.com",
+            "4242+deji@users.noreply.github.com",
+        ]
+        rejected = [
+            "bot@bots.example",
+            "someone@github.com",
+        ]
+
+        def is_allowed(address):
+            raw = address.lower()
+            domain = raw.split("@", 1)[1]
+            return domain in ALLOWED_EMAIL_DOMAINS or raw in ALLOWED_EMAIL_EXACT
+
+        for address in allowed:
+            self.assertTrue(is_allowed(address), f"Expected allowlisted mailbox: {address}")
+        for address in rejected:
+            self.assertFalse(is_allowed(address), f"Expected rejected lookalike mailbox: {address}")
 
     def test_git_hooks_block_secrets_binaries_and_bad_messages(self):
         """Verify .githooks/pre-commit, commit-msg, and pre-push exist, are executable, and block bad commits."""
@@ -394,13 +426,25 @@ class TestRepoFreeOfSecretsAndPersonalIdentifiers(unittest.TestCase):
             "scripts/review-plan-and-code.sh",
             "scripts/gh-issue-workflow.sh",
             "scripts/deploy-pixel8pro.sh",
+            "scripts/agent-commit.sh",
+            "scripts/check-title.sh",
+            "scripts/test-workflow.sh",
+            ".github/pull_request_template.md",
+            ".github/workflows/title-check.yml",
         ]
         for rel in required_files:
             path = os.path.join(self.repo_root, rel)
             self.assertTrue(os.path.isfile(path), f"Missing required doc/skill/script file: {rel}")
             self.assertGreater(os.path.getsize(path), 0, f"Required file is empty: {rel}")
 
-        for rel_script in ("scripts/gh-issue-workflow.sh", "scripts/review-plan-and-code.sh", "scripts/deploy-pixel8pro.sh"):
+        for rel_script in (
+            "scripts/gh-issue-workflow.sh",
+            "scripts/review-plan-and-code.sh",
+            "scripts/deploy-pixel8pro.sh",
+            "scripts/agent-commit.sh",
+            "scripts/check-title.sh",
+            "scripts/test-workflow.sh",
+        ):
             script_path = os.path.join(self.repo_root, rel_script)
             self.assertTrue(os.access(script_path, os.X_OK), f"{rel_script} must be executable")
 
@@ -649,23 +693,27 @@ class TestRepoFreeOfSecretsAndPersonalIdentifiers(unittest.TestCase):
                     text=True,
                 )
 
-            missing = run(["comment", "7", "testing", "Checked the emulator drawer."])
+            missing = run(["comment", "7", "testing", "Checked the emulator drawer.",
+                           "--agent", "t3-code", "--model", "gemini-4-neon", "--effort", "high"])
             self.assertNotEqual(missing.returncode, 0, missing.stdout + missing.stderr)
             self.assertIn("before-shot", missing.stderr)
             self.assertFalse(os.path.exists(log), "gh must not be called when the screenshot is missing")
 
-            bare_plan = run(["comment", "7", "plan", "Verify later on the emulator."])
+            bare_plan = run(["comment", "7", "plan", "Verify later on the emulator.",
+                             "--agent", "t3-code", "--model", "gemini-4-neon", "--effort", "high"])
             self.assertNotEqual(bare_plan.returncode, 0, bare_plan.stderr)
             self.assertIn("UI evidence:", bare_plan.stderr)
 
             planned = run([
                 "comment", "7", "plan",
                 "Verify later on the emulator.\n\nUI evidence: none",
+                "--agent", "t3-code", "--model", "gemini-4-neon", "--effort", "high",
             ])
             self.assertEqual(planned.returncode, 0, planned.stderr)
             os.remove(log)
 
-            opted_out = run(["comment", "7", "testing", "No emulator UI was exercised."])
+            opted_out = run(["comment", "7", "testing", "No emulator UI was exercised.",
+                             "--agent", "t3-code", "--model", "gemini-4-neon", "--effort", "high"])
             self.assertEqual(opted_out.returncode, 0, opted_out.stderr)
             with open(log, encoding="utf-8") as fh:
                 self.assertIn("## [TESTING]", fh.read())
@@ -685,10 +733,12 @@ class TestRepoFreeOfSecretsAndPersonalIdentifiers(unittest.TestCase):
 
             # A before-and-after plan enforces evidence unconditionally, even when the
             # testing body never mentions the emulator or asks for the collector-only opt-out.
-            no_attach = run(["comment", "7", "testing", "All checks passed."])
+            no_attach = run(["comment", "7", "testing", "All checks passed.",
+                             "--agent", "t3-code", "--model", "gemini-4-neon", "--effort", "high"])
             self.assertNotEqual(no_attach.returncode, 0, no_attach.stderr)
             self.assertIn("Before", no_attach.stderr)
-            statement_only = run(["comment", "7", "testing", "No emulator UI was exercised."])
+            statement_only = run(["comment", "7", "testing", "No emulator UI was exercised.",
+                                  "--agent", "t3-code", "--model", "gemini-4-neon", "--effort", "high"])
             self.assertNotEqual(statement_only.returncode, 0, statement_only.stderr)
             self.assertIn("collector-only opt-out is not permitted", statement_only.stderr)
             self.assertFalse(os.path.exists(log), "gh must not post a testing comment without both screenshots")
@@ -753,6 +803,7 @@ class TestRepoFreeOfSecretsAndPersonalIdentifiers(unittest.TestCase):
             only_after = run([
                 "comment", "7", "testing", "Verified on the emulator.",
                 "--attach", shot + "#After: full-bleed plate",
+                "--agent", "t3-code", "--model", "gemini-4-neon", "--effort", "high",
             ])
             self.assertNotEqual(only_after.returncode, 0, only_after.stderr)
             self.assertIn("Before", only_after.stderr)
@@ -765,6 +816,7 @@ class TestRepoFreeOfSecretsAndPersonalIdentifiers(unittest.TestCase):
                 "comment", "7", "testing", "Verified on the emulator.",
                 "--attach", shot + "#After: full-bleed plate",
                 "--attach", shot + "#Before: inner disc",
+                "--agent", "t3-code", "--model", "gemini-4-neon", "--effort", "high",
             ])
             self.assertEqual(attached.returncode, 0, attached.stderr)
             with open(log, encoding="utf-8") as fh:
@@ -782,6 +834,7 @@ class TestRepoFreeOfSecretsAndPersonalIdentifiers(unittest.TestCase):
                 rejected = run([
                     "comment", "7", "testing", "Verified on the emulator.",
                     "--attach", inside + "#In repo shot",
+                    "--agent", "t3-code", "--model", "gemini-4-neon", "--effort", "high",
                 ])
                 self.assertNotEqual(rejected.returncode, 0, rejected.stderr)
                 self.assertIn("outside the repository", rejected.stderr)

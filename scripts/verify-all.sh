@@ -14,8 +14,9 @@ echo "==> [1/5] Verifying git hooks path & pre-commit secret guard..."
 git config core.hooksPath .githooks
 sh .githooks/pre-commit
 
-echo "==> [2/5] Running Mac Collector & Repo Hygiene Test Suite..."
+echo "==> [2/5] Running Mac Collector, Repo Hygiene & Workflow Test Suites..."
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s collector/tests -v
+./scripts/test-workflow.sh
 
 echo "==> [3/5] Running Android Lint, JUnit Tests, and Debug APK Build..."
 ./gradlew --no-daemon lintDebug testDebugUnitTest assembleDebug
@@ -37,6 +38,11 @@ REQUIRED_DOCS=(
   "scripts/gh-issue-workflow.sh"
   "scripts/review-plan-and-code.sh"
   "scripts/deploy-pixel8pro.sh"
+  "scripts/agent-commit.sh"
+  "scripts/check-title.sh"
+  "scripts/test-workflow.sh"
+  ".github/pull_request_template.md"
+  ".github/workflows/title-check.yml"
 )
 for doc in "${REQUIRED_DOCS[@]}"; do
   if [[ ! -s "$doc" ]]; then
@@ -44,7 +50,7 @@ for doc in "${REQUIRED_DOCS[@]}"; do
     exit 1
   fi
 done
-for script in "scripts/gh-issue-workflow.sh" "scripts/review-plan-and-code.sh" "scripts/deploy-pixel8pro.sh"; do
+for script in "scripts/gh-issue-workflow.sh" "scripts/review-plan-and-code.sh" "scripts/deploy-pixel8pro.sh" "scripts/agent-commit.sh" "scripts/check-title.sh" "scripts/test-workflow.sh"; do
   if [[ ! -x "$script" ]]; then
     echo "ERROR: $script must be executable" >&2
     exit 1

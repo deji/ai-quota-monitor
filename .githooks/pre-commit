@@ -53,7 +53,7 @@ if [ -n "$added_lines" ]; then
     exit 1
   fi
 
-  # 4b. Check for non-synthetic email addresses (only exact @example.com/.org/.net, noreply@github.com, and *@users.noreply.github.com are permitted)
+  # 4b. Check for non-synthetic email addresses (only exact @example.com/.org/.net/.test/.invalid, *@bots.invalid, noreply@github.com, and *@users.noreply.github.com are permitted)
   emails=$(printf '%s\n' "$added_lines" | sed 's/^+//' | grep -Eo '[A-Za-z0-9][A-Za-z0-9._%+-]*@[A-Za-z][A-Za-z0-9.-]*\.[A-Za-z]{2,}' || true)
   if [ -n "$emails" ]; then
     for em in $emails; do
@@ -64,7 +64,7 @@ if [ -n "$added_lines" ]; then
       esac
       lower_em=$(printf '%s' "$em" | tr '[:upper:]' '[:lower:]')
       case "$lower_em" in
-        *@example.com|*@example.org|*@example.net|noreply@github.com|*@users.noreply.github.com)
+        *@example.com|*@example.org|*@example.net|*@example.test|*@example.invalid|*@bots.invalid|noreply@github.com|*@users.noreply.github.com)
           ;;
         *)
           echo "pre-commit: detected non-synthetic email address in staged changes: $em" >&2

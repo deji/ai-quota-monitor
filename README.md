@@ -36,7 +36,7 @@ git config core.hooksPath .githooks
 
 ### 2. Run the Full Verification Suite (`scripts/verify-all.sh`)
 
-Runs the pre-commit secret guard, all Python collector + repo-hygiene unit tests, Android Lint (`lintDebug`), Android JUnit unit tests (`testDebugUnitTest`), and builds `app/build/outputs/apk/debug/app-debug.apk`:
+Runs the pre-commit secret guard, all Python collector + repo-hygiene unit tests, the offline agent/workflow suite (`./scripts/test-workflow.sh`), Android Lint (`lintDebug`), Android JUnit unit tests (`testDebugUnitTest`), and builds `app/build/outputs/apk/debug/app-debug.apk`:
 
 ```bash
 ./scripts/verify-all.sh
@@ -173,21 +173,24 @@ To verify the adaptive launcher icon in both modes on a local emulator, swipe up
 
 ---
 
-### 5. GitHub Issue-First Workflow & 3-Gate `grok-4.7` Reviews (`scripts/gh-issue-workflow.sh` & `scripts/review-plan-and-code.sh`)
+### 5. GitHub Issue-First Workflow, Agent Attribution & 3-Gate `grok-4.7` Reviews (`scripts/gh-issue-workflow.sh` & `scripts/review-plan-and-code.sh`)
 
-All bugs and features follow a mandatory **GitHub Issue-First Workflow** where the issue is created first and all four stages (`[PLAN]`, `[IMPLEMENTATION]`, `[TESTING]`, `[REVIEW]`) are recorded as comments on the issue:
+All bugs and features follow a mandatory **GitHub Issue-First Workflow** where the issue is created first and all four stages (`[PLAN]`, `[IMPLEMENTATION]`, `[TESTING]`, `[REVIEW]`) are recorded as attributed comments on the issue:
 
 ```bash
 # 1. Create a GitHub Issue first (scrubbed for secret/PII hygiene)
 ./scripts/gh-issue-workflow.sh create "<title>" "<description>" "enhancement"
 
-# 2. Post Plan, Implementation, and Testing comments on the Issue
-./scripts/gh-issue-workflow.sh comment <issue-number> plan "<plan-details>"
+# 2. Post attributed Plan, Implementation, and Testing comments on the Issue
+./scripts/gh-issue-workflow.sh comment <issue-number> plan "<plan-details>" \
+  --agent t3-code --model gemini-4-neon --effort high
 # Plan includes one line: UI evidence: before-and-after  or  UI evidence: none
 # Capture the before shot before editing UI files:
 ./scripts/gh-issue-workflow.sh before-shot <issue-number> --attach "$TMPDIR/before.png#Before: previous screen"
-./scripts/gh-issue-workflow.sh comment <issue-number> implementation "<commit-and-diff-summary>"
+./scripts/gh-issue-workflow.sh comment <issue-number> implementation "<commit-and-diff-summary>" \
+  --agent opencode2 --model deepseek-v4.1-flash --effort high
 ./scripts/gh-issue-workflow.sh comment <issue-number> testing "<verify-all-results>" \
+  --agent opencode2 --model deepseek-v4.1-flash --effort high \
   --attach "$TMPDIR/before.png#Before: previous screen" \
   --attach "$TMPDIR/after.png#After: screen after the change"
 
@@ -196,9 +199,18 @@ All bugs and features follow a mandatory **GitHub Issue-First Workflow** where t
 ./scripts/review-plan-and-code.sh worktree /path/to/worktree --issue <issue-number>
 ./scripts/review-plan-and-code.sh cross-system --issue <issue-number>
 
-# 4. Verify all 4 lifecycle comments exist and close the Issue
+# 4. Verify all 4 attributed lifecycle comments exist and close the Issue
 ./scripts/gh-issue-workflow.sh close <issue-number>
 ```
+
+`--agent`/`--model`/`--effort` fall back to `AQM_AGENT`/`AQM_MODEL`/`AQM_EFFORT`; `--human` records the owner's own note. Commits use `Refs #<n>` and **never** a GitHub auto-closing keyword (`Closes`, `Fixes`, `Resolves`, …) — `.githooks/commit-msg` and `scripts/check-title.sh` both reject those, and the issue closes only after `verify`. Agents commit through `./scripts/agent-commit.sh`:
+
+```bash
+./scripts/agent-commit.sh --author-name "T3 Code" --author-email "t3-code@bots.invalid" \
+  -m "feat: ..." -m "Refs #6"
+```
+
+`./scripts/check-title.sh` enforces `[<agent> <model> <effort>] <summary>` PR titles and `[<agent>]` / `[<agent> <model> <effort>]` issue titles in CI (`.github/workflows/title-check.yml`), and PRs use [`.github/pull_request_template.md`](.github/pull_request_template.md). `./scripts/test-workflow.sh` exercises all of it offline with a stub `gh` (no network) and runs inside `./scripts/verify-all.sh` and CI.
 
 ---
 
@@ -211,7 +223,7 @@ All bugs and features follow a mandatory **GitHub Issue-First Workflow** where t
 | [`docs/providers.md`](docs/providers.md) | Upstream wire specs (`agy`, `opencode go`, `grok`), v1 snapshot schema, and v1 AES-256-GCM envelope spec |
 | [`docs/lessons.md`](docs/lessons.md) | Engineering lessons, cross-boundary invariants, and historical bug post-mortems (`COL-*`, `APP-*`, `SYS-*`) |
 | [`docs/design/README.md`](docs/design/README.md) | Google Stitch 3-set + Hybrid Master prototype workflow, [`DESIGN.md`](.stitch/DESIGN.md), and Compose mapping |
-| [`docs/workers.md`](docs/workers.md) | Orca multi-agent orchestration playbook (`agy` Argon Medium planner + quota-aware `opencode2`/Flash 3.8 implementer + `grok` 4.7 Medium reviewer) |
+| [`docs/workers.md`](docs/workers.md) | T3 Code & Orca multi-agent orchestration playbook (`agy` Argon Medium planner + quota-aware `opencode2`/Flash 3.8 implementer + `grok` 4.7 Medium reviewer), issue attribution, agent commits, and the title gate |
 | [`.agents/skills/orca-quota-engineering/SKILL.md`](.agents/skills/orca-quota-engineering/SKILL.md) | Project-local skill codifying the 3-gate review workflow, golden test vector rules, and verification gates |
 | [`docs/status.md`](docs/status.md) | Project status, toolchain audit, and milestone tracker |
 | [`docs/bugs/index.md`](docs/bugs/index.md) | Defect registry and remediation verification log |

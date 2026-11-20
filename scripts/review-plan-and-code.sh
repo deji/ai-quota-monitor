@@ -72,7 +72,8 @@ if [[ -n "$ISSUE_NUM" ]]; then
   if [[ "$MODE" == "plan" ]]; then
     STAGE="plan"
   fi
-  "$REPO_ROOT/scripts/gh-issue-workflow.sh" comment "$ISSUE_NUM" "$STAGE" "@$OUT_FILE"
+  "$REPO_ROOT/scripts/gh-issue-workflow.sh" comment "$ISSUE_NUM" "$STAGE" "@$OUT_FILE" \
+    --agent grok --model grok-4.7 --effort medium
 else
   exec grok -m grok-4.7 --effort medium --always-approve --cwd "$TARGET_DIR" -p "$PROMPT"
 fi

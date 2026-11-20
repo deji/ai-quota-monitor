@@ -1,30 +1,32 @@
 ---
 name: orca-quota-engineering
-description: Project-specific architecture, multi-agent Orca orchestration workflow (coordinator gate in AGENTS.md, quota-routed planner, opencode2 implementer, and the other expensive planner as reviewer), cross-language AES-256-GCM relay invariants, provider wire parsing rules, and verification gates for ai-quota-monitor. Use whenever planning, implementing, testing, or reviewing changes in this repository.
+description: Project-specific architecture, multi-agent orchestration workflow (coordinator gate in AGENTS.md covering T3 Code `delegate_task` and Orca `orca` workers, quota-routed planner, opencode2 implementer, and the other expensive planner as reviewer), agent attribution and title gates, cross-language AES-256-GCM relay invariants, provider wire parsing rules, and verification gates for ai-quota-monitor. Use whenever planning, implementing, testing, or reviewing changes in this repository.
 ---
 
 # Orca Quota Engineering Skill (`ai-quota-monitor`)
 
 Use this skill whenever planning, modifying, testing, or reviewing `collector/`, `app/`, `.stitch/`, or `docs/` in `ai-quota-monitor`.
 
-## 1. Mandatory 3-Gate Orca Orchestration Workflow
+## 1. Mandatory Multi-Agent Orchestration Workflow (T3 Code & Orca)
 
-All non-trivial work in this repository goes through the coordinator gate in [`AGENTS.md`](../../../AGENTS.md) and the global `orca-cheap-workers` skill. The open pane is the coordinator. It checks quota and dispatches workers. It does not edit the repo.
+All non-trivial work in this repository goes through the coordinator gate in [`AGENTS.md`](../../../AGENTS.md) and the active global skill (`t3-cheap-workers` in T3 Code; `orca-cheap-workers` in Orca). The two harnesses have distinct routing rules:
 
-| Stage | Worker | Responsibility |
+- **T3 Code (`t3-cheap-workers`, `delegate_task`):** Coordinator (`antigravity` / `gemini-4-neon`, or `grok` / `grok-4.7`) writes the plan itself and delegates only Implement and Review via `delegate_task` (brief in `task`, separate `target.providerInstanceId` and `target.model`, provider option keys `variant` / `reasoningEffort` / `thought_level`, never `xhigh`). Quota from `~/.t3/caches/{opencode,antigravity,grok}.json` (`< 80%` available; Antigravity/Grok `<= 50%` → `high`, `> 50%` and `< 80%` → `medium`). Implement: `opencode/opencode-go/deepseek-v4.1-flash` (`{"variant":"high"}`) → `antigravity/gemini-4-hydrogen` → `grok/grok-4.7`. Review: opposite top-tier model (`gemini-4-neon` ↔ `grok-4.7`), else cheap non-author fallback. Sequential implement → review uses `isolation: "shared"`; `isolation: "worktree"` is for parallel independent tasks.
+- **Orca (`orca-cheap-workers`, `orca` CLI):** Coordinator checks `orca account list --json` (`status == "ok"`, `usedPercent < 80`) and dispatches all three stages into one worktree per issue:
+
+| Stage | Orca Worker | Responsibility |
 | :--- | :--- | :--- |
-| **Plan** | Argon Medium, else Grok, else Gemini 3.8 Flash, else opencode2 | Architecture, Stitch UI/UX prototyping, and the task spec. `--agent antigravity --model gemini-4-argon-medium` takes no `--effort`. |
-| **Implement** | opencode2, else Gemini 3.8 Flash | Feature implementation, unit/UI tests, Gradle builds, and emulator/device verification. Pass neither `--model` nor `--effort` to `--agent opencode2`. |
-| **Review** | The other expensive planner | Read-only review of the plan and the worktree diff. Argon planned, so Grok reviews. Grok planned, so Argon reviews. If that window is low, use a cheap worker that did not implement. |
-
-`--agent grok` does not take `--model` or `--effort`. It reads `~/.grok/config.toml` (`grok-4.7`, medium). A window is available when `orca account list --json` shows `status` `ok` and `usedPercent` under 80.
+| **Plan** | Hydrogen High or Argon High, else Grok High, else Gemini 3.8 Flash High, else opencode2 | Architecture, Stitch UI/UX prototyping, and the task spec (`--agent antigravity --model gemini-4-hydrogen-high` or `gemini-4-argon-high` with no extra `--effort`, else `--agent grok --model grok-4.7 --effort high`). |
+| **Implement** | opencode2, else Gemini 3.8 Flash High | Feature implementation, unit/UI tests, Gradle builds, and emulator/device verification. Pass neither `--model` nor `--effort` to `--agent opencode2`. |
+| **Review** | The other expensive planner | Read-only review of the plan and the worktree diff. Antigravity planned → `--agent grok --model grok-4.7 --effort medium`. Grok planned → Hydrogen or Argon high. If that window is low, use a cheap non-author worker. |
 
 ### The GitHub Issue-First Lifecycle (`scripts/gh-issue-workflow.sh`) & 3 Review Gates (`scripts/review-plan-and-code.sh`)
 0. **Gate 0 — GitHub Issue Creation & Plan Comment (Mandatory Before Code)**:
    Every bug or feature MUST be filed as a GitHub Issue first, and its architectural plan MUST be posted as a `## [PLAN]` comment on that issue:
    ```bash
-   ./scripts/gh-issue-workflow.sh create "<title>" "<description>" "enhancement"
-   ./scripts/gh-issue-workflow.sh comment <issue-number> plan "<plan-markdown>"
+   ./scripts/gh-issue-workflow.sh create "[t3-code] <title>" "<description>" "enhancement"
+   ./scripts/gh-issue-workflow.sh comment <issue-number> plan "<plan-markdown>" \
+     --agent t3-code --model gemini-4-neon --effort high
    # The plan body must contain exactly one line: UI evidence: before-and-after
    # or UI evidence: none.
    ```
@@ -32,19 +34,21 @@ All non-trivial work in this repository goes through the coordinator gate in [`A
    Before dispatching implementation workers for a new feature, UX change, or architectural change, run the review worker from the coordinator gate against the task spec and `docs/plan.md` + `docs/providers.md`, and post the review to `## [PLAN]`. The sample below is the command when that worker is Grok:
    ```bash
    # Via supervised Orca worker (after pre-trusting the worktree in ~/.grok/trusted_folders.toml):
-   orca orchestration worker-start --task-title "Issue #<n>: Gate 1 Plan Review" --spec "<prompt>" --worktree "<worktreeSelector>" --agent grok --json
+   orca orchestration worker-start --task-title "Issue #<n>: Gate 1 Plan Review" --spec "<prompt>" --worktree "<worktreeSelector>" --agent grok --model grok-4.7 --effort medium --json
    # Or via helper script (auto-trusts target worktree and posts ## [PLAN] when --issue is given):
    ./scripts/review-plan-and-code.sh plan "<worktree-path>" --spec "<spec-file>" --issue <issue-number>
    ```
-   - **Grok Orca Worker Rule**: `orca orchestration worker-start --agent grok` reads `default = "grok-4.7"` and `default_reasoning_effort = "medium"` from `~/.grok/config.toml` (it does **not** accept `--model` or `--effort` CLI flags) and requires `[folders."<worktreePath>"]\ntrusted = true` in `~/.grok/trusted_folders.toml` so newly created worktrees never block on interactive TUI folder trust (`agent-trust-workspace`).
+   - **Grok Orca Worker Rule**: `orca orchestration worker-start --agent grok --model grok-4.7 --effort high|medium` requires `[folders."<worktreePath>"]\ntrusted = true` in `~/.grok/trusted_folders.toml` so newly created worktrees never block on interactive TUI folder trust (`agent-trust-workspace`). Only `--agent opencode2` omits `--model`/`--effort`.
    - **Follow-Up Worker Dispatch Rule**: When sending Gate 1 review findings or follow-up instructions to a running worker terminal via `orca orchestration send`, always pass `--type dispatch` (valid types: `status, dispatch, worker_done, merge_ready, escalation, handoff, decision_gate, question, heartbeat`; `--type steer` is invalid).
 2. **Gate 2 — Worktree Implementation, Testing & Review Comments**:
-   Every commit must reference `#<issue-number>` (enforced by `.githooks/commit-msg`). After the implementer worker (`opencode2`, or `gemini-3.8-flash-high` when that quota is low or the launch fails; never `--agent agy`) finishes and passes unit/hygiene tests, post the `## [IMPLEMENTATION]` and `## [TESTING]` comments, release its worker terminal, and run the review worker against that worktree to post `## [REVIEW]`. `./scripts/review-plan-and-code.sh` is the Grok path:
+   Every commit must carry `Refs #<issue-number>` (never auto-closing keywords; enforced by `.githooks/commit-msg`) and agents commit via `./scripts/agent-commit.sh`. After the implementer finishes and passes unit/hygiene tests, post attributed `## [IMPLEMENTATION]` and `## [TESTING]` comments, release any Orca worker terminal, and run the review worker against the diff to post `## [REVIEW]`. `./scripts/review-plan-and-code.sh` is the Grok CLI helper:
    ```bash
    # Before editing UI files, when the plan says UI evidence: before-and-after:
    ./scripts/gh-issue-workflow.sh before-shot <issue-number> --attach "$TMPDIR/before.png#Before: previous screen"
-   ./scripts/gh-issue-workflow.sh comment <issue-number> implementation "<summary>"
+   ./scripts/gh-issue-workflow.sh comment <issue-number> implementation "<summary>" \
+     --agent opencode --model opencode-go/deepseek-v4.1-flash --effort high
    ./scripts/gh-issue-workflow.sh comment <issue-number> testing "<test-output>" \
+     --agent t3-code --model gemini-4-neon --effort high \
      --attach "$TMPDIR/before.png#Before: previous screen" \
      --attach "$TMPDIR/after.png#After: screen after the change"
    ./scripts/review-plan-and-code.sh worktree "<worktree-path>" --issue <issue-number>
@@ -125,11 +129,6 @@ All non-trivial work in this repository goes through the coordinator gate in [`A
     - **`SyncHubSheet` stays a bounded `verticalScroll`, never a `LazyColumn`**, so `ConnectionSettingsForm`, text-field focus/drafts, `rememberSaveable` `isEditExpanded`, and the 30s age ticker stay composed (`APP-UX1` / `APP-SYNC1`).
     - **`APP-UX2` invariants survive the restructure**: `onTogglePin` calls only `onSetPinnedBucket(null)` / `onSetPinnedBucket(id)`, and screen `BackHandler` order (`selectedBucket` → `showSyncHub` → `showFilterSheet`) is untouched.
     - **`AQM-LINT-011`**: `collector/tests/test_repo_hygiene.py` asserts the three sheets never put `verticalScroll` on the root content child, always bound the scroll body with `weight(1f, fill = false)`, and apply `sheetContentNestedScroll` immediately before `verticalScroll`. Lock the gesture contract with `SheetScrollGuardTest` and the layout with `ModelFilterSheetScrollTest`.
-16. **Concept B Bento Widgets (`APP-UX6` / Issue #13)**:
-    - **Live resolvers**: `QuotaCompactWidget` renders the 2x2 Quad Micro-Bento grid from `QuotaSnapshot.resolveCompactCriticalBuckets(hiddenBucketIds, pinnedBucketId, compactBucketId)` (slot 0 = compact selection, which strictly beats the pin and never falls back; one critical bucket per provider in canonical `agy` → `opencode_go` → `grok` order, then the leftover pool up to 4 cells). `QuotaWideWidget` renders the 4x3 three-column Provider Bento Deck from `QuotaSnapshot.resolveWideProviderGroups(hiddenBucketIds)`, which ignores `wideWidgetBucketIds` entirely — every visible bucket of every provider is shown, grouped and canonically ordered, with empty providers omitted.
-    - **Legacy-compatible surface**: `resolveCompactWidgetItem`, `resolveWideWidgetItems`, `setWideWidgetBuckets`, and `toggleWideWidgetBucket` remain implemented and tested for backwards compatibility, but nothing in the live widget or preview path calls them.
-    - **Shared visual language**: both widgets and `GlancePreviewCard` colour every cell through `widget/widgetHealthColor(displayPercent, polarity)` — `Double.NaN` is guarded first and renders slate `#94A3B8`, then `REMAINING` degrades downward (coral ≤ 20, amber ≤ 50) while `USED` is polarity-inverted (coral ≥ 80, amber ≥ 50). Micro-bars are `createProgressBarBitmap` ARGB bitmaps (never recycled) because Glance cannot draw arbitrary Compose shapes.
-    - **One countdown**: `formatResetCountdownFromIso(resetsAt, nowEpochMs, includeMinutesUnderDay)` in `domain/model/QuotaBucket.kt` is the only countdown. It parses once, truncates with `Long` division (never rounds or carries), returns `""` for blank/malformed, `"Now"` for elapsed, `"<n>d"`/`"<n>d <h>h"` for multi-day, `"<h>h <m>m"`/`"<h>h"` for sub-day, and `"<m>m"` (minimum `"1m"`) under an hour — it must never emit `0d`, `0m`, or `1d 0h`.
 14. **Login LaunchAgent, Tailscale wait, and Healthchecks ping (`COL-H7` / Issue #11)**:
     - `install-launchd` bootstraps `gui/$UID/com.aiquotamonitor.collector` when the plist destination is `~/Library/LaunchAgents`. The agent runs `collector serve --host tailscale` with `RunAtLoad`, `KeepAlive`, and `ThrottleInterval` 10, and logs under `~/Library/Logs/ai-quota-monitor/` (never `/tmp`, which a reboot clears). It starts at user login.
     - `load_config` keeps the `tailscale` sentinel. `resolve_listen_host` waits up to 120s and probes `/opt/homebrew/bin/tailscale`, `/usr/local/bin/tailscale`, and the Tailscale.app binary before `PATH`. It must not bind `127.0.0.1` when the requested host is `tailscale`; exit 75 so launchd retries.
@@ -140,6 +139,17 @@ All non-trivial work in this repository goes through the coordinator gate in [`A
     - **OpenCode Go Multi-Pool Bento Card (`APP-UX5`)**: `OpenCodeBentoCard` renders all visible secondary buckets sorted in canonical order (`opencode-rolling`, `opencode-weekly`, `opencode-monthly`) as clickable health-colored pills below the `WEEKLY` ring (`displayPercent(polarity)` + `tnum`), with labels `"5-Hour Rolling"`, `"Weekly Pool"`, and `"Monthly Pool"` (`subtitle = "5h Rolling, Weekly & Monthly Pools"`).
     - **Hardened UI Evidence & Receipt Gate (`SEC-G2` / `AQM-LINT-012`)**: `.githooks/commit-msg` only exempts real `MERGE_HEAD` merges (never a bare `^Merge ` commit message), validates numeric `$issue`, confines `image=` to `.aqm-ui-evidence/$issue/before.<ext>` (rejecting slashes or `..`), and verifies `sha256` against the receipt. `scripts/gh-issue-workflow.sh` includes untracked UI files in `ui_changes_since_clean`, validates numeric `ISSUE_NUM`, and resolves `latest_plan_text` on `TESTING` comments to enforce `before-and-after` attachments unconditionally.
     - **Never pipe `./gradlew` to `| tail` without `--no-daemon`**: A newly spawned `GradleDaemon` inherits pipe file descriptors and blocks `tail` until the daemon's idle timeout expires.
+16. **Concept B Bento Widgets (`APP-UX6` / Issue #13)**:
+    - **Live resolvers**: `QuotaCompactWidget` renders the 2x2 Quad Micro-Bento grid from `QuotaSnapshot.resolveCompactCriticalBuckets(hiddenBucketIds, pinnedBucketId, compactBucketId)` (slot 0 = compact selection, which strictly beats the pin and never falls back; one critical bucket per provider in canonical `agy` → `opencode_go` → `grok` order, then the leftover pool up to 4 cells). `QuotaWideWidget` renders the 4x3 three-column Provider Bento Deck from `QuotaSnapshot.resolveWideProviderGroups(hiddenBucketIds)`, which ignores `wideWidgetBucketIds` entirely — every visible bucket of every provider is shown, grouped and canonically ordered, with empty providers omitted.
+    - **Legacy-compatible surface**: `resolveCompactWidgetItem`, `resolveWideWidgetItems`, `setWideWidgetBuckets`, and `toggleWideWidgetBucket` remain implemented and tested for backwards compatibility, but nothing in the live widget or preview path calls them.
+    - **Shared visual language**: both widgets and `GlancePreviewCard` colour every cell through `widget/widgetHealthColor(displayPercent, polarity)` — `Double.NaN` is guarded first and renders slate `#94A3B8`, then `REMAINING` degrades downward (coral ≤ 20, amber ≤ 50) while `USED` is polarity-inverted (coral ≥ 80, amber ≥ 50). Micro-bars are `createProgressBarBitmap` ARGB bitmaps (never recycled) because Glance cannot draw arbitrary Compose shapes.
+    - **One countdown**: `formatResetCountdownFromIso(resetsAt, nowEpochMs, includeMinutesUnderDay)` in `domain/model/QuotaBucket.kt` is the only countdown. It parses once, truncates with `Long` division (never rounds or carries), returns `""` for blank/malformed, `"Now"` for elapsed, `"<n>d"`/`"<n>d <h>h"` for multi-day, `"<h>h <m>m"`/`"<h>h"` for sub-day, and `"<m>m"` (minimum `"1m"`) under an hour — it must never emit `0d`, `0m`, or `1d 0h`.
+17. **T3 Code Orchestration & Attributed Agent Workflow (`SEC-G3` / Issue #18)**:
+    - **Two harnesses, distinct routing contracts**: T3 Code (`t3-cheap-workers`) and Orca (`orca-cheap-workers`) do not share one routing table. In T3 Code, the coordinator (`gemini-4-neon` or `grok-4.7`) writes the plan itself and delegates only implement and review via `delegate_task` (`task` brief, separate `target.providerInstanceId` and `target.model`, provider option keys `variant` / `reasoningEffort` / `thought_level`, never `xhigh`, `isolation: "shared"` for sequential implement → review, `isolation: "worktree"` for parallel tasks). In Orca, the coordinator dispatches all three stages via `orca` CLI (Hydrogen/Argon/Grok high plan, `opencode2` without `--model`/`--effort` implement, opposite expensive planner review).
+    - **Attribution is required, not conventional**: `scripts/gh-issue-workflow.sh comment <n> <stage> "<body>" --agent <slug> --model <model> [--effort <level>]` (or `--human`, or `AQM_AGENT`/`AQM_MODEL`/`AQM_EFFORT`) composes `## [STAGE]`, strips a pasted duplicate, prepends `_Contributor: …_`, and scrubs the result. `verify` fails closed unless all four stages are separate comments whose first non-empty line is exactly `## [STAGE]` and which carry a `_Contributor:` line.
+    - **No auto-closing keywords, ever**: `.githooks/commit-msg` rejects `Closes`/`Fixes`/`Resolves` and variants (optionally `owner/repo#N`) on every line, including merge commits and `AQM_SKIP_ISSUE_REF=1` scrubs; `Refs #<n>` is required once `origin` exists; only a real `MERGE_HEAD` exempts the ref/receipt checks. `scripts/check-title.sh` repeats the rejection for PR bodies and `base..head` commits (and fails closed if a CI `pull_request` event omits `base`/`head` SHAs), and `gh-issue-workflow.sh close` runs `verify` first.
+    - **Agent commits carry the owner**: `scripts/agent-commit.sh` requires a `<agent>@bots.invalid` identity (never a GitHub noreply address), appends the owner `Co-authored-by:` trailer via `git interpret-trailers`, allowlists only `-a`, `--all`, `--allow-empty`, `-q`, `--quiet`, `--dry-run`, `-v`, `--verbose` plus `-- pathspec`, unsets `AQM_SKIP_ISSUE_REF`/`AQM_SKIP_ATTRIBUTION`, validates the message with `.githooks/commit-msg`, and commits with `git -c core.hooksPath=… commit`.
+    - **Titles and PRs are gated**: agent PRs read `[<agent> <model> <effort>] <summary>`; agent issues read `[<agent>]` or `[<agent> <model> <effort>]`. `scripts/check-title.sh` runs in CI (`.github/workflows/title-check.yml`); PRs use `.github/pull_request_template.md` with its `Models:` line and `Opened by …` footer. `./scripts/test-workflow.sh` is the offline proof (stub `gh`, 131 cases) and runs inside `./scripts/verify-all.sh` and CI.
 
 ---
 
@@ -153,10 +163,10 @@ Before completing any task or merging any branch, run:
 
 This executes 5 automated gates:
 1. `.githooks/pre-commit` + repo-wide secret & PII scan (`test_repo_hygiene.py`)
-2. Python collector unit test suite (`python3 -m unittest discover -s collector/tests -v`)
+2. Python collector unit test suite (`python3 -m unittest discover -s collector/tests -v`) plus the offline agent/workflow suite (`./scripts/test-workflow.sh`)
 3. Android lint, JUnit unit tests, and debug APK build (`./gradlew --no-daemon lintDebug testDebugUnitTest assembleDebug` — the `--no-daemon` flag is baked into the script so a piped `verify-all.sh | tail` exits instead of hanging on a daemon that inherited the pipe)
 4. APK artifact verification (`app/build/outputs/apk/debug/app-debug.apk`)
-5. **Learnings, Bug Ledger & Skill Sync Check**: Verifies all living docs (`docs/lessons.md`, `docs/bugs/index.md`, `docs/status.md`, `README.md`, and this `SKILL.md`) are present and that every defect ID in `docs/bugs/index.md` is documented in `docs/lessons.md`.
+5. **Learnings, Bug Ledger & Skill Sync Check**: Verifies all living docs (`docs/lessons.md`, `docs/bugs/index.md`, `docs/status.md`, `README.md`, and this `SKILL.md`), the workflow scripts (`agent-commit.sh`, `check-title.sh`, `test-workflow.sh`, `gh-issue-workflow.sh`), and `.github/pull_request_template.md` + `.github/workflows/title-check.yml` exist (scripts executable), and that every defect ID in `docs/bugs/index.md` is documented in `docs/lessons.md`.
 
 ---
 

@@ -26,6 +26,9 @@ jobs:
         run: |
           PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s collector/tests -v
 
+      - name: Workflow script tests
+        run: ./scripts/test-workflow.sh
+
   android-build-and-test:
     name: Android Unit Tests & Debug APK Build
     runs-on: ubuntu-latest
