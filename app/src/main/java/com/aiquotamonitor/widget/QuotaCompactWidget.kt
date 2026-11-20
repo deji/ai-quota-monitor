@@ -22,6 +22,7 @@ import androidx.glance.layout.Box
 import androidx.glance.layout.Column
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
+import androidx.glance.layout.fillMaxHeight
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
@@ -134,14 +135,14 @@ class QuotaCompactWidget : GlanceAppWidget() {
                                         item = items.getOrNull(0),
                                         polarity = polarity,
                                         nowEpochMs = nowEpochMs,
-                                        modifier = GlanceModifier.defaultWeight()
+                                        modifier = GlanceModifier.defaultWeight().fillMaxHeight()
                                     )
                                     Spacer(modifier = GlanceModifier.width(4.dp))
                                     CompactBentoCell(
                                         item = items.getOrNull(1),
                                         polarity = polarity,
                                         nowEpochMs = nowEpochMs,
-                                        modifier = GlanceModifier.defaultWeight()
+                                        modifier = GlanceModifier.defaultWeight().fillMaxHeight()
                                     )
                                 }
                                 Spacer(modifier = GlanceModifier.height(4.dp))
@@ -150,14 +151,14 @@ class QuotaCompactWidget : GlanceAppWidget() {
                                         item = items.getOrNull(2),
                                         polarity = polarity,
                                         nowEpochMs = nowEpochMs,
-                                        modifier = GlanceModifier.defaultWeight()
+                                        modifier = GlanceModifier.defaultWeight().fillMaxHeight()
                                     )
                                     Spacer(modifier = GlanceModifier.width(4.dp))
                                     CompactBentoCell(
                                         item = items.getOrNull(3),
                                         polarity = polarity,
                                         nowEpochMs = nowEpochMs,
-                                        modifier = GlanceModifier.defaultWeight()
+                                        modifier = GlanceModifier.defaultWeight().fillMaxHeight()
                                     )
                                 }
                             }
@@ -212,7 +213,7 @@ private fun CompactBentoCell(
             .cornerRadius(10.dp)
             .background(ColorProvider(Color(0xFF1A252A)))
             .padding(6.dp),
-        verticalAlignment = Alignment.Top
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Row(
             modifier = GlanceModifier.fillMaxWidth(),

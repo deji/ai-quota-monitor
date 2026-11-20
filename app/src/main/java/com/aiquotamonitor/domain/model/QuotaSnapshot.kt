@@ -24,7 +24,8 @@ data class WidgetQuotaItem(
     val windowDurationHours: Int = 0,
     val shortHeaderLabel: String = categoryLabel,
     val shortWindowLabel: String = "",
-    val shortWideRowLabel: String = titleLabel
+    val shortWideRowLabel: String = titleLabel,
+    val productBreakdown: List<ProductUsageBreakdown> = emptyList()
 ) {
     fun displayPercent(polarity: QuotaPolarity): Double = when (polarity) {
         QuotaPolarity.REMAINING -> remainingPercent
@@ -480,7 +481,8 @@ data class QuotaSnapshot(
             // provider-derived category (which may be a custom provider name).
             shortHeaderLabel = shortHeaderLabel().takeIf { it != "QUOTA" } ?: providerCategoryLabel(id),
             shortWindowLabel = shortWindowLabel(),
-            shortWideRowLabel = shortWideRowLabel()
+            shortWideRowLabel = shortWideRowLabel(),
+            productBreakdown = productBreakdown
         )
     }
 

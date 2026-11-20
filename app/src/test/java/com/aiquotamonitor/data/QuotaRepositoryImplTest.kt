@@ -1616,6 +1616,52 @@ class QuotaRepositoryImplTest {
     }
 
     @Test
+    fun testResolveWideProviderGroupsForwardsProductBreakdownAndLease() {
+        val snapshot = SeedData.createSeedSnapshot()
+        val groups = snapshot.resolveWideProviderGroups(defaultHidden)
+
+        assertEquals(3, groups.size)
+        assertEquals(
+            listOf("gemini-argon-wtu-weekly", "gemini-5h", "gemini-weekly"),
+            groups[0].items.map { it.id }
+        )
+        assertEquals(
+            listOf("opencode-rolling", "opencode-weekly", "opencode-monthly"),
+            groups[1].items.map { it.id }
+        )
+
+        val grok = groups.single { it.providerId == "grok" }
+        assertEquals(listOf("grok-weekly-credits"), grok.items.map { it.id })
+        assertEquals("350m TTL", grok.oauthLeaseLabel)
+        val grokItem = grok.items.single()
+        assertEquals(
+            listOf("Grok Bot", "Grok Build", "Cursor"),
+            grokItem.productBreakdown.map { it.label }
+        )
+        assertEquals(49.0, grokItem.productBreakdown[0].usagePercent, 0.001)
+        assertEquals(2.0, grokItem.productBreakdown[2].usagePercent, 0.001)
+        assertTrue(groups[0].items.all { it.productBreakdown.isEmpty() })
+        assertTrue(groups[1].items.all { it.productBreakdown.isEmpty() })
+    }
+
+    @Test
+    fun testResolveWideProviderGroupsShowsAllFiveAntigravityBucketsWhen3PUnhidden() {
+        val snapshot = SeedData.createSeedSnapshot()
+        val agy = snapshot.resolveWideProviderGroups(emptySet()).first { it.providerId == "agy" }
+
+        assertEquals(
+            listOf(
+                "gemini-argon-wtu-weekly",
+                "gemini-5h",
+                "gemini-weekly",
+                "3p-5h",
+                "3p-weekly"
+            ),
+            agy.items.map { it.id }
+        )
+    }
+
+    @Test
     fun testResolveWideProviderGroupsOmitsProvidersWithNoVisibleBuckets() {
         val snapshot = SeedData.createSeedSnapshot()
         val agyBucketIds = snapshot.providers

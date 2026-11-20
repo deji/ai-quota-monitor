@@ -7,8 +7,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -158,13 +160,13 @@ fun GlancePreviewCard(
                                 item = compactItems.getOrNull(0),
                                 polarity = polarity,
                                 nowEpochMs = nowEpochMs,
-                                modifier = Modifier.weight(1f).fillMaxWidth()
+                                modifier = Modifier.weight(1f).fillMaxWidth().fillMaxHeight()
                             )
                             CompactBentoPreviewCell(
                                 item = compactItems.getOrNull(1),
                                 polarity = polarity,
                                 nowEpochMs = nowEpochMs,
-                                modifier = Modifier.weight(1f).fillMaxWidth()
+                                modifier = Modifier.weight(1f).fillMaxWidth().fillMaxHeight()
                             )
                         }
 
@@ -178,13 +180,13 @@ fun GlancePreviewCard(
                                 item = compactItems.getOrNull(2),
                                 polarity = polarity,
                                 nowEpochMs = nowEpochMs,
-                                modifier = Modifier.weight(1f).fillMaxWidth()
+                                modifier = Modifier.weight(1f).fillMaxWidth().fillMaxHeight()
                             )
                             CompactBentoPreviewCell(
                                 item = compactItems.getOrNull(3),
                                 polarity = polarity,
                                 nowEpochMs = nowEpochMs,
-                                modifier = Modifier.weight(1f).fillMaxWidth()
+                                modifier = Modifier.weight(1f).fillMaxWidth().fillMaxHeight()
                             )
                         }
                     }
@@ -289,7 +291,7 @@ fun GlancePreviewCard(
                         }
                     } else {
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Max),
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             wideGroups.forEach { group ->
@@ -297,7 +299,7 @@ fun GlancePreviewCard(
                                     group = group,
                                     polarity = polarity,
                                     nowEpochMs = nowEpochMs,
-                                    modifier = Modifier.weight(1f)
+                                    modifier = Modifier.weight(1f).fillMaxHeight()
                                 )
                             }
                         }
@@ -338,7 +340,8 @@ private fun CompactBentoPreviewCell(
         modifier = modifier
             .clip(RoundedCornerShape(10.dp))
             .background(BENTO_CARD)
-            .padding(6.dp)
+            .padding(6.dp),
+        verticalArrangement = Arrangement.Center
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -432,13 +435,24 @@ private fun WideProviderColumnPreview(
         )
 
         group.items.forEach { item ->
-            Spacer(modifier = Modifier.height(3.dp))
-            WideBucketRowPreview(item = item, polarity = polarity, nowEpochMs = nowEpochMs)
+            WideBucketRowPreview(
+                item = item,
+                polarity = polarity,
+                nowEpochMs = nowEpochMs,
+                modifier = Modifier.padding(top = 3.dp)
+            )
+        }
+
+        val breakdownItem = group.items.singleOrNull()
+            ?.takeIf { it.productBreakdown.isNotEmpty() }
+        if (breakdownItem != null) {
+            WideProductBreakdownPreview(item = breakdownItem)
         }
 
         val leaseLabel = group.oauthLeaseLabel
         if (leaseLabel != null) {
-            Spacer(modifier = Modifier.height(6.dp))
+            // Pin the lease footer to the column bottom so all three columns read level.
+            Spacer(modifier = Modifier.weight(1f))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -465,10 +479,43 @@ private fun WideProviderColumnPreview(
 }
 
 @Composable
+private fun WideProductBreakdownPreview(item: WidgetQuotaItem) {
+    Column(modifier = Modifier.fillMaxWidth().padding(top = 2.dp)) {
+        item.productBreakdown.take(3).forEach { breakdown ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = breakdown.label,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontSize = 7.5.sp,
+                    color = Color(0xFF64748B),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(modifier = Modifier.width(2.dp))
+                Text(
+                    text = "${breakdown.usagePercent.roundToInt()}%",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontSize = 7.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF38BDF8),
+                    maxLines = 1
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun WideBucketRowPreview(
     item: WidgetQuotaItem,
     polarity: QuotaPolarity,
-    nowEpochMs: Long
+    nowEpochMs: Long,
+    modifier: Modifier = Modifier
 ) {
     val displayPercent = item.displayPercent(polarity)
     val isUnavailable = displayPercent.isNaN()
@@ -479,55 +526,57 @@ private fun WideBucketRowPreview(
         includeMinutesUnderDay = true
     )
 
-    // Two-line micro-header: the label owns the full column width so provider
-    // bucket names never collide with the reset countdown.
-    Text(
-        text = item.shortWideRowLabel,
-        style = MaterialTheme.typography.labelSmall,
-        fontSize = 8.5.sp,
-        fontWeight = FontWeight.Medium,
-        color = Color(0xFFE2E8F0),
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis
-    )
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        // Two-line micro-header: the label owns the full column width so provider
+        // bucket names never collide with the reset countdown.
         Text(
-            text = pctText,
-            style = MaterialTheme.typography.labelSmall,
-            fontSize = 9.5.sp,
-            fontWeight = FontWeight.Bold,
-            color = healthColor,
-            maxLines = 1
-        )
-        Text(
-            text = resetText.ifBlank { "—" },
+            text = item.shortWideRowLabel,
             style = MaterialTheme.typography.labelSmall,
             fontSize = 8.5.sp,
-            fontWeight = FontWeight.Bold,
-            color = healthColor,
+            fontWeight = FontWeight.Medium,
+            color = Color(0xFFE2E8F0),
             maxLines = 1,
-            softWrap = false
+            overflow = TextOverflow.Ellipsis
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = pctText,
+                style = MaterialTheme.typography.labelSmall,
+                fontSize = 9.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = healthColor,
+                maxLines = 1
+            )
+            Text(
+                text = resetText.ifBlank { "—" },
+                style = MaterialTheme.typography.labelSmall,
+                fontSize = 8.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = healthColor,
+                maxLines = 1,
+                softWrap = false
+            )
+        }
+
+        Spacer(modifier = Modifier.height(1.dp))
+
+        LinearProgressIndicator(
+            progress = {
+                if (isUnavailable) 0f else (displayPercent / 100.0).toFloat().coerceIn(0f, 1f)
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(4.dp)
+                .clip(RoundedCornerShape(2.dp)),
+            color = healthColor,
+            trackColor = BENTO_TRACK
         )
     }
-
-    Spacer(modifier = Modifier.height(2.dp))
-
-    LinearProgressIndicator(
-        progress = {
-            if (isUnavailable) 0f else (displayPercent / 100.0).toFloat().coerceIn(0f, 1f)
-        },
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(4.dp)
-            .clip(RoundedCornerShape(2.dp)),
-        color = healthColor,
-        trackColor = BENTO_TRACK
-    )
 }
 
 @Composable

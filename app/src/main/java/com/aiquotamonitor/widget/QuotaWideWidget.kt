@@ -202,8 +202,16 @@ private fun ProviderDeckColumn(
         )
 
         group.items.forEach { item ->
-            Spacer(modifier = GlanceModifier.height(3.dp))
+            // Each bucket is exactly ONE direct child of this Column: Glance's RemoteViews
+            // template silently drops child #11 and later, so buckets must never emit
+            // sibling Spacers/Images of their own (APP-UX7).
             WideBucketBlock(item = item, polarity = polarity, nowEpochMs = nowEpochMs)
+        }
+
+        val breakdownItem = group.items.singleOrNull()
+            ?.takeIf { it.productBreakdown.isNotEmpty() }
+        if (breakdownItem != null) {
+            ProductBreakdownBlock(item = breakdownItem)
         }
 
         val leaseLabel = group.oauthLeaseLabel
@@ -250,7 +258,9 @@ private fun WideBucketBlock(
         includeMinutesUnderDay = true
     )
 
-    Column(modifier = GlanceModifier.fillMaxWidth()) {
+    // Root container: this single Column is the only child the bucket contributes to
+    // ProviderDeckColumn's Column (title + 5 buckets + breakdown + lease stays <= 9).
+    Column(modifier = GlanceModifier.fillMaxWidth().padding(top = 3.dp)) {
         // Two-line micro-header: the label owns the full column width so provider
         // bucket names never collide with the reset countdown.
         Text(
@@ -286,16 +296,52 @@ private fun WideBucketBlock(
                 )
             )
         }
+
+        Spacer(modifier = GlanceModifier.height(1.dp))
+
+        Image(
+            provider = ImageProvider(createProgressBarBitmap(displayPercent, healthColor)),
+            contentDescription = null,
+            modifier = GlanceModifier.fillMaxWidth().height(4.dp)
+        )
     }
-
-    Spacer(modifier = GlanceModifier.height(2.dp))
-
-    Image(
-        provider = ImageProvider(createProgressBarBitmap(displayPercent, healthColor)),
-        contentDescription = null,
-        modifier = GlanceModifier.fillMaxWidth().height(4.dp)
-    )
 }
+
+/**
+ * Top-3 contributor lines for a unified-pool bucket (COL-P6 Grok). Rendered in a
+ * single Column so the whole breakdown costs exactly one ProviderDeckColumn child.
+ */
+@Composable
+private fun ProductBreakdownBlock(item: WidgetQuotaItem) {
+    Column(modifier = GlanceModifier.fillMaxWidth().padding(top = 2.dp)) {
+        item.productBreakdown.take(3).forEach { breakdown ->
+            Row(
+                modifier = GlanceModifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = breakdown.label,
+                    maxLines = 1,
+                    modifier = GlanceModifier.defaultWeight(),
+                    style = TextStyle(
+                        color = ColorProvider(Color(0xFF64748B)),
+                        fontSize = 7.5.sp
+                    )
+                )
+                Text(
+                    text = "${breakdown.usagePercent.roundToInt()}%",
+                    maxLines = 1,
+                    style = TextStyle(
+                        color = ColorProvider(Color(0xFF38BDF8)),
+                        fontSize = 7.5.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                )
+            }
+        }
+    }
+}
+
 
 class QuotaWideWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = QuotaWideWidget()

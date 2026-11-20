@@ -645,6 +645,76 @@ class TestRepoFreeOfSecretsAndPersonalIdentifiers(unittest.TestCase):
             "AQM-LINT-012: collector-only testing comments need an explicit opt-out",
         )
 
+    def test_widget_layout_child_cap_and_compact_fill(self):
+        """AQM-LINT-013: Glance's 10-child Column cap and full-height 2x2 bento cells."""
+        widget_dir = os.path.join(
+            self.repo_root,
+            "app",
+            "src",
+            "main",
+            "java",
+            "com",
+            "aiquotamonitor",
+            "widget",
+        )
+        with open(os.path.join(widget_dir, "QuotaWideWidget.kt"), "r", encoding="utf-8") as fh:
+            wide_kt = fh.read()
+        with open(os.path.join(widget_dir, "QuotaCompactWidget.kt"), "r", encoding="utf-8") as fh:
+            compact_kt = fh.read()
+
+        # AQM-LINT-013: ProviderDeckColumn's Column caps direct children at 10 in
+        # RemoteViews. Every bucket must be exactly one child, so group.items.forEach
+        # may not emit a bare sibling Spacer next to WideBucketBlock.
+        bucket_loop = re.search(r"group\.items\.forEach\s*\{(?P<body>[^}]*)\}", wide_kt)
+        self.assertIsNotNone(
+            bucket_loop,
+            "AQM-LINT-013: QuotaWideWidget must iterate group.items to build the deck",
+        )
+        loop_body = bucket_loop.group("body")
+        self.assertIn(
+            "WideBucketBlock(",
+            loop_body,
+            "AQM-LINT-013: every wide-deck bucket must render through WideBucketBlock",
+        )
+        self.assertNotIn(
+            "Spacer(",
+            loop_body,
+            "AQM-LINT-013: never emit bare sibling Spacers inside group.items.forEach (Glance 10-child cap)",
+        )
+
+        # WideBucketBlock must itself be a single root Column so a bucket contributes
+        # exactly one direct child (title + 5 buckets + breakdown + lease stays <= 9).
+        block_start = wide_kt.index("private fun WideBucketBlock(")
+        block_end = wide_kt.index("private fun ProductBreakdownBlock(")
+        bucket_block = wide_kt[block_start:block_end]
+        self.assertIn(
+            "Column(modifier = GlanceModifier.fillMaxWidth().padding(top = ",
+            bucket_block,
+            "AQM-LINT-013: WideBucketBlock must wrap its rows in one root Column",
+        )
+        self.assertNotRegex(
+            bucket_block,
+            r"\n    Spacer\(",
+            "AQM-LINT-013: WideBucketBlock must not emit a top-level sibling Spacer",
+        )
+        self.assertNotRegex(
+            bucket_block,
+            r"\n    Image\(",
+            "AQM-LINT-013: WideBucketBlock must not emit a top-level sibling Image",
+        )
+        self.assertIn(
+            "take(3)",
+            wide_kt,
+            "AQM-LINT-013: the Grok product breakdown is capped at the top 3 contributors",
+        )
+
+        # AQM-LINT-013: every 2x2 bento cell must expand to the full tile height.
+        self.assertEqual(
+            4,
+            compact_kt.count("GlanceModifier.defaultWeight().fillMaxHeight()"),
+            "AQM-LINT-013: all four compact bento cells must use defaultWeight().fillMaxHeight()",
+        )
+
     def test_testing_comment_attaches_emulator_screenshots(self):
         """AQM-LINT-012: emulator evidence is uploaded to the issue and is not committed."""
         import struct
