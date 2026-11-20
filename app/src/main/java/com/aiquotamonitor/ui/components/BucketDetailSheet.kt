@@ -39,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -238,10 +239,73 @@ fun BucketDetailSheet(
                 }
             }
 
+            // Section 1.5: Shared unified-pool breakdown (for example Grok Unified)
+            if (bucket.productBreakdown.isNotEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                        .padding(16.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(
+                            text = "SHARED POOL BREAKDOWN",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 10.sp
+                        )
+
+                        bucket.productBreakdown.forEach { product ->
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = product.label,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = "${String.format(Locale.US, "%.1f", product.usagePercent)}%",
+                                        style = MaterialTheme.typography.bodySmall.copy(
+                                            fontFeatureSettings = "tnum"
+                                        ),
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (product.usagePercent >= 50.0) QuotaAmber else QuotaCyan
+                                    )
+                                }
+
+                                LinearProgressIndicator(
+                                    progress = {
+                                        (product.usagePercent / 100.0).toFloat().coerceIn(0f, 1f)
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(4.dp)
+                                        .clip(RoundedCornerShape(2.dp)),
+                                    color = if (product.usagePercent >= 50.0) QuotaAmber else QuotaCyan,
+                                    trackColor = Color(0xFF263238).copy(alpha = 0.5f)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             // Section 2: Reset Window & Exhaustion Projection
             // Shared truncation-only countdown; never rounds up across a boundary.
             val resetCountdown = bucket.formatResetCountdown().ifBlank { "N/A" }
-
             val exhaustionText = if (bucket.burnRatePerHour > 0.0) {
                 val hoursToZero = bucket.remainingPercent / bucket.burnRatePerHour
                 val hoursToReset = bucket.hoursUntilReset ?: 24.0

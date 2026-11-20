@@ -39,6 +39,13 @@ fun formatResetCountdownFromIso(
 }
 
 @Serializable
+data class ProductUsageBreakdown(
+    val product: String,
+    val label: String,
+    val usagePercent: Double
+)
+
+@Serializable
 data class QuotaBucket(
     val id: String,
     val group: String,
@@ -52,7 +59,8 @@ data class QuotaBucket(
     val paceDeltaPercent: Double = 0.0,
     val burnRatePerHour: Double = 0.0,
     val projectedRemainingAtReset: Double = 0.0,
-    val status: String = "healthy"
+    val status: String = "healthy",
+    val productBreakdown: List<ProductUsageBreakdown> = emptyList()
 ) {
     /**
      * Value depending on chosen polarity
@@ -97,7 +105,7 @@ data class QuotaBucket(
         "gemini-weekly" -> "AGY GEMINI"
         "3p-5h", "3p-weekly" -> "AGY 3P"
         "opencode-rolling", "opencode-weekly", "opencode-monthly" -> "OPENCODE"
-        "grok-weekly-credits" -> "GROK 4.7"
+        "grok-weekly-credits" -> "GROK"
         "grok-bot-weekly" -> "GROK BOT"
         else -> when {
             id.startsWith("gemini") || id.startsWith("3p") -> "AGY"
@@ -134,7 +142,7 @@ data class QuotaBucket(
         "opencode-rolling" -> "5-Hour Rolling"
         "opencode-weekly" -> "Weekly Pool"
         "opencode-monthly" -> "Monthly Pool"
-        "grok-weekly-credits" -> "Grok 4.7 Weekly"
+        "grok-weekly-credits" -> "Grok Weekly"
         "grok-bot-weekly" -> "Grok Bot Weekly"
         else -> label
     }

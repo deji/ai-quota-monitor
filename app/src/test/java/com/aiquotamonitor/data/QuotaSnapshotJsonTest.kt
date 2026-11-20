@@ -42,7 +42,7 @@ class QuotaSnapshotJsonTest {
             },
             {
               "role": "REVIEWER",
-              "label": "Grok 4.7 Build",
+              "label": "Grok Unified",
               "primaryBucketId": "grok-weekly-credits",
               "remainingPercent": 97.0,
               "status": "primed"
@@ -100,5 +100,92 @@ class QuotaSnapshotJsonTest {
         val bottleneck = snapshot.bottleneckBucket
         assertNotNull(bottleneck)
         assertEquals("gemini-argon-wtu-weekly", bottleneck!!.id)
+    }
+
+    @Test
+    fun testParseGrokUnifiedProductBreakdownJson() {
+        val grokJson = """
+        {
+          "schemaVersion": 1,
+          "capturedAt": "2026-11-01T16:27:47Z",
+          "host": "collector",
+          "providers": [
+            {
+              "id": "grok",
+              "displayName": "Grok",
+              "subtitle": "Build, Bot & Cursor Weekly",
+              "status": "ok",
+              "buckets": [
+                {
+                  "id": "grok-weekly-credits",
+                  "group": "Grok Unified",
+                  "label": "Grok Weekly Credits",
+                  "windowType": "weekly",
+                  "windowDurationHours": 168,
+                  "remainingPercent": 45.0,
+                  "usedPercent": 55.0,
+                  "status": "warning",
+                  "productBreakdown": [
+                    { "product": "GrokBot", "label": "Grok Bot", "usagePercent": 49.0 },
+                    { "product": "GrokBuild", "label": "Grok Build", "usagePercent": 4.0 },
+                    { "product": "Cursor", "label": "Cursor", "usagePercent": 2.0 }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+        """.trimIndent()
+
+        val snapshot = json.decodeFromString<QuotaSnapshot>(grokJson)
+        val grok = snapshot.findBucket("grok-weekly-credits")
+        assertNotNull(grok)
+        assertEquals("Grok Unified", grok!!.group)
+        assertEquals("Grok Weekly Credits", grok.label)
+        assertEquals("GROK", grok.shortHeaderLabel())
+        assertEquals("Grok Weekly", grok.shortWideRowLabel())
+        assertEquals(3, grok.productBreakdown.size)
+        assertEquals("Grok Bot", grok.productBreakdown[0].label)
+        assertEquals(49.0, grok.productBreakdown[0].usagePercent, 0.001)
+        assertEquals("Cursor", grok.productBreakdown[2].label)
+        assertEquals(2.0, grok.productBreakdown[2].usagePercent, 0.001)
+        assertEquals(listOf("grok-weekly-credits"), snapshot.resolveWideProviderGroups().single().items.map { it.id })
+        assertEquals("GROK", snapshot.resolveWideProviderGroups().single().title)
+    }
+
+    @Test
+    fun testLegacySnapshotWithoutProductBreakdownDeserializesEmptyList() {
+        val legacyJson = """
+        {
+          "schemaVersion": 1,
+          "capturedAt": "2026-11-01T16:27:47Z",
+          "host": "collector",
+          "providers": [
+            {
+              "id": "grok",
+              "displayName": "Grok Build CLI",
+              "subtitle": "Build & Bot Weekly",
+              "status": "ok",
+              "buckets": [
+                {
+                  "id": "grok-weekly-credits",
+                  "group": "Grok Build",
+                  "label": "Grok 4.7 Weekly Credits",
+                  "windowType": "weekly",
+                  "windowDurationHours": 168,
+                  "remainingPercent": 97.0,
+                  "usedPercent": 3.0,
+                  "status": "healthy"
+                }
+              ]
+            }
+          ]
+        }
+        """.trimIndent()
+
+        val snapshot = json.decodeFromString<QuotaSnapshot>(legacyJson)
+        val grok = snapshot.findBucket("grok-weekly-credits")
+        assertNotNull(grok)
+        assertEquals(emptyList<String>(), grok!!.productBreakdown.map { it.product })
     }
 }

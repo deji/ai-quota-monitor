@@ -50,7 +50,7 @@ data class StreamSeries(
 val ALL_STREAM_SERIES: List<StreamSeries> = listOf(
     StreamSeries("Argon 4", "gemini-argon-wtu-weekly", QuotaCyan),
     StreamSeries("OpenCode Wk", "opencode-weekly", QuotaAmber),
-    StreamSeries("Grok Build", "grok-weekly-credits", QuotaEmerald),
+    StreamSeries("Grok Weekly", "grok-weekly-credits", QuotaEmerald),
     StreamSeries("Gemini 5h", "gemini-5h", Color(0xFF64B5F6)),
     StreamSeries("Gemini Wk", "gemini-weekly", Color(0xFF81C784)),
     StreamSeries("OpenCode 5h", "opencode-rolling", Color(0xFFFFD54F)),

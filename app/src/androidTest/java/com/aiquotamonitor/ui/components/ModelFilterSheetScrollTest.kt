@@ -72,8 +72,8 @@ class ModelFilterSheetScrollTest {
             )
         }
 
-        composeRule.onNodeWithText("GROK BUILD CLI").assertIsDisplayed()
-        composeRule.onNodeWithText("Weekly Unified Credits").assertIsDisplayed()
+        composeRule.onNodeWithText("GROK").assertIsDisplayed()
+        composeRule.onNodeWithText("Grok Weekly Credits").assertIsDisplayed()
 
         val headerTopAfter = composeRule
             .onNodeWithText("Customize Visible Models")

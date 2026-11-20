@@ -317,7 +317,7 @@ private fun GrokBentoCard(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "GROK BUILD",
+                        text = "GROK",
                         style = MaterialTheme.typography.labelSmall,
                         color = QuotaCyan,
                         fontWeight = FontWeight.Bold,
@@ -325,7 +325,7 @@ private fun GrokBentoCard(
                         letterSpacing = 0.8.sp
                     )
                     Text(
-                        text = provider?.subtitle ?: "Build & Bot Weekly",
+                        text = provider?.subtitle ?: "Build, Bot & Cursor Weekly",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
@@ -392,7 +392,57 @@ private fun GrokBentoCard(
                 }
             }
 
-            // Secondary Grok quota pills (for example Grok Bot Weekly)
+            // Shared unified-pool contributors (Grok Bot, Grok Build, Cursor, ...)
+            val productBreakdown = creditBucket?.productBreakdown.orEmpty()
+            if (productBreakdown.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    productBreakdown.forEach { product ->
+                        val clickTarget = creditBucket ?: return@forEach
+                        val pillModifier = if (onBucketClick != null) {
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                                .clickable { onBucketClick(clickTarget) }
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                        } else {
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                        }
+
+                        Row(
+                            modifier = pillModifier,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = product.label,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 10.sp
+                            )
+                            Text(
+                                text = "${product.usagePercent.roundToInt()}% used",
+                                style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                color = if (product.usagePercent >= 50.0) QuotaAmber else QuotaEmerald,
+                                fontSize = 10.sp
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Legacy cached snapshots may still carry a separate Grok Bot bucket.
             secondaryBuckets.forEach { bucket ->
                 Spacer(modifier = Modifier.height(10.dp))
 

@@ -16,8 +16,8 @@ Running `quota.py` and `python3 -m collector collect --json` on the live host co
 2. **`grok` wraps monetary/credit caps in `{"val": <number>}` objects**:
    - `billing.config.onDemandCap` is `{"val": 0}`, `onDemandUsed` is `{"val": 0}`, and `prepaidBalance` is `{"val": 0}` (or bare numbers).
    - `billing.config.currentPeriod.type` is `"USAGE_PERIOD_TYPE_WEEKLY"`.
-   - `billing.config.productUsage` is an array: `[{"product": "GrokBuild", "usagePercent": 5.0}]` (and may also include explicit Grok Bot / Chat entries `product` in `{"grokbot", "grok_bot", "grok-bot", "grokchat", "grok_chat", "grok-chat"}` or top-level `grokBotUsagePercent` / `botUsagePercent`).
-   - **Fail-closed rule**: If an HTTP 200 response contains no numeric `creditUsagePercent`, no numeric `productUsage[GrokBuild].usagePercent`, and no numeric Grok Bot usage field, mark the provider `status = "parse_error"` with an empty bucket list (never report a phantom `100% remaining`). For `grok-weekly-credits` (`Grok 4.7 Weekly Credits`), take `max(creditUsagePercent, productUsage[GrokBuild].usagePercent)` so a `0` in one field cannot mask active usage in the other. Emit a second bucket `grok-bot-weekly` (`Grok Bot Weekly`, group `Grok Bot`) when an explicit Grok Bot product/field usage is numeric or when `isUnifiedBillingUser` is `true` (sharing the unified weekly credit pool). In `QuotaSnapshot` (`heroBucket`, `bottleneckBucket`, `resolveWideWidgetItems`), tie-break equal `remainingPercent` values so `grok-weekly-credits` always sorts ahead of `grok-bot-weekly`.
+   - `billing.config.productUsage` is an array of every product contributing to the single weekly credit pool: `[{"product": "GrokBot", "usagePercent": 49.0}, {"product": "GrokImagine", "usagePercent": 3.0}, {"product": "GrokBuild", "usagePercent": 3.0}, {"product": "Cursor", "usagePercent": 2.0}]` (any future xAI product may appear; `product` is a non-empty string and `usagePercent` may be wrapped in `{"val": <number>}`).
+   - **Fail-closed rule**: If an HTTP 200 response contains no numeric `creditUsagePercent`, no numeric `productUsage[].usagePercent`, and no legacy numeric Grok Bot usage field, mark the provider `status = "parse_error"` with an empty bucket list (never report a phantom `100% remaining`). Grok bills **one** unified weekly credit bucket `grok-weekly-credits` (`Grok Weekly Credits`, group `Grok Unified`) covering Grok Build, Grok Bot, Grok Imagine, Cursor, and any other product in `productUsage[]`; never emit a separate `grok-bot-weekly` bucket. Use `creditUsagePercent` as the pool total when numeric (clamped `[0,100]`), otherwise the clamped sum of the numeric product usages, otherwise the legacy `grokBotUsagePercent`/`botUsagePercent`. Preserve every contribution as a `productBreakdown` list sorted by `usagePercent` descending then `label` ascending.
 3. **Polarity normalization & clamping**:
    - `agy` reports **`remaining_fraction` LEFT** (`0.0` to `1.0`, clamped to `[0.0, 1.0]`; buckets missing `remaining_fraction` are skipped).
    - `opencode go` (`percent`) and `grok` (`creditUsagePercent` / `usagePercent`) report **percentage USED** (`0.0` to `100.0`, clamped to `[0.0, 100.0]`).
@@ -70,7 +70,7 @@ Running `quota.py` and `python3 -m collector collect --json` on the live host co
 
 ---
 
-### 2.3 `grok` (Grok Build CLI — Grok 4.7) — Undocumented HTTP + Smart Prime
+### 2.3 `grok` (Grok Unified — Weekly Credit Pool) — Undocumented HTTP + Smart Prime
 
 - **Request**: `GET https://cli-chat-proxy.grok.com/v1/billing?format=credits` (fallback to `GET https://cli-chat-proxy.grok.com/v1/billing` on HTTP error, `URLError`, timeout, or empty/unparseable JSON body)
 - **Required Headers**:
@@ -80,6 +80,12 @@ Running `quota.py` and `python3 -m collector collect --json` on the live host co
   - `User-Agent: opencode/2.2.2`
   - `Accept: application/json`
 - **Credential Source**: `~/.grok/auth.json`, entry matching key prefix `https://auth.x.ai` (`key`, `user_id`, `expires_at`).
+- **Unified Weekly Credit Pool (`COL-P6`, Issue #17)**:
+  - Verified body: `{"config": {"currentPeriod": {"type": "USAGE_PERIOD_TYPE_WEEKLY", "end": "..."}, "creditUsagePercent": 55.0, "productUsage": [{"product": "GrokBot", "usagePercent": 49.0}, {"product": "GrokImagine", "usagePercent": 3.0}, {"product": "GrokBuild", "usagePercent": 3.0}], "isUnifiedBillingUser": true}}`.
+  - `creditUsagePercent` is the total of the one shared pool; the per-product values sum into it (`49 + 3 + 3 = 55`). Cursor and any future xAI product appear in the same `productUsage[]` list and must not create a second bucket.
+  - The parser emits exactly one bucket: `id = "grok-weekly-credits"`, `group = "Grok Unified"`, `label = "Grok Weekly Credits"`, `windowType = "weekly"`, `windowDurationHours = 168.0`, with `productBreakdown = [{"product": <raw wire key>, "label": <friendly label>, "usagePercent": <clamped>}]` sorted by `usagePercent` descending then `label` ascending. Friendly labels: `GrokBuild` → `Grok Build`, `GrokBot`/`GrokChat` → `Grok Bot`, `GrokImagine` → `Grok Imagine`, `Cursor` → `Cursor`, unknown keys humanized (`GrokCodeBeta` → `Grok Code Beta`).
+  - Total fallback order: numeric `creditUsagePercent` → clamped sum of numeric `productUsage[].usagePercent` → legacy `grokBotUsagePercent`/`botUsagePercent`. No numeric value at all means `status = "parse_error"` and `buckets = []`.
+
 - **Unified Smart Prime State Machine**:
   - Let `remaining_seconds = expires_at - now`.
   - **Expired or Near Expiry (`remaining_seconds < 900`)**:
@@ -129,10 +135,10 @@ All collector endpoints (`GET /v1/quota`, `POST /v1/quota/refresh`, `POST /v1/gr
     },
     {
       "role": "REVIEWER",
-      "label": "Grok 4.7 Build",
+      "label": "Grok Unified",
       "primaryBucketId": "grok-weekly-credits",
-      "remainingPercent": 97.0,
-      "status": "primed"
+      "remainingPercent": 45.0,
+      "status": "healthy"
     }
   ],
   "providers": [
@@ -156,6 +162,34 @@ All collector endpoints (`GET /v1/quota`, `POST /v1/quota/refresh`, `POST /v1/gr
           "burnRatePerHour": 0.39,
           "projectedRemainingAtReset": 33.8,
           "status": "healthy"
+        }
+      ]
+    },
+    {
+      "id": "grok",
+      "displayName": "Grok",
+      "subtitle": "Build, Bot & Cursor Weekly",
+      "status": "ok",
+      "buckets": [
+        {
+          "id": "grok-weekly-credits",
+          "group": "Grok Unified",
+          "label": "Grok Weekly Credits",
+          "windowType": "weekly",
+          "windowDurationHours": 168,
+          "remainingPercent": 45.0,
+          "usedPercent": 55.0,
+          "resetsAt": "2026-11-05T16:45:10Z",
+          "elapsedPercent": 42.0,
+          "paceDeltaPercent": 13.0,
+          "burnRatePerHour": 0.12,
+          "projectedRemainingAtReset": 10.0,
+          "status": "warning",
+          "productBreakdown": [
+            { "product": "GrokBot", "label": "Grok Bot", "usagePercent": 49.0 },
+            { "product": "GrokBuild", "label": "Grok Build", "usagePercent": 4.0 },
+            { "product": "Cursor", "label": "Cursor", "usagePercent": 2.0 }
+          ]
         }
       ]
     }

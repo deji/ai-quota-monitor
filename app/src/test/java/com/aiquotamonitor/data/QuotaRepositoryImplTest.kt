@@ -1426,8 +1426,9 @@ class QuotaRepositoryImplTest {
     fun testResolveCompactCriticalBucketsBackfillsWhenProviderPoolIsHidden() {
         val snapshot = SeedData.createSeedSnapshot()
 
+        // With the only Grok bucket hidden, the grid fills from the remaining pool.
         assertEquals(
-            listOf("gemini-argon-wtu-weekly", "opencode-rolling", "grok-bot-weekly", "gemini-5h"),
+            listOf("gemini-argon-wtu-weekly", "opencode-rolling", "gemini-5h", "opencode-weekly"),
             compactIds(snapshot, hidden = defaultHidden + "grok-weekly-credits")
         )
     }
@@ -1511,15 +1512,22 @@ class QuotaRepositoryImplTest {
     }
 
     @Test
-    fun testResolveCompactCriticalBucketsTieBreaksEqualGrokPercents() {
+    fun testResolveCompactCriticalBucketsTieBreaksLegacyGrokBuckets() {
         val base = SeedData.createSeedSnapshot()
-        val equalGrok = base.copy(
+        // Simulate a legacy cached snapshot that still carries the retired bucket.
+        val legacyGrok = base.copy(
             providers = base.providers.map { provider ->
                 if (provider.id == "grok") {
                     provider.copy(
-                        buckets = provider.buckets.map {
-                            it.copy(remainingPercent = 100.0, usedPercent = 0.0)
-                        }
+                        buckets = provider.buckets + QuotaBucket(
+                            id = "grok-bot-weekly",
+                            group = "Grok Bot",
+                            label = "Grok Bot Weekly",
+                            windowType = "weekly",
+                            windowDurationHours = 168,
+                            remainingPercent = 45.0,
+                            usedPercent = 55.0
+                        )
                     )
                 } else {
                     provider
@@ -1537,10 +1545,10 @@ class QuotaRepositoryImplTest {
             "opencode-monthly"
         )
 
-        // COL-P5: grok-weekly-credits always wins the equal-percent tie.
+        // Equal percentages: grok-weekly-credits must still win over the legacy bucket.
         assertEquals(
             listOf("grok-weekly-credits", "grok-bot-weekly"),
-            compactIds(equalGrok, hidden = onlyGrokVisible)
+            compactIds(legacyGrok, hidden = onlyGrokVisible)
         )
     }
 
@@ -1589,7 +1597,7 @@ class QuotaRepositoryImplTest {
     fun testResolveWideProviderGroupsOrdersProvidersAndBucketsCanonically() {
         val groups = SeedData.createSeedSnapshot().resolveWideProviderGroups(defaultHidden)
 
-        assertEquals(listOf("ANTIGRAVITY", "OPENCODE GO", "GROK BUILD"), groups.map { it.title })
+        assertEquals(listOf("ANTIGRAVITY", "OPENCODE GO", "GROK"), groups.map { it.title })
         assertEquals(
             listOf("gemini-argon-wtu-weekly", "gemini-5h", "gemini-weekly"),
             groups[0].items.map { it.id }
@@ -1599,7 +1607,7 @@ class QuotaRepositoryImplTest {
             groups[1].items.map { it.id }
         )
         assertEquals(
-            listOf("grok-weekly-credits", "grok-bot-weekly"),
+            listOf("grok-weekly-credits"),
             groups[2].items.map { it.id }
         )
         assertEquals("Argon Weekly", groups[0].items.first().shortWideRowLabel)
@@ -1618,7 +1626,7 @@ class QuotaRepositoryImplTest {
 
         val groups = snapshot.resolveWideProviderGroups(defaultHidden + agyBucketIds)
 
-        assertEquals(listOf("OPENCODE GO", "GROK BUILD"), groups.map { it.title })
+        assertEquals(listOf("OPENCODE GO", "GROK"), groups.map { it.title })
     }
 
     @Test

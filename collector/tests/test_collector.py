@@ -207,59 +207,186 @@ class TestCollectorProviderParsers(unittest.TestCase):
         }
 
         buckets = GrokProvider.parse(fixture)
-        self.assertEqual(len(buckets), 2)
+        self.assertEqual(len(buckets), 1)
         grok = buckets[0]
         self.assertEqual(grok["id"], "grok-weekly-credits")
+        self.assertEqual(grok["group"], "Grok Unified")
+        self.assertEqual(grok["label"], "Grok Weekly Credits")
+        self.assertEqual(grok["windowType"], "weekly")
+        self.assertEqual(grok["windowDurationHours"], 168.0)
         self.assertEqual(grok["usedPercent"], 3.0)
         self.assertEqual(grok["remainingPercent"], 97.0)
         self.assertEqual(grok["resetsAt"], "2026-11-05T16:45:10.524836+00:00")
+        self.assertEqual(
+            grok["productBreakdown"],
+            [{"product": "GrokBuild", "label": "Grok Build", "usagePercent": 3.0}],
+        )
 
-        bot = buckets[1]
-        self.assertEqual(bot["id"], "grok-bot-weekly")
-        self.assertEqual(bot["group"], "Grok Bot")
-        self.assertEqual(bot["label"], "Grok Bot Weekly")
-        self.assertEqual(bot["usedPercent"], 3.0)
-        self.assertEqual(bot["remainingPercent"], 97.0)
-        self.assertEqual(bot["resetsAt"], "2026-11-05T16:45:10.524836+00:00")
-
-    def test_grok_parser_grok_bot_product_usage(self):
+    def test_grok_parser_single_unified_bucket_never_emits_bot_bucket(self):
+        """COL-P6: unified billing shares ONE weekly pool, never a separate bot bucket."""
         fixture = {
             "config": {
-                "creditUsagePercent": 15.0,
+                "creditUsagePercent": 55.0,
                 "productUsage": [
-                    {"product": "GrokBuild", "usagePercent": 15.0},
-                    {"product": "GrokBot", "usagePercent": 42.5},
+                    {"product": "GrokBot", "usagePercent": 49.0},
+                    {"product": "GrokBuild", "usagePercent": 3.0},
+                ],
+                "isUnifiedBillingUser": True,
+                "currentPeriod": {"end": "2026-04-20T00:00:00Z"},
+            }
+        }
+
+        buckets = GrokProvider.parse(fixture)
+        self.assertEqual(len(buckets), 1)
+        self.assertEqual(buckets[0]["id"], "grok-weekly-credits")
+        self.assertEqual(buckets[0]["usedPercent"], 55.0)
+        self.assertNotIn("grok-bot-weekly", [b["id"] for b in buckets])
+
+    def test_grok_parser_multi_product_breakdown(self):
+        """Every product in productUsage[] contributes to the single unified pool."""
+        fixture = {
+            "config": {
+                "creditUsagePercent": 57.0,
+                "productUsage": [
+                    {"product": "GrokBot", "usagePercent": 49.0},
+                    {"product": "GrokImagine", "usagePercent": {"val": 3.0}},
+                    {"product": "GrokBuild", "usagePercent": 3.0},
+                    {"product": "Cursor", "usagePercent": 2.0},
                 ],
                 "billingPeriodEnd": "2026-04-20T00:00:00Z",
             }
         }
 
         buckets = GrokProvider.parse(fixture)
-        self.assertEqual(len(buckets), 2)
-        self.assertEqual(buckets[0]["id"], "grok-weekly-credits")
-        self.assertEqual(buckets[0]["usedPercent"], 15.0)
-        self.assertEqual(buckets[0]["remainingPercent"], 85.0)
-        self.assertEqual(buckets[1]["id"], "grok-bot-weekly")
-        self.assertEqual(buckets[1]["label"], "Grok Bot Weekly")
-        self.assertEqual(buckets[1]["group"], "Grok Bot")
-        self.assertEqual(buckets[1]["usedPercent"], 42.5)
-        self.assertEqual(buckets[1]["remainingPercent"], 57.5)
-        self.assertEqual(buckets[1]["resetsAt"], "2026-04-20T00:00:00Z")
+        self.assertEqual(len(buckets), 1)
+        grok = buckets[0]
+        self.assertEqual(grok["usedPercent"], 57.0)
+        self.assertEqual(grok["remainingPercent"], 43.0)
+        self.assertEqual(
+            grok["productBreakdown"],
+            [
+                {"product": "GrokBot", "label": "Grok Bot", "usagePercent": 49.0},
+                {"product": "GrokBuild", "label": "Grok Build", "usagePercent": 3.0},
+                {"product": "GrokImagine", "label": "Grok Imagine", "usagePercent": 3.0},
+                {"product": "Cursor", "label": "Cursor", "usagePercent": 2.0},
+            ],
+        )
 
-    def test_grok_parser_bot_only_usage_still_emits_bucket(self):
-        """A Grok Bot reading remains valid even when Grok Build usage is absent."""
+    def test_grok_parser_humanizes_unknown_products(self):
         fixture = {
             "config": {
-                "productUsage": [{"product": "grok-bot", "usagePercent": 25.0}],
+                "creditUsagePercent": 4.0,
+                "productUsage": [
+                    {"product": "GrokCodeBeta", "usagePercent": 4.0},
+                ],
+            }
+        }
+
+        buckets = GrokProvider.parse(fixture)
+        self.assertEqual(len(buckets), 1)
+        self.assertEqual(
+            buckets[0]["productBreakdown"],
+            [{"product": "GrokCodeBeta", "label": "Grok Code Beta", "usagePercent": 4.0}],
+        )
+
+    def test_grok_parser_missing_credit_usage_sums_products(self):
+        """Without creditUsagePercent, the pool total is the clamped product sum."""
+        fixture = {
+            "config": {
+                "productUsage": [
+                    {"product": "GrokBuild", "usagePercent": 7.5},
+                    {"product": "Cursor", "usagePercent": 2.5},
+                ],
                 "billingPeriodEnd": "2026-04-20T00:00:00Z",
             }
         }
 
         buckets = GrokProvider.parse(fixture)
         self.assertEqual(len(buckets), 1)
-        self.assertEqual(buckets[0]["id"], "grok-bot-weekly")
+        self.assertEqual(buckets[0]["id"], "grok-weekly-credits")
+        self.assertEqual(buckets[0]["usedPercent"], 10.0)
+        self.assertEqual(buckets[0]["remainingPercent"], 90.0)
+
+    def test_grok_parser_clamps_product_sum_to_100(self):
+        fixture = {
+            "config": {
+                "creditUsagePercent": None,
+                "productUsage": [
+                    {"product": "GrokBuild", "usagePercent": 80.0},
+                    {"product": "GrokBot", "usagePercent": 40.0},
+                ],
+            }
+        }
+
+        buckets = GrokProvider.parse(fixture)
+        self.assertEqual(len(buckets), 1)
+        self.assertEqual(buckets[0]["usedPercent"], 100.0)
+        self.assertEqual(buckets[0]["remainingPercent"], 0.0)
+
+    def test_grok_parser_duplicate_products_aggregate(self):
+        fixture = {
+            "config": {
+                "creditUsagePercent": None,
+                "productUsage": [
+                    {"product": "grok-build", "usagePercent": 2.0},
+                    {"product": "GrokBuild", "usagePercent": 3.0},
+                    {"product": "GROK_BOT", "usagePercent": 4.0},
+                ],
+            }
+        }
+
+        buckets = GrokProvider.parse(fixture)
+        self.assertEqual(len(buckets), 1)
+        self.assertEqual(buckets[0]["usedPercent"], 9.0)
+        self.assertEqual(
+            buckets[0]["productBreakdown"],
+            [
+                {"product": "grok-build", "label": "Grok Build", "usagePercent": 5.0},
+                {"product": "GROK_BOT", "label": "Grok Bot", "usagePercent": 4.0},
+            ],
+        )
+
+    def test_grok_parser_clamps_individual_product_usage(self):
+        fixture = {
+            "config": {
+                "creditUsagePercent": -5.0,
+                "productUsage": [
+                    {"product": "GrokBuild", "usagePercent": 150.0},
+                    {"product": "Cursor", "usagePercent": -20.0},
+                ],
+            }
+        }
+
+        buckets = GrokProvider.parse(fixture)
+        self.assertEqual(len(buckets), 1)
+        self.assertEqual(buckets[0]["usedPercent"], 0.0)
+        self.assertEqual(
+            buckets[0]["productBreakdown"],
+            [
+                {"product": "GrokBuild", "label": "Grok Build", "usagePercent": 100.0},
+                {"product": "Cursor", "label": "Cursor", "usagePercent": 0.0},
+            ],
+        )
+
+    def test_grok_parser_legacy_bot_field_fallback(self):
+        """Legacy top-level Grok Bot usage still yields the unified bucket."""
+        fixture = {
+            "config": {
+                "productUsage": [
+                    {"product": "", "usagePercent": 25.0},
+                    {"product": "Unknown", "usagePercent": "n/a"},
+                ],
+                "grokBotUsagePercent": 25.0,
+                "billingPeriodEnd": "2026-04-20T00:00:00Z",
+            }
+        }
+
+        buckets = GrokProvider.parse(fixture)
+        self.assertEqual(len(buckets), 1)
+        self.assertEqual(buckets[0]["id"], "grok-weekly-credits")
         self.assertEqual(buckets[0]["usedPercent"], 25.0)
         self.assertEqual(buckets[0]["remainingPercent"], 75.0)
+        self.assertNotIn("productBreakdown", buckets[0])
 
     def test_grok_parser_fallback_and_bare_numbers(self):
         """Test productUsage fallback and bare numbers."""
@@ -279,32 +406,97 @@ class TestCollectorProviderParsers(unittest.TestCase):
         self.assertEqual(grok["usedPercent"], 7.5)
         self.assertEqual(grok["remainingPercent"], 92.5)
 
-    def test_grok_parser_ignores_non_grokbuild_products(self):
-        """GrokBuild product filter: only read usagePercent from items where product in ('GrokBuild', None, '')."""
-        fixture = {
-            "config": {
-                "currentPeriod": {"end": "2026-11-05T16:45:10Z"},
-                "productUsage": [
-                    {"product": "UnrelatedProduct", "usagePercent": 99.0},
-                    {"product": "GrokBuild", "usagePercent": 12.0},
-                ],
-            }
-        }
-        buckets = GrokProvider.parse(fixture)
-        self.assertEqual(len(buckets), 1)
-        self.assertEqual(buckets[0]["usedPercent"], 12.0)
-
     def test_grok_parser_no_numeric_usage_returns_empty(self):
         """If HTTP 200 body has no numeric usage, return empty buckets list."""
         fixture = {
             "config": {
                 "currentPeriod": {"end": "2026-11-05T16:45:10Z"},
                 "creditUsagePercent": None,
-                "productUsage": [{"product": "UnrelatedProduct", "usagePercent": 50.0}],
+                "productUsage": [
+                    {"product": "", "usagePercent": 50.0},
+                    {"product": "Unknown", "usagePercent": "not-a-number"},
+                    {"product": "Cursor", "usagePercent": None},
+                ],
             }
         }
         buckets = GrokProvider.parse(fixture)
         self.assertEqual(buckets, [])
+
+    def test_normalize_bucket_preserves_product_breakdown(self):
+        normalized = normalize_bucket(
+            {
+                "id": "grok-weekly-credits",
+                "group": "Grok Unified",
+                "label": "Grok Weekly Credits",
+                "windowType": "weekly",
+                "windowDurationHours": 168.0,
+                "remainingPercent": 45.0,
+                "usedPercent": 55.0,
+                "productBreakdown": [
+                    {"product": "GrokBot", "label": "Grok Bot", "usagePercent": 49.0},
+                    {"product": "Cursor", "label": "Cursor", "usagePercent": 2.0},
+                ],
+            },
+            captured_at="2026-11-01T16:27:47Z",
+        )
+
+        self.assertEqual(
+            normalized["productBreakdown"],
+            [
+                {"product": "GrokBot", "label": "Grok Bot", "usagePercent": 49.0},
+                {"product": "Cursor", "label": "Cursor", "usagePercent": 2.0},
+            ],
+        )
+
+    def test_normalize_bucket_omits_empty_product_breakdown(self):
+        normalized = normalize_bucket(
+            {
+                "id": "gemini-5h",
+                "group": "Gemini Models",
+                "label": "Gemini 5-Hour",
+                "windowType": "rolling",
+                "windowDurationHours": 5.0,
+                "remainingPercent": 99.0,
+                "usedPercent": 1.0,
+                "productBreakdown": [],
+            },
+            captured_at="2026-11-01T16:27:47Z",
+        )
+
+        self.assertNotIn("productBreakdown", normalized)
+
+    def test_assemble_snapshot_grok_unified_branding(self):
+        grok_buckets = GrokProvider.parse(
+            {
+                "config": {
+                    "creditUsagePercent": 55.0,
+                    "productUsage": [
+                        {"product": "GrokBot", "usagePercent": 49.0},
+                        {"product": "GrokBuild", "usagePercent": 3.0},
+                        {"product": "Cursor", "usagePercent": 3.0},
+                    ],
+                }
+            }
+        )
+
+        snapshot = assemble_snapshot(
+            agy_buckets=[],
+            opencode_buckets=[],
+            grok_buckets=grok_buckets,
+            captured_at="2026-11-01T16:27:47Z",
+        )
+
+        grok = next(p for p in snapshot["providers"] if p["id"] == "grok")
+        self.assertEqual(grok["displayName"], "Grok")
+        self.assertEqual(grok["subtitle"], "Build, Bot & Cursor Weekly")
+        self.assertEqual([b["id"] for b in grok["buckets"]], ["grok-weekly-credits"])
+        self.assertEqual(grok["buckets"][0]["group"], "Grok Unified")
+        self.assertEqual(len(grok["buckets"][0]["productBreakdown"]), 3)
+
+        reviewer = next(r for r in snapshot["orcaRoles"] if r["role"] == "REVIEWER")
+        self.assertEqual(reviewer["label"], "Grok Unified")
+        self.assertEqual(reviewer["primaryBucketId"], "grok-weekly-credits")
+        self.assertEqual(reviewer["remainingPercent"], 45.0)
 
     @patch("urllib.request.urlopen")
     def test_grok_collect_parse_error_on_200_without_numeric_usage(self, mock_urlopen):

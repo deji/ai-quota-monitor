@@ -2,6 +2,7 @@ package com.aiquotamonitor.data.local
 
 import com.aiquotamonitor.domain.model.HistoryPoint
 import com.aiquotamonitor.domain.model.OrcaRoleReadiness
+import com.aiquotamonitor.domain.model.ProductUsageBreakdown
 import com.aiquotamonitor.domain.model.ProviderQuota
 import com.aiquotamonitor.domain.model.QuotaBucket
 import com.aiquotamonitor.domain.model.QuotaSnapshot
@@ -164,39 +165,41 @@ object SeedData {
 
         val grokProvider = ProviderQuota(
             id = "grok",
-            displayName = "Grok Build CLI",
-            subtitle = "Build & Bot Weekly",
+            displayName = "Grok",
+            subtitle = "Build, Bot & Cursor Weekly",
             status = "ok",
             buckets = listOf(
                 QuotaBucket(
                     id = "grok-weekly-credits",
-                    group = "Grok 4.7",
-                    label = "Weekly Unified Credits",
+                    group = "Grok Unified",
+                    label = "Grok Weekly Credits",
                     windowType = "weekly",
                     windowDurationHours = 168,
-                    remainingPercent = 97.0,
-                    usedPercent = 3.0,
+                    remainingPercent = 45.0,
+                    usedPercent = 55.0,
                     resetsAt = grokWeeklyReset,
                     elapsedPercent = 42.0,
-                    paceDeltaPercent = -39.0,
-                    burnRatePerHour = 0.04,
-                    projectedRemainingAtReset = 93.1,
-                    status = "primed"
-                ),
-                QuotaBucket(
-                    id = "grok-bot-weekly",
-                    group = "Grok Bot",
-                    label = "Grok Bot Weekly",
-                    windowType = "weekly",
-                    windowDurationHours = 168,
-                    remainingPercent = 100.0,
-                    usedPercent = 0.0,
-                    resetsAt = "2026-04-16T03:54:51Z",
-                    elapsedPercent = 42.0,
-                    paceDeltaPercent = 18.0,
-                    burnRatePerHour = 0.0,
-                    projectedRemainingAtReset = 100.0,
-                    status = "healthy"
+                    paceDeltaPercent = 13.0,
+                    burnRatePerHour = 0.12,
+                    projectedRemainingAtReset = 10.0,
+                    status = "warning",
+                    productBreakdown = listOf(
+                        ProductUsageBreakdown(
+                            product = "GrokBot",
+                            label = "Grok Bot",
+                            usagePercent = 49.0
+                        ),
+                        ProductUsageBreakdown(
+                            product = "GrokBuild",
+                            label = "Grok Build",
+                            usagePercent = 4.0
+                        ),
+                        ProductUsageBreakdown(
+                            product = "Cursor",
+                            label = "Cursor",
+                            usagePercent = 2.0
+                        )
+                    )
                 )
             )
         )
@@ -218,10 +221,10 @@ object SeedData {
             ),
             OrcaRoleReadiness(
                 role = "REVIEWER",
-                label = "Grok 4.7 Build",
+                label = "Grok Unified",
                 primaryBucketId = "grok-weekly-credits",
-                remainingPercent = 97.0,
-                status = "primed"
+                remainingPercent = 45.0,
+                status = "warning"
             )
         )
 
@@ -233,8 +236,7 @@ object SeedData {
             val argonVal = 60.0 - (fraction * 25.0) // 60% down to 35%
             val gemini5hVal = 100.0 - (fraction * 1.0)
             val openCodeWeeklyVal = 100.0 - (fraction * 2.0)
-            val grokVal = 100.0 - (fraction * 3.0)
-            val grokBotVal = 100.0
+            val grokVal = 100.0 - (fraction * 55.0)
             val threePWeeklyVal = 65.0 - (fraction * 23.3)
 
             HistoryPoint(
@@ -247,7 +249,6 @@ object SeedData {
                     "opencode-weekly" to openCodeWeeklyVal,
                     "opencode-monthly" to 99.0,
                     "grok-weekly-credits" to grokVal,
-                    "grok-bot-weekly" to grokBotVal,
                     "3p-5h" to 100.0,
                     "3p-weekly" to threePWeeklyVal
                 )

@@ -2,6 +2,7 @@
 import datetime
 import json
 import os
+import re
 import shutil
 import sqlite3
 import subprocess
@@ -268,7 +269,38 @@ class OpencodeGoProvider:
 
 
 class GrokProvider:
-    """Provider for Grok Build CLI (Grok 4.7 Credits)."""
+    """Provider for Grok Build CLI (unified weekly credit pool)."""
+
+    # Friendly labels for the products that share the single unified weekly pool.
+    _PRODUCT_LABELS = {
+        "grokbuild": "Grok Build",
+        "grok_build": "Grok Build",
+        "grok-build": "Grok Build",
+        "grokbot": "Grok Bot",
+        "grok_bot": "Grok Bot",
+        "grok-bot": "Grok Bot",
+        "grokchat": "Grok Bot",
+        "grok_chat": "Grok Bot",
+        "grok-chat": "Grok Bot",
+        "grokimagine": "Grok Imagine",
+        "grok_imagine": "Grok Imagine",
+        "grok-imagine": "Grok Imagine",
+        "cursor": "Cursor",
+    }
+
+    @staticmethod
+    def _friendly_product_label(raw_name: str) -> str:
+        """Map a wire product key to a human label, humanizing unknown keys."""
+        cleaned = raw_name.strip()
+        key = cleaned.lower()
+        mapped = GrokProvider._PRODUCT_LABELS.get(key)
+        if mapped:
+            return mapped
+        spaced = re.sub(r"[_-]+", " ", cleaned)
+        spaced = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", spaced)
+        spaced = re.sub(r"(?<=[A-Z])(?=[A-Z][a-z])", " ", spaced)
+        words = [word for word in spaced.split() if word]
+        return " ".join(word[:1].upper() + word[1:] for word in words) or cleaned
 
     def __init__(self, auth_path: Optional[str] = None):
         self.auth_path = auth_path
@@ -314,10 +346,17 @@ class GrokProvider:
 
     @staticmethod
     def parse(raw_data: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Defensively parse Grok billing configuration.
-        
-        Handles billing.config, config, onDemandCap.val, and productUsage arrays.
-        Fails closed with empty list if neither creditUsagePercent nor productUsage[].usagePercent is numeric.
+        """Defensively parse Grok billing configuration into ONE unified weekly bucket.
+
+        Grok bills a single weekly credit pool that covers Grok Build, Grok Bot,
+        Grok Imagine, Cursor, and any other product returned in
+        ``config.productUsage[]``. ``creditUsagePercent`` is the authoritative pool
+        total; when it is absent the numeric product usages are summed. Every
+        product entry is preserved as a sorted ``productBreakdown`` list.
+
+        Fails closed with an empty list when neither ``creditUsagePercent`` nor any
+        numeric ``productUsage[].usagePercent`` nor a legacy bot usage field is
+        numeric.
         """
         if not raw_data or not isinstance(raw_data, dict):
             return []
@@ -329,29 +368,6 @@ class GrokProvider:
         if not isinstance(config, dict):
             return []
 
-        # Find creditUsagePercent and productUsage[].usagePercent
-        credit_pct: Optional[float] = None
-        if "creditUsagePercent" in config and config["creditUsagePercent"] is not None:
-            raw_c = config["creditUsagePercent"]
-            try:
-                if isinstance(raw_c, dict) and "val" in raw_c:
-                    credit_pct = float(raw_c["val"])
-                else:
-                    credit_pct = float(raw_c)
-            except (ValueError, TypeError):
-                credit_pct = None
-
-        prod_pct: Optional[float] = None
-        bot_pct: Optional[float] = None
-        grok_bot_products = {
-            "grokbot",
-            "grok_bot",
-            "grok-bot",
-            "grokchat",
-            "grok_chat",
-            "grok-chat",
-        }
-
         def _numeric_pct(raw: Any) -> Optional[float]:
             try:
                 if isinstance(raw, dict) and "val" in raw:
@@ -362,56 +378,58 @@ class GrokProvider:
                 pass
             return None
 
-        if "productUsage" in config and isinstance(config["productUsage"], list):
-            for prod in config["productUsage"]:
+        credit_pct = _numeric_pct(config.get("creditUsagePercent"))
+
+        # Aggregate every named product by its friendly label. Duplicate product
+        # keys on the wire are summed (then clamped) so one pool is never counted
+        # less than reality.
+        product_totals: Dict[str, float] = {}
+        product_labels: Dict[str, str] = {}
+        product_raw_names: Dict[str, str] = {}
+        raw_products = config.get("productUsage")
+        if isinstance(raw_products, list):
+            for prod in raw_products:
                 if not isinstance(prod, dict):
                     continue
-                product_name = str(prod.get("product") or "").strip().lower()
-                if product_name in grok_bot_products:
-                    # Grok Bot / Chat product entry: capture the highest numeric usage.
-                    b_val = _numeric_pct(prod.get("usagePercent"))
-                    if b_val is not None and (bot_pct is None or b_val > bot_pct):
-                        bot_pct = b_val
+                raw_name = prod.get("product")
+                if not isinstance(raw_name, str) or not raw_name.strip():
                     continue
-                # Only read usagePercent from items where item.get('product') in ('GrokBuild', None, '')
-                if prod.get("product") not in ("GrokBuild", None, ""):
+                value = _numeric_pct(prod.get("usagePercent"))
+                if value is None:
                     continue
-                p_val = _numeric_pct(prod.get("usagePercent"))
-                if p_val is not None and (prod_pct is None or p_val > prod_pct):
-                    prod_pct = p_val
+                value = max(0.0, min(100.0, value))
+                label = GrokProvider._friendly_product_label(raw_name)
+                key = label.lower()
+                product_totals[key] = min(100.0, product_totals.get(key, 0.0) + value)
+                product_labels[key] = label
+                product_raw_names.setdefault(key, raw_name.strip())
 
-        # Explicit top-level Grok Bot usage fields take precedence when no product entry matched.
-        if bot_pct is None:
-            for bot_key in ("grokBotUsagePercent", "botUsagePercent"):
-                if bot_key in config and config[bot_key] is not None:
-                    bot_pct = _numeric_pct(config[bot_key])
-                    if bot_pct is not None:
-                        break
+        product_breakdown = [
+            {
+                "product": product_raw_names[key],
+                "label": product_labels[key],
+                "usagePercent": round(product_totals[key], 1),
+            }
+            for key in product_totals
+        ]
+        product_breakdown.sort(key=lambda item: (-item["usagePercent"], item["label"]))
 
-        if credit_pct is None and prod_pct is None and bot_pct is None:
-            # Mark parse_error with empty buckets if no usage field is numeric
-            return []
-
+        # Total pool usage: authoritative creditUsagePercent, else the clamped sum
+        # of the numeric product usages, else a legacy Grok Bot field.
         used_pct: Optional[float] = None
-        if credit_pct is not None and prod_pct is not None:
-            used_pct = max(credit_pct, prod_pct)
-        elif credit_pct is not None:
-            used_pct = credit_pct
-        elif prod_pct is not None:
-            used_pct = prod_pct
-
-        if used_pct is not None:
-            used_pct = max(0.0, min(100.0, round(used_pct, 1)))
-
-        # Unified billing shares the weekly credit pool across Grok Build and Grok Bot.
-        if bot_pct is not None:
-            bot_used_pct: Optional[float] = max(0.0, min(100.0, round(bot_pct, 1)))
-        elif config.get("isUnifiedBillingUser") is True and used_pct is not None:
-            bot_used_pct = used_pct
+        if credit_pct is not None:
+            used_pct = max(0.0, min(100.0, round(credit_pct, 1)))
+        elif product_totals:
+            product_sum = sum(product_totals.values())
+            used_pct = max(0.0, min(100.0, round(product_sum, 1)))
         else:
-            bot_used_pct = None
+            for bot_key in ("grokBotUsagePercent", "botUsagePercent"):
+                bot_val = _numeric_pct(config.get(bot_key))
+                if bot_val is not None:
+                    used_pct = max(0.0, min(100.0, round(bot_val, 1)))
+                    break
 
-        if used_pct is None and bot_used_pct is None:
+        if used_pct is None:
             return []
 
         # Resets at end of period
@@ -422,32 +440,20 @@ class GrokProvider:
         if not resets_at:
             resets_at = config.get("billingPeriodEnd")
 
-        buckets: List[Dict[str, Any]] = []
-        if used_pct is not None:
-            buckets.append({
-                "id": "grok-weekly-credits",
-                "group": "Grok Build",
-                "label": "Grok 4.7 Weekly Credits",
-                "windowType": "weekly",
-                "windowDurationHours": 168.0,
-                "remainingPercent": round(100.0 - used_pct, 1),
-                "usedPercent": used_pct,
-                "resetsAt": resets_at,
-            })
+        bucket: Dict[str, Any] = {
+            "id": "grok-weekly-credits",
+            "group": "Grok Unified",
+            "label": "Grok Weekly Credits",
+            "windowType": "weekly",
+            "windowDurationHours": 168.0,
+            "remainingPercent": round(100.0 - used_pct, 1),
+            "usedPercent": used_pct,
+            "resetsAt": resets_at,
+        }
+        if product_breakdown:
+            bucket["productBreakdown"] = product_breakdown
 
-        if bot_used_pct is not None:
-            buckets.append({
-                "id": "grok-bot-weekly",
-                "group": "Grok Bot",
-                "label": "Grok Bot Weekly",
-                "windowType": "weekly",
-                "windowDurationHours": 168.0,
-                "remainingPercent": round(100.0 - bot_used_pct, 1),
-                "usedPercent": bot_used_pct,
-                "resetsAt": resets_at,
-            })
-
-        return buckets
+        return [bucket]
 
 
 def normalize_bucket(
@@ -495,7 +501,7 @@ def normalize_bucket(
 
     status = determine_bucket_status(rem_pct, pace_delta, projected_rem)
 
-    return {
+    normalized: Dict[str, Any] = {
         "id": bid,
         "group": group,
         "label": label,
@@ -510,6 +516,12 @@ def normalize_bucket(
         "projectedRemainingAtReset": projected_rem,
         "status": status,
     }
+
+    product_breakdown = bucket_raw.get("productBreakdown")
+    if isinstance(product_breakdown, list) and product_breakdown:
+        normalized["productBreakdown"] = product_breakdown
+
+    return normalized
 
 
 def assemble_snapshot(
@@ -561,7 +573,7 @@ def assemble_snapshot(
     builder_status = builder_bucket["status"] if builder_bucket else "unknown"
     builder_primary_id = builder_bucket["id"] if builder_bucket else "gemini-5h"
 
-    # REVIEWER: Grok 4.7
+    # REVIEWER: Grok (single unified weekly credit pool)
     reviewer_bucket = all_buckets_map.get("grok-weekly-credits")
     reviewer_rem = reviewer_bucket["remainingPercent"] if reviewer_bucket else 0.0
     reviewer_status = "primed"
@@ -590,7 +602,7 @@ def assemble_snapshot(
         },
         {
             "role": "REVIEWER",
-            "label": "Grok 4.7 Build",
+            "label": "Grok Unified",
             "primaryBucketId": "grok-weekly-credits",
             "remainingPercent": reviewer_rem,
             "status": reviewer_status,
@@ -614,8 +626,8 @@ def assemble_snapshot(
         },
         {
             "id": "grok",
-            "displayName": "Grok Build CLI",
-            "subtitle": "Build & Bot Weekly",
+            "displayName": "Grok",
+            "subtitle": "Build, Bot & Cursor Weekly",
             "status": errs.get("grok", "ok"),
             "buckets": norm_grok,
         },

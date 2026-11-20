@@ -425,7 +425,7 @@ data class QuotaSnapshot(
     private fun providerGroupTitle(provider: ProviderQuota): String = when (provider.id.lowercase()) {
         "agy" -> "ANTIGRAVITY"
         "opencode_go", "opencode" -> "OPENCODE GO"
-        "grok" -> "GROK BUILD"
+        "grok" -> "GROK"
         else -> provider.displayName.uppercase().ifBlank { provider.id.uppercase() }
     }
 
@@ -440,7 +440,7 @@ data class QuotaSnapshot(
     private fun canonicalBucketOrder(providerId: String): List<String> = when (providerId.lowercase()) {
         "agy" -> listOf("gemini-argon-wtu-weekly", "gemini-5h", "gemini-weekly", "3p-5h", "3p-weekly")
         "opencode_go", "opencode" -> listOf("opencode-rolling", "opencode-weekly", "opencode-monthly")
-        "grok" -> listOf("grok-weekly-credits", "grok-bot-weekly")
+        "grok" -> listOf("grok-weekly-credits")
         else -> emptyList()
     }
 
