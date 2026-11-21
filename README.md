@@ -43,7 +43,7 @@ Runs the pre-commit secret guard, all Python collector + repo-hygiene unit tests
 ./scripts/verify-all.sh
 ```
 
-Gate 3 runs `./gradlew --no-daemon lintDebug testDebugUnitTest assembleDebug` internally, so piping the script's output (`./scripts/verify-all.sh 2>&1 | tail -60`) returns as soon as the build finishes instead of hanging on a `GradleDaemon` that inherited the pipe.
+Gate 3 runs `./gradlew --no-daemon lintDebug testDebugUnitTest assembleDebug` under a 5-minute wall-clock timeout (override via `AQM_GRADLE_TIMEOUT_SECONDS`, default `300`, automatically capturing `jstack` for any stuck Gradle test worker and terminating the process group with exit `124` on timeout) plus a 3-minute per-task JUnit timeout in `app/build.gradle.kts`, so piping the script's output (`./scripts/verify-all.sh 2>&1 | tail -60`) returns cleanly instead of hanging on a `GradleDaemon` or deadlocked test.
 
 Or run individual test suites directly:
 

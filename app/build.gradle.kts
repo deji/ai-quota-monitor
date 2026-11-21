@@ -1,3 +1,5 @@
+import java.time.Duration
+
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.compose.compiler)
@@ -80,6 +82,11 @@ android {
 
 kotlin {
   jvmToolchain(17)
+}
+
+tasks.withType<Test>().configureEach {
+  // Fail deadlocked unit tests loudly instead of hanging Gradle Test Executor indefinitely (APP-TEST1).
+  timeout.set(Duration.ofMinutes(3))
 }
 
 dependencies {

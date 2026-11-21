@@ -19,7 +19,48 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s collector/tests -v
 ./scripts/test-workflow.sh
 
 echo "==> [3/5] Running Android Lint, JUnit Tests, and Debug APK Build..."
-./gradlew --no-daemon lintDebug testDebugUnitTest assembleDebug
+AQM_GRADLE_TIMEOUT_SECONDS="${AQM_GRADLE_TIMEOUT_SECONDS:-300}" REPO_ROOT="$REPO_ROOT" python3 - <<'PY'
+import os, signal, subprocess, sys
+
+timeout_s = int(os.environ.get("AQM_GRADLE_TIMEOUT_SECONDS", "300"))
+repo_root = os.environ["REPO_ROOT"]
+cmd = ["./gradlew", "--no-daemon", "lintDebug", "testDebugUnitTest", "assembleDebug"]
+proc = subprocess.Popen(cmd, start_new_session=True)
+try:
+    sys.exit(proc.wait(timeout=timeout_s))
+except subprocess.TimeoutExpired:
+    print(f"\nERROR: Gradle verification timed out after {timeout_s}s. Capturing jstack before termination...", file=sys.stderr, flush=True)
+    try:
+        ps = subprocess.run(["ps", "-axo", "pid=,command="], capture_output=True, text=True, timeout=10)
+        for line in ps.stdout.splitlines():
+            if "GradleWorkerMain" in line and repo_root in line:
+                pid = line.strip().split(None, 1)[0]
+                print(f"--- jstack {pid} ---", file=sys.stderr, flush=True)
+                try:
+                    subprocess.run(["jstack", pid], stdout=sys.stderr, stderr=sys.stderr, timeout=15)
+                except Exception as exc:
+                    print(f"jstack {pid} failed: {exc}", file=sys.stderr, flush=True)
+    except Exception as exc:
+        print(f"Unable to inspect Gradle workers before termination: {exc}", file=sys.stderr, flush=True)
+    finally:
+        try:
+            os.killpg(proc.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            pass
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        try:
+            proc.wait(timeout=5)
+        except Exception:
+            pass
+    sys.exit(124)
+PY
 
 echo "==> [4/5] Verifying Built APK Artifact..."
 ls -lh app/build/outputs/apk/debug/app-debug.apk
