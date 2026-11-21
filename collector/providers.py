@@ -595,7 +595,7 @@ def assemble_snapshot(
         },
         {
             "role": "BUILDER",
-            "label": "Flash 3.8 / OpenCode",
+            "label": "Gemini Pool / OpenCode",
             "primaryBucketId": builder_primary_id,
             "remainingPercent": builder_rem,
             "status": builder_status,
@@ -613,7 +613,7 @@ def assemble_snapshot(
         {
             "id": "agy",
             "displayName": "Antigravity (CLI)",
-            "subtitle": "Gemini 4 Argon & 3.8 Flash",
+            "subtitle": "Gemini 4 Argon, Gemini Pool & 3P",
             "status": errs.get("agy", "ok"),
             "buckets": norm_agy,
         },
@@ -635,6 +635,16 @@ def assemble_snapshot(
 
     history = storage.get_history(limit=50) if storage else []
 
+    if storage is not None:
+        activity = storage.get_activity_summary(now_iso=timestamp)
+    else:
+        activity = {
+            "window5h": [],
+            "window24h": [],
+            "window7d": [],
+            "window30d": [],
+        }
+
     smart_prime = smart_prime_info or {
         "policy": "active_hours_or_manual",
         "activeHoursStart": "08:00",
@@ -652,6 +662,7 @@ def assemble_snapshot(
         "orcaRoles": orca_roles,
         "providers": providers,
         "history": history,
+        "activity": activity,
     }
 
 

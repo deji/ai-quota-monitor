@@ -172,7 +172,7 @@ fun BurnVelocityScreen(
             MetricSquircle(
                 label = "PEAK VELOCITY",
                 value = "1.25%/hr",
-                subtext = "Gemini Flash Burst",
+                subtext = "Gemini Pool 5h Burst",
                 color = QuotaCyan,
                 modifier = Modifier.weight(1f)
             )
@@ -286,7 +286,7 @@ fun BurnVelocityScreen(
                 Spacer(modifier = Modifier.height(8.dp))
                 StageCheckpointRow(
                     stage = "BUILDER",
-                    model = "Gemini 3.8 Flash High + OpenCode",
+                    model = "Gemini Pool + OpenCode",
                     status = "Ready · 99% 5h pool remaining",
                     statusColor = QuotaCyan
                 )

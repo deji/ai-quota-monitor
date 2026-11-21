@@ -786,6 +786,101 @@ class TestStorage(unittest.TestCase):
             st = os.stat(db_path)
             self.assertEqual(oct(st.st_mode & 0o777), oct(0o600))
 
+    def test_activity_summary_window_bin_counts(self):
+        """get_activity_summary emits the four fixed activity windows."""
+        storage = QuotaStorage(db_path=":memory:")
+        summary = storage.get_activity_summary(now_iso="2026-11-18T12:00:00Z")
+
+        self.assertEqual(20, len(summary["window5h"]))
+        self.assertEqual(24, len(summary["window24h"]))
+        self.assertEqual(28, len(summary["window7d"]))
+        self.assertEqual(35, len(summary["window30d"]))
+        for name in ("window5h", "window24h", "window7d", "window30d"):
+            for bucket in summary[name]:
+                self.assertEqual({"startAt", "endAt", "deltas", "wallHits", "resets"}, set(bucket))
+                self.assertEqual({}, bucket["deltas"])
+
+    def test_activity_summary_empty_db_is_honest(self):
+        """An empty database returns bins with no fabricated deltas or flags."""
+        storage = QuotaStorage(db_path=":memory:")
+        summary = storage.get_activity_summary(now_iso="2026-11-17T00:00:00Z")
+
+        for name in ("window5h", "window24h", "window7d", "window30d"):
+            for bucket in summary[name]:
+                self.assertEqual({}, bucket["deltas"])
+                self.assertEqual([], bucket["wallHits"])
+                self.assertEqual([], bucket["resets"])
+
+    def test_activity_summary_positive_deltas_resets_and_wall_hits(self):
+        """Deltas, resets (value drop or reset-time jump), and wall hits land in the right bins."""
+        storage = QuotaStorage(db_path=":memory:")
+        reset_at = "2026-11-18T18:00:00Z"
+        readings = [
+            ("2026-11-18T09:00:00Z", 90.0, 10.0, reset_at),
+            ("2026-11-18T10:00:00Z", 70.0, 30.0, reset_at),
+            ("2026-11-18T10:30:00Z", 95.0, 5.0, "2026-11-18T20:00:00Z"),
+            ("2026-11-18T11:00:00Z", 5.0, 95.0, "2026-11-18T20:00:00Z"),
+            ("2026-11-18T11:05:00Z", 97.0, 3.0, "2026-11-18T22:00:00Z"),
+            ("2026-11-18T11:20:00Z", 97.0, 3.0, "2026-11-18T22:00:00Z"),
+        ]
+        for captured_at, remaining, used, resets_at in readings:
+            storage.record_readings(
+                [{
+                    "id": "gemini-5h",
+                    "remainingPercent": remaining,
+                    "usedPercent": used,
+                    "windowDurationHours": 5.0,
+                    "resetsAt": resets_at,
+                }],
+                captured_at=captured_at,
+            )
+
+        summary = storage.get_activity_summary(now_iso="2026-11-18T12:00:00Z")
+        window5h = summary["window5h"]
+
+        # 09:00 is bin 8, 10:00 is bin 12, 10:30 is bin 14, 11:00/11:05/11:20 are bin 16.
+        self.assertEqual(20.0, window5h[12]["deltas"]["gemini-5h"])
+        self.assertEqual([], window5h[12]["resets"])
+        # Reset-time jump (+2h) and value drop are both detected.
+        self.assertIn("gemini-5h", window5h[14]["resets"])
+        self.assertEqual(90.0, window5h[16]["deltas"]["gemini-5h"])
+        self.assertEqual(["gemini-5h"], window5h[16]["wallHits"])
+        self.assertEqual(["gemini-5h"], window5h[16]["resets"])
+        # A repeated reading produces no zero delta and no extra flags.
+        self.assertNotIn("gemini-5h", window5h[17]["deltas"])
+
+        # The daily window aligns Monday..Sunday and still records the burst.
+        self.assertEqual(35, len(summary["window30d"]))
+        daily = summary["window30d"]
+        self.assertEqual(110.0, daily[30]["deltas"]["gemini-5h"])
+
+    def test_activity_summary_includes_reading_at_exact_now_iso(self):
+        """A live reading stamped at exact now_iso lands in the final bin of 5h, 24h, 7d, and 30d."""
+        storage = QuotaStorage(db_path=":memory:")
+        reset_at = "2026-11-18T18:00:00Z"
+        for captured_at, remaining, used in (
+            ("2026-11-18T11:50:00Z", 90.0, 10.0),
+            ("2026-11-18T12:00:00Z", 75.0, 25.0),
+        ):
+            storage.record_readings(
+                [{
+                    "id": "gemini-5h",
+                    "remainingPercent": remaining,
+                    "usedPercent": used,
+                    "windowDurationHours": 5.0,
+                    "resetsAt": reset_at,
+                }],
+                captured_at=captured_at,
+            )
+
+        summary = storage.get_activity_summary(now_iso="2026-11-18T12:00:00Z")
+        self.assertEqual(15.0, summary["window5h"][19]["deltas"].get("gemini-5h"))
+        self.assertEqual(15.0, summary["window24h"][23]["deltas"].get("gemini-5h"))
+        self.assertEqual(15.0, summary["window7d"][27]["deltas"].get("gemini-5h"))
+        self.assertEqual(15.0, summary["window30d"][30]["deltas"].get("gemini-5h"))
+        # Interior bins remain half-open and do not double-count the live edge.
+        self.assertEqual({}, summary["window5h"][18]["deltas"])
+
 
 FIXTURE_SYNTHETIC_AGY = {
     "status": "SUCCESS",

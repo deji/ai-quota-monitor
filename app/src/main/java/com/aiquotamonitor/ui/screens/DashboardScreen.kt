@@ -8,12 +8,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -36,12 +36,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
@@ -49,17 +51,14 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import com.aiquotamonitor.data.repository.ConnectionState
 import com.aiquotamonitor.domain.model.QuotaBucket
-import com.aiquotamonitor.domain.model.QuotaSnapshot
-import com.aiquotamonitor.ui.components.AntigravityBucketsCard
+import com.aiquotamonitor.ui.components.ActivityBoardCard
 import com.aiquotamonitor.ui.components.BucketDetailSheet
 import com.aiquotamonitor.ui.components.ConnectCollectorCard
-import com.aiquotamonitor.ui.components.HeroBottleneckCard
 import com.aiquotamonitor.ui.components.ModelFilterSheet
-import com.aiquotamonitor.ui.components.OrcaRoleReadinessStrip
-import com.aiquotamonitor.ui.components.ProviderBentoRow
+import com.aiquotamonitor.ui.components.QuotaChronographCard
 import com.aiquotamonitor.ui.components.QuotaPolarityToggle
+import com.aiquotamonitor.ui.components.SelectedPoolStrip
 import com.aiquotamonitor.ui.components.SyncHubSheet
-import com.aiquotamonitor.ui.components.TimeTravelScrubberDock
 import com.aiquotamonitor.ui.theme.QuotaAmber
 import com.aiquotamonitor.ui.theme.QuotaCoral
 import com.aiquotamonitor.ui.theme.QuotaCyan
@@ -77,8 +76,6 @@ fun DashboardScreen(
     val polarity by viewModel.polarity.collectAsState()
     val settings by viewModel.settings.collectAsState()
     val connectionState by viewModel.connectionState.collectAsState()
-    val scrubOffset by viewModel.scrubOffsetHours.collectAsState()
-    val isScrubbing by viewModel.isScrubbing.collectAsState()
     val isPriming by viewModel.isPriming.collectAsState()
     val isSyncError by viewModel.isSyncError.collectAsState()
     val snapshotIsStale by viewModel.isStale.collectAsState()
@@ -86,7 +83,7 @@ fun DashboardScreen(
     val hiddenBucketIds by viewModel.hiddenBucketIds.collectAsState()
     val pinnedBucketId by viewModel.pinnedBucketId.collectAsState()
 
-    // Lifecycle-aware 30s clock so "3m old" advances even between network polls.
+    // Lifecycle-aware 30s clock so countdowns and ages advance between polls.
     val lifecycleOwner = LocalLifecycleOwner.current
     val nowEpochMs by produceState(
         initialValue = System.currentTimeMillis(),
@@ -101,14 +98,19 @@ fun DashboardScreen(
     }
     val ageLabel = snapshot.formatAgeShort(nowEpochMs)
     val ageSuffix = if (ageLabel.isNotEmpty()) " · $ageLabel" else ""
-    // Re-evaluate staleness against the live 30s clock so the badge crosses the
-    // 7200s boundary even when no repository emission (or frozen scrub base) changes.
     val isStale = snapshotIsStale || (snapshot.ageSeconds(nowEpochMs) ?: 0L) > 7200L
     val isRefreshing = connectionState == ConnectionState.SYNCING || isAutoSyncing
 
     var selectedBucket by remember { mutableStateOf<QuotaBucket?>(null) }
     var showSyncHub by remember { mutableStateOf(false) }
     var showFilterSheet by remember { mutableStateOf(false) }
+
+    // Chronograph selection: a bucket wedge wins over a provider legend filter.
+    var selectedBucketId by rememberSaveable { mutableStateOf<String?>(null) }
+    var selectedProviderId by rememberSaveable { mutableStateOf<String?>(null) }
+
+    val effectiveBucketId = selectedBucketId?.takeIf { it !in hiddenBucketIds }
+    val effectiveProviderId = selectedProviderId
 
     // Intercept back gesture to close modal bottom sheets in topmost z-order
     if (selectedBucket != null) {
@@ -119,202 +121,186 @@ fun DashboardScreen(
         BackHandler { showFilterSheet = false }
     }
 
-    val heroBucket = snapshot.heroBucket(hiddenBucketIds, pinnedBucketId)
-    val isHeroPinned = pinnedBucketId != null && heroBucket?.id == pinnedBucketId
-    val agyProvider = snapshot.providers.firstOrNull { it.id == "agy" }
-    val openCodeProvider = snapshot.providers.firstOrNull { it.id == "opencode_go" }
-    val grokProvider = snapshot.providers.firstOrNull { it.id == "grok" }
-
-    val historyValues = heroBucket?.let { b ->
-        snapshot.history.mapNotNull { it.bucketRemaining[b.id] }
-    } ?: emptyList()
-
-    // Nearest reset hours across visible buckets for quick RESET preset
-    val nearestResetHours = snapshot.visibleBuckets(hiddenBucketIds)
-        .mapNotNull { it.hoursUntilReset }
-        .filter { it > 0.0 }
-        .minOrNull() ?: QuotaSnapshot.DEFAULT_NEAREST_RESET_HOURS
-
-    Box(modifier = modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 136.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        // Fixed-width status pill: the leading slot swaps dot -> spinner in place,
+        // so the label never reflows horizontally during a refresh.
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
+            val dotColor = when {
+                isSyncError -> QuotaCoral
+                isStale -> QuotaAmber
+                connectionState == ConnectionState.TAILSCALE_LIVE -> QuotaEmerald
+                connectionState == ConnectionState.CLOUD_RELAY_SYNCED -> QuotaCyan
+                connectionState == ConnectionState.DEMO_SEED -> QuotaAmber
+                connectionState == ConnectionState.SYNCING -> MaterialTheme.colorScheme.primary
+                else -> Color(0xFF94A3B8)
+            }
+
+            val pillBorderColor = when {
+                isSyncError -> QuotaCoral.copy(alpha = 0.6f)
+                isStale -> QuotaAmber.copy(alpha = 0.6f)
+                else -> Color.Transparent
+            }
+
+            val statusText = when {
+                isSyncError -> "Fallback Mode$ageSuffix"
+                isStale -> "${connectionState.label} (Stale)$ageSuffix"
+                else -> "${connectionState.label}$ageSuffix"
+            }
+
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier
+                    .width(164.dp)
+                    .height(32.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .clickable { showSyncHub = true }
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                    .border(1.dp, pillBorderColor, RoundedCornerShape(16.dp))
+                    .padding(horizontal = 9.dp)
             ) {
-                val dotColor = when {
-                    isSyncError -> QuotaCoral
-                    isStale -> QuotaAmber
-                    connectionState == ConnectionState.TAILSCALE_LIVE -> QuotaEmerald
-                    connectionState == ConnectionState.CLOUD_RELAY_SYNCED -> QuotaCyan
-                    connectionState == ConnectionState.DEMO_SEED -> QuotaAmber
-                    connectionState == ConnectionState.SYNCING -> MaterialTheme.colorScheme.primary
-                    else -> Color(0xFF94A3B8)
-                }
-
-                val pillBorderColor = when {
-                    isSyncError -> QuotaCoral.copy(alpha = 0.6f)
-                    isStale -> QuotaAmber.copy(alpha = 0.6f)
-                    else -> Color.Transparent
-                }
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(16.dp))
-                        .clickable { showSyncHub = true }
-                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                        .border(1.dp, pillBorderColor, RoundedCornerShape(16.dp))
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                Box(
+                    modifier = Modifier.size(12.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    if (isRefreshing) {
-                        CircularProgressIndicator(
+                    when {
+                        isRefreshing -> CircularProgressIndicator(
                             modifier = Modifier.size(10.dp),
                             strokeWidth = 2.dp,
                             color = dotColor
                         )
-                    } else if (isSyncError) {
-                        Icon(
+                        isSyncError -> Icon(
                             imageVector = Icons.Default.Warning,
                             contentDescription = "Sync Alert",
                             tint = QuotaCoral,
                             modifier = Modifier.size(12.dp)
                         )
-                    } else {
-                        Box(
+                        else -> Box(
                             modifier = Modifier
                                 .size(8.dp)
                                 .clip(CircleShape)
                                 .background(dotColor)
                         )
                     }
-
-                    Text(
-                        text = when {
-                            isRefreshing -> "Refreshing...$ageSuffix"
-                            isSyncError -> "Fallback Mode$ageSuffix"
-                            isStale -> "${connectionState.label} (Stale)$ageSuffix"
-                            else -> "${connectionState.label}$ageSuffix"
-                        },
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (isSyncError) QuotaCoral else if (isStale) QuotaAmber else MaterialTheme.colorScheme.onSurface,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 11.sp
-                    )
                 }
 
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    BadgedBox(
-                        badge = {
-                            if (hiddenBucketIds.isNotEmpty() || pinnedBucketId != null) {
-                                Badge(
-                                    containerColor = MaterialTheme.colorScheme.primary,
-                                    contentColor = MaterialTheme.colorScheme.onPrimary
-                                ) {
-                                    Text(
-                                        text = if (pinnedBucketId != null) "★" else "${hiddenBucketIds.size}",
-                                        fontSize = 9.sp
-                                    )
-                                }
+                Text(
+                    text = statusText,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (isSyncError) QuotaCoral else if (isStale) QuotaAmber else MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 10.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                BadgedBox(
+                    badge = {
+                        if (hiddenBucketIds.isNotEmpty() || pinnedBucketId != null) {
+                            Badge(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
+                            ) {
+                                Text(
+                                    text = if (pinnedBucketId != null) "★" else "${hiddenBucketIds.size}",
+                                    fontSize = 9.sp
+                                )
                             }
                         }
-                    ) {
-                        IconButton(
-                            onClick = { showFilterSheet = true },
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Tune,
-                                contentDescription = "Model Filters",
-                                tint = if (hiddenBucketIds.isNotEmpty() || pinnedBucketId != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
                     }
-
+                ) {
                     IconButton(
-                        onClick = { viewModel.refresh(forceTailscale = false, isManual = true) },
+                        onClick = { showFilterSheet = true },
                         modifier = Modifier.size(36.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = "Refresh",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            imageVector = Icons.Default.Tune,
+                            contentDescription = "Model Filters",
+                            tint = if (hiddenBucketIds.isNotEmpty() || pinnedBucketId != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(20.dp)
                         )
                     }
+                }
 
-                    QuotaPolarityToggle(
-                        polarity = polarity,
-                        onToggle = { viewModel.setPolarity(it) }
+                IconButton(
+                    onClick = { viewModel.refresh(forceTailscale = false, isManual = true) },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "Refresh",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
-            }
 
-            if (!settings.hasUsableTransport) {
-                ConnectCollectorCard(
-                    connectionState = connectionState,
-                    onConnectClick = { showSyncHub = true }
-                )
-            }
-
-            if (snapshot.orcaRoles.isNotEmpty()) {
-                OrcaRoleReadinessStrip(
-                    roles = snapshot.orcaRoles,
-                    polarity = polarity
-                )
-            }
-
-            if (heroBucket != null) {
-                HeroBottleneckCard(
-                    bucket = heroBucket,
+                QuotaPolarityToggle(
                     polarity = polarity,
-                    historyPoints = historyValues,
-                    isPinned = isHeroPinned,
-                    isScrubbing = isScrubbing,
-                    onClick = { selectedBucket = heroBucket }
+                    onToggle = { viewModel.setPolarity(it) }
                 )
             }
-
-            ProviderBentoRow(
-                openCodeProvider = openCodeProvider,
-                grokProvider = grokProvider,
-                smartPrime = snapshot.smartPrime,
-                polarity = polarity,
-                onPrimePulse = { viewModel.primeGrok() },
-                isPriming = isPriming,
-                isScrubbing = isScrubbing,
-                hiddenBucketIds = hiddenBucketIds,
-                onBucketClick = { selectedBucket = it }
-            )
-
-            AntigravityBucketsCard(
-                agyProvider = agyProvider,
-                polarity = polarity,
-                hiddenBucketIds = hiddenBucketIds,
-                heroBucketId = heroBucket?.id,
-                onBucketClick = { selectedBucket = it }
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
         }
 
-        TimeTravelScrubberDock(
-            scrubOffsetHours = scrubOffset,
-            onScrubOffsetChanged = { viewModel.setScrubOffset(it) },
-            nearestResetHours = nearestResetHours,
-            onResetScrub = { viewModel.resetScrub() },
-            modifier = Modifier.align(Alignment.BottomCenter)
+        if (!settings.hasUsableTransport) {
+            ConnectCollectorCard(
+                connectionState = connectionState,
+                onConnectClick = { showSyncHub = true },
+                compact = true
+            )
+        }
+
+        QuotaChronographCard(
+            snapshot = snapshot,
+            polarity = polarity,
+            hiddenBucketIds = hiddenBucketIds,
+            selectedBucketId = effectiveBucketId,
+            selectedProviderId = effectiveProviderId,
+            onSelectBucket = { bucketId ->
+                selectedBucketId = bucketId
+                selectedProviderId = null
+            },
+            onSelectProvider = { providerId ->
+                selectedBucketId = null
+                selectedProviderId = providerId
+            },
+            nowEpochMs = nowEpochMs
+        )
+
+        SelectedPoolStrip(
+            snapshot = snapshot,
+            polarity = polarity,
+            hiddenBucketIds = hiddenBucketIds,
+            selectedBucketId = effectiveBucketId,
+            selectedProviderId = effectiveProviderId,
+            pinnedBucketId = pinnedBucketId,
+            onOpenDetails = { selectedBucket = it },
+            onSetPinnedBucket = { viewModel.setPinnedBucket(it) },
+            onPrime = { viewModel.primeGrok() },
+            isPriming = isPriming,
+            nowEpochMs = nowEpochMs
+        )
+
+        ActivityBoardCard(
+            snapshot = snapshot,
+            polarity = polarity,
+            hiddenBucketIds = hiddenBucketIds,
+            selectedBucketId = effectiveBucketId,
+            selectedProviderId = effectiveProviderId
         )
     }
 

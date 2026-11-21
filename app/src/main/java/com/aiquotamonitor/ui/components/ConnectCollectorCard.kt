@@ -2,6 +2,7 @@ package com.aiquotamonitor.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,7 +42,8 @@ import com.aiquotamonitor.ui.theme.QuotaEmerald
 fun ConnectCollectorCard(
     onConnectClick: () -> Unit,
     modifier: Modifier = Modifier,
-    connectionState: ConnectionState = ConnectionState.DEMO_SEED
+    connectionState: ConnectionState = ConnectionState.DEMO_SEED,
+    compact: Boolean = false
 ) {
     val isOfflineCache = connectionState == ConnectionState.OFFLINE
     val isLive = connectionState == ConnectionState.TAILSCALE_LIVE || connectionState == ConnectionState.CLOUD_RELAY_SYNCED
@@ -62,6 +64,62 @@ fun ConnectCollectorCard(
         isOfflineCache -> "Currently viewing cached offline data. Connect your Pixel 8 Pro to the Mac collector over Tailscale or encrypted GitHub Gist relay to stream live quota windows and burn rates."
         isLive -> "Connected to ${connectionState.label}. Tap below to view or edit connection settings."
         else -> "Currently viewing demo simulation data. Connect your Pixel 8 Pro to the Mac collector over Tailscale or encrypted GitHub Gist relay to stream live quota windows and burn rates."
+    }
+
+    if (compact) {
+        Row(
+            modifier = modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                .border(
+                    width = 1.dp,
+                    color = QuotaCyan.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(16.dp)
+                )
+                .clickable(onClick = onConnectClick)
+                .padding(horizontal = 12.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Sensors,
+                contentDescription = null,
+                tint = QuotaCyan,
+                modifier = Modifier.size(18.dp)
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Connect to your Mac collector",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1
+                )
+                Text(
+                    text = if (isOfflineCache) "Offline cache · tap to configure live sync" else "Demo data · tap to configure live sync",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 10.sp,
+                    maxLines = 1
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(badgeColor.copy(alpha = 0.15f))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = badgeText,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = badgeColor,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 8.sp
+                )
+            }
+        }
+        return
     }
 
     Box(

@@ -929,7 +929,7 @@ class QuotaRepositoryImplTest {
     }
 
     @Test
-    fun testAutoRefreshSkipsImmediatelyWhenSyncMutexLocked() = runTest {
+    fun testAutoRefreshSkipsImmediatelyWhenSyncMutexLocked() = runBlocking {
         val gate = CompletableDeferred<Unit>()
         val manualStarted = CompletableDeferred<Unit>()
         var autoFetchCalls = 0
@@ -953,22 +953,24 @@ class QuotaRepositoryImplTest {
         repository.updateSettings(SyncSettings(tailscaleUrl = "http://100.64.0.1:8741"))
 
         val manual = async(Dispatchers.IO) { repository.refresh(forceTailscale = false, isManual = true) }
-        withTimeout(5_000L) { manualStarted.await() }
-        val snapshotBeforeManualCompletes = repository.snapshotFlow.value
+        try {
+            withTimeout(5_000L) { manualStarted.await() }
+            val snapshotBeforeManualCompletes = repository.snapshotFlow.value
 
-        val auto = repository.refresh(forceTailscale = false, isManual = false)
+            val auto = repository.refresh(forceTailscale = false, isManual = false)
 
-        assertTrue("Skipped auto-sync must report success", auto.isSuccess)
-        assertEquals("Skipped auto-sync must not hit the network", 0, autoFetchCalls)
-        assertEquals(snapshotBeforeManualCompletes, auto.getOrNull())
-
-        gate.complete(Unit)
+            assertTrue("Skipped auto-sync must report success", auto.isSuccess)
+            assertEquals("Skipped auto-sync must not hit the network", 0, autoFetchCalls)
+            assertEquals(snapshotBeforeManualCompletes, auto.getOrNull())
+        } finally {
+            gate.complete(Unit)
+        }
         assertTrue(manual.await().isSuccess)
         assertEquals("manual-refresh", repository.snapshotFlow.value.host)
     }
 
     @Test
-    fun testConcurrentManualRefreshesAreSerializedBySyncMutex() = runTest {
+    fun testConcurrentManualRefreshesAreSerializedBySyncMutex() = runBlocking {
         val gate = CompletableDeferred<Unit>()
         val firstStarted = CompletableDeferred<Unit>()
         val secondStarted = CompletableDeferred<Unit>()
@@ -996,12 +998,15 @@ class QuotaRepositoryImplTest {
         repository.updateSettings(SyncSettings(tailscaleUrl = "http://100.64.0.1:8741"))
 
         val first = async(Dispatchers.IO) { repository.refresh(forceTailscale = false, isManual = true) }
-        withTimeout(5_000L) { firstStarted.await() }
-        val second = async(Dispatchers.IO) { repository.refresh(forceTailscale = false, isManual = true) }
-        Thread.sleep(50)
-        assertFalse("Second refresh must wait on syncMutex", secondStarted.isCompleted)
-
-        gate.complete(Unit)
+        val second: kotlinx.coroutines.Deferred<Result<QuotaSnapshot>>
+        try {
+            withTimeout(5_000L) { firstStarted.await() }
+            second = async(Dispatchers.IO) { repository.refresh(forceTailscale = false, isManual = true) }
+            Thread.sleep(50)
+            assertFalse("Second refresh must wait on syncMutex", secondStarted.isCompleted)
+        } finally {
+            gate.complete(Unit)
+        }
         assertTrue(first.await().isSuccess)
         assertTrue(second.await().isSuccess)
 
@@ -1241,7 +1246,7 @@ class QuotaRepositoryImplTest {
         assertNotNull(concrete)
         assertEquals("gemini-5h", concrete?.id)
         assertEquals("AGY", concrete?.categoryLabel)
-        assertEquals("Gemini 3.8 Flash 5h Rolling", concrete?.titleLabel)
+        assertEquals("Gemini Pool 5h", concrete?.titleLabel)
         assertFalse(concrete!!.isFallback)
 
         // Role tokens are case-insensitive and use OrcaRoleReadiness percents, not the raw bucket copy.
@@ -1561,7 +1566,7 @@ class QuotaRepositoryImplTest {
             compactBucketId = "gemini-5h"
         ).first()
         assertEquals("gemini-5h", flash.id)
-        assertEquals("AGY FLASH", flash.shortHeaderLabel)
+        assertEquals("AGY GEMINI", flash.shortHeaderLabel)
         assertEquals("5h Roll", flash.shortWindowLabel)
         assertEquals("Gemini 5h Roll", flash.shortWideRowLabel)
 

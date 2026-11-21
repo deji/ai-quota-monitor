@@ -7,8 +7,14 @@ import com.aiquotamonitor.domain.model.ProviderQuota
 import com.aiquotamonitor.domain.model.QuotaBucket
 import com.aiquotamonitor.domain.model.QuotaSnapshot
 import com.aiquotamonitor.domain.model.SmartPrimeStatus
+import com.aiquotamonitor.domain.model.ActivityBin
+import com.aiquotamonitor.domain.model.ActivitySummary
+import java.time.DayOfWeek
+import java.time.Duration
 import java.time.Instant
+import java.time.ZoneOffset
 import java.time.temporal.ChronoUnit
+import java.time.temporal.TemporalAdjusters
 
 object SeedData {
 
@@ -28,7 +34,7 @@ object SeedData {
         val agyProvider = ProviderQuota(
             id = "agy",
             displayName = "Antigravity (CLI)",
-            subtitle = "Gemini 4 Argon & 3.8 Flash",
+            subtitle = "Gemini 4 Argon, Gemini Pool & 3P",
             status = "ok",
             buckets = listOf(
                 QuotaBucket(
@@ -49,7 +55,7 @@ object SeedData {
                 QuotaBucket(
                     id = "gemini-5h",
                     group = "Gemini Models",
-                    label = "Gemini 3.8 Flash 5h Rolling",
+                    label = "Gemini Pool 5h",
                     windowType = "rolling",
                     windowDurationHours = 5,
                     remainingPercent = 99.0,
@@ -64,7 +70,7 @@ object SeedData {
                 QuotaBucket(
                     id = "gemini-weekly",
                     group = "Gemini Models",
-                    label = "Gemini Weekly Pool",
+                    label = "Gemini Pool 7d",
                     windowType = "weekly",
                     windowDurationHours = 168,
                     remainingPercent = 100.0,
@@ -214,7 +220,7 @@ object SeedData {
             ),
             OrcaRoleReadiness(
                 role = "BUILDER",
-                label = "Flash 3.8 / OpenCode",
+                label = "Gemini Pool / OpenCode",
                 primaryBucketId = "gemini-5h",
                 remainingPercent = 99.0,
                 status = "healthy"
@@ -269,7 +275,140 @@ object SeedData {
             ),
             orcaRoles = orcaRoles,
             providers = listOf(agyProvider, openCodeProvider, grokProvider),
-            history = historyPoints
+            history = historyPoints,
+            activity = buildSeedActivity(now)
         )
+    }
+
+    private data class SeedBinContent(
+        val deltas: Map<String, Double> = emptyMap(),
+        val wallHits: List<String> = emptyList(),
+        val resets: List<String> = emptyList()
+    )
+
+    private fun buildSeedActivity(now: Instant): ActivitySummary {
+        val monday = now
+            .atZone(ZoneOffset.UTC)
+            .toLocalDate()
+            .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+            .atStartOfDay(ZoneOffset.UTC)
+            .toInstant()
+
+        return ActivitySummary(
+            window5h = seedBins(now.minus(Duration.ofHours(5)), 20, Duration.ofMinutes(15), ::seed5h),
+            window24h = seedBins(now.minus(Duration.ofHours(24)), 24, Duration.ofHours(1), ::seed24h),
+            window7d = seedBins(now.minus(Duration.ofDays(7)), 28, Duration.ofHours(6), ::seed7d),
+            window30d = seedBins(monday.minus(Duration.ofDays(28)), 35, Duration.ofDays(1), ::seed30d)
+        )
+    }
+
+    private fun seedBins(
+        start: Instant,
+        count: Int,
+        step: Duration,
+        content: (Int) -> SeedBinContent
+    ): List<ActivityBin> = (0 until count).map { index ->
+        val binStart = start.plus(step.multipliedBy(index.toLong()))
+        val body = content(index)
+        ActivityBin(
+            startAt = binStart.toString(),
+            endAt = binStart.plus(step).toString(),
+            deltas = body.deltas,
+            wallHits = body.wallHits,
+            resets = body.resets
+        )
+    }
+
+    private fun seed5h(index: Int): SeedBinContent = when (index) {
+        2 -> SeedBinContent(mapOf("gemini-5h" to 4.2))
+        3 -> SeedBinContent(mapOf("gemini-5h" to 8.7, "opencode-rolling" to 2.1))
+        4 -> SeedBinContent(mapOf("gemini-5h" to 12.4, "opencode-rolling" to 5.3))
+        5 -> SeedBinContent(mapOf("gemini-5h" to 6.1, "opencode-rolling" to 3.0))
+        8 -> SeedBinContent(mapOf("opencode-rolling" to 4.4, "grok-weekly-credits" to 1.8))
+        11 -> SeedBinContent(mapOf("gemini-5h" to 7.6, "opencode-rolling" to 6.2))
+        12 -> SeedBinContent(
+            mapOf("gemini-5h" to 14.2, "opencode-rolling" to 3.1, "grok-weekly-credits" to 1.2),
+            wallHits = listOf("gemini-5h")
+        )
+        13 -> SeedBinContent(mapOf("gemini-5h" to 5.4))
+        15 -> SeedBinContent(resets = listOf("gemini-5h"))
+        17 -> SeedBinContent(mapOf("opencode-rolling" to 8.3, "grok-weekly-credits" to 2.4))
+        else -> SeedBinContent()
+    }
+
+    private fun seed24h(index: Int): SeedBinContent = when (index) {
+        1 -> SeedBinContent(mapOf("gemini-argon-wtu-weekly" to 3.2, "opencode-weekly" to 1.1))
+        5 -> SeedBinContent(mapOf("gemini-5h" to 6.5, "opencode-rolling" to 2.2))
+        6 -> SeedBinContent(mapOf("gemini-5h" to 11.3, "opencode-rolling" to 4.8))
+        7 -> SeedBinContent(mapOf("gemini-5h" to 9.1, "opencode-rolling" to 5.6, "grok-weekly-credits" to 2.3))
+        9 -> SeedBinContent(mapOf("gemini-5h" to 7.4, "opencode-rolling" to 3.2))
+        12 -> SeedBinContent(
+            mapOf("gemini-5h" to 16.8, "opencode-rolling" to 6.4),
+            wallHits = listOf("gemini-5h")
+        )
+        13 -> SeedBinContent(mapOf("gemini-5h" to 4.6, "opencode-rolling" to 2.9))
+        14 -> SeedBinContent(resets = listOf("gemini-5h"))
+        16 -> SeedBinContent(mapOf("gemini-argon-wtu-weekly" to 5.1, "grok-weekly-credits" to 3.4))
+        18 -> SeedBinContent(mapOf("opencode-weekly" to 4.7, "opencode-rolling" to 3.6))
+        20 -> SeedBinContent(
+            mapOf("grok-weekly-credits" to 13.2, "gemini-5h" to 3.1),
+            wallHits = listOf("grok-weekly-credits")
+        )
+        22 -> SeedBinContent(mapOf("gemini-5h" to 2.4))
+        else -> SeedBinContent()
+    }
+
+    private fun seed7d(index: Int): SeedBinContent = when (index) {
+        1 -> SeedBinContent(mapOf("gemini-argon-wtu-weekly" to 4.1, "opencode-weekly" to 2.2))
+        3 -> SeedBinContent(mapOf("gemini-5h" to 12.6, "opencode-rolling" to 5.4))
+        5 -> SeedBinContent(mapOf("3p-weekly" to 3.8, "gemini-weekly" to 1.2))
+        7 -> SeedBinContent(mapOf("gemini-5h" to 8.2, "opencode-weekly" to 4.6))
+        9 -> SeedBinContent(mapOf("gemini-argon-wtu-weekly" to 7.3, "grok-weekly-credits" to 6.1))
+        11 -> SeedBinContent(
+            mapOf("gemini-5h" to 17.4, "opencode-rolling" to 7.2),
+            wallHits = listOf("gemini-5h")
+        )
+        12 -> SeedBinContent(resets = listOf("opencode-weekly"))
+        14 -> SeedBinContent(mapOf("gemini-weekly" to 4.9, "3p-weekly" to 6.2))
+        17 -> SeedBinContent(mapOf("gemini-argon-wtu-weekly" to 5.7, "opencode-weekly" to 3.1))
+        19 -> SeedBinContent(
+            mapOf("grok-weekly-credits" to 14.8, "gemini-5h" to 6.3),
+            wallHits = listOf("grok-weekly-credits")
+        )
+        21 -> SeedBinContent(mapOf("gemini-5h" to 9.6, "opencode-rolling" to 4.1))
+        23 -> SeedBinContent(resets = listOf("gemini-5h"))
+        25 -> SeedBinContent(mapOf("opencode-weekly" to 5.9, "gemini-weekly" to 2.7))
+        else -> SeedBinContent()
+    }
+
+    private fun seed30d(index: Int): SeedBinContent = when (index) {
+        1 -> SeedBinContent(mapOf("gemini-argon-wtu-weekly" to 6.4, "opencode-weekly" to 3.2))
+        3 -> SeedBinContent(mapOf("gemini-5h" to 14.7, "opencode-rolling" to 6.1))
+        5 -> SeedBinContent(mapOf("3p-weekly" to 8.3, "gemini-weekly" to 3.4))
+        7 -> SeedBinContent(resets = listOf("opencode-weekly"))
+        8 -> SeedBinContent(mapOf("gemini-argon-wtu-weekly" to 5.1, "grok-weekly-credits" to 7.2))
+        10 -> SeedBinContent(mapOf("gemini-5h" to 18.1, "opencode-rolling" to 8.4))
+        12 -> SeedBinContent(mapOf("gemini-weekly" to 6.8, "opencode-weekly" to 4.2))
+        13 -> SeedBinContent(
+            mapOf("grok-weekly-credits" to 16.3, "gemini-5h" to 5.9),
+            wallHits = listOf("grok-weekly-credits")
+        )
+        14 -> SeedBinContent(resets = listOf("gemini-5h"))
+        17 -> SeedBinContent(mapOf("gemini-argon-wtu-weekly" to 7.9, "3p-weekly" to 5.4))
+        19 -> SeedBinContent(
+            mapOf("gemini-5h" to 19.6, "opencode-rolling" to 9.1),
+            wallHits = listOf("gemini-5h")
+        )
+        21 -> SeedBinContent(resets = listOf("gemini-5h", "opencode-weekly"))
+        23 -> SeedBinContent(mapOf("grok-weekly-credits" to 11.4, "gemini-weekly" to 4.7))
+        26 -> SeedBinContent(
+            mapOf("gemini-5h" to 15.2, "opencode-weekly" to 6.8),
+            wallHits = listOf("gemini-5h")
+        )
+        28 -> SeedBinContent(resets = listOf("gemini-5h"))
+        30 -> SeedBinContent(mapOf("gemini-argon-wtu-weekly" to 4.3, "opencode-monthly" to 2.1))
+        32 -> SeedBinContent(mapOf("3p-weekly" to 7.6, "gemini-5h" to 10.4))
+        34 -> SeedBinContent(resets = listOf("opencode-weekly"))
+        else -> SeedBinContent()
     }
 }

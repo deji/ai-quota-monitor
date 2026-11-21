@@ -47,6 +47,11 @@ Running `quota.py` and `python3 -m collector collect --json` on the live host co
   | `Claude and GPT models` | `3p-5h` | `5h` (rolling) | Standby / 3P |
   | `Claude and GPT models` | `3p-weekly` | `168h` (7 days) | Standby / 3P |
 
+> **Gemini Pool naming (`APP-UX8`)**: `gemini-5h` and `gemini-weekly` are the single unified
+> **Gemini Pool** covering Neon, Hydrogen, and 3.8. UI copy must say `Gemini Pool 5h`,
+> `Gemini Pool 7d`, and `AGY GEMINI` (never `Flash 3.8` / `AGY FLASH`); CLI model IDs such as
+> `gemini-3.8-flash-high` stay untouched in orchestration docs.
+
 ---
 
 ### 2.2 `opencode go` (OpenCode Go Plan — DeepSeek 4.1 Flash) — Undocumented HTTP
@@ -128,7 +133,7 @@ All collector endpoints (`GET /v1/quota`, `POST /v1/quota/refresh`, `POST /v1/gr
     },
     {
       "role": "BUILDER",
-      "label": "Flash 3.8 / OpenCode",
+      "label": "Gemini Pool / OpenCode",
       "primaryBucketId": "gemini-5h",
       "remainingPercent": 99.0,
       "status": "healthy"
@@ -145,7 +150,7 @@ All collector endpoints (`GET /v1/quota`, `POST /v1/quota/refresh`, `POST /v1/gr
     {
       "id": "agy",
       "displayName": "Antigravity (CLI)",
-      "subtitle": "Gemini 4 Argon & 3.8 Flash",
+      "subtitle": "Gemini 4 Argon, Gemini Pool & 3P",
       "status": "ok",
       "buckets": [
         {

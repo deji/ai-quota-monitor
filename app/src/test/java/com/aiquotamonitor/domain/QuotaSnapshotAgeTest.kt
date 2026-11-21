@@ -84,7 +84,7 @@ class QuotaSnapshotAgeTest {
         QuotaBucket(
             id = "gemini-5h",
             group = "Gemini Models",
-            label = "Gemini 3.8 Flash 5h Rolling",
+            label = "Gemini Pool 5h",
             windowType = "rolling",
             windowDurationHours = 5,
             remainingPercent = 99.0,

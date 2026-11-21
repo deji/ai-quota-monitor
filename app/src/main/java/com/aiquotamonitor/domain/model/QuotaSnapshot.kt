@@ -74,7 +74,8 @@ data class QuotaSnapshot(
     val smartPrime: SmartPrimeStatus = SmartPrimeStatus(),
     val orcaRoles: List<OrcaRoleReadiness> = emptyList(),
     val providers: List<ProviderQuota> = emptyList(),
-    val history: List<HistoryPoint> = emptyList()
+    val history: List<HistoryPoint> = emptyList(),
+    val activity: ActivitySummary? = null
 ) {
     /**
      * Snapshots older than 2 hours (7200 seconds) are considered stale.

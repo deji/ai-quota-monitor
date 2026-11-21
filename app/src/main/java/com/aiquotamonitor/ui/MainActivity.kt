@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Speed
-import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -36,7 +35,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import com.aiquotamonitor.data.repository.QuotaRepositoryProvider
-import com.aiquotamonitor.ui.screens.BurnVelocityScreen
 import com.aiquotamonitor.ui.screens.DashboardScreen
 import com.aiquotamonitor.ui.screens.WidgetsAndSyncScreen
 import com.aiquotamonitor.ui.theme.AIQuotaMonitorTheme
@@ -45,8 +43,7 @@ import com.aiquotamonitor.ui.viewmodel.QuotaViewModel
 import com.aiquotamonitor.widget.WidgetSyncScheduler
 
 enum class AppDestination(val label: String, val icon: ImageVector) {
-    DASHBOARD("Dashboard", Icons.Default.Speed),
-    BURN_VELOCITY("Burn Velocity", Icons.Default.Timeline),
+    QUOTAS("Quotas", Icons.Default.Speed),
     WIDGETS_SYNC("Widgets & Sync", Icons.Default.Widgets)
 }
 
@@ -78,7 +75,7 @@ fun MainContent(
     viewModel: QuotaViewModel,
     modifier: Modifier = Modifier
 ) {
-    var currentDestination by rememberSaveable { mutableStateOf(AppDestination.DASHBOARD) }
+    var currentDestination by rememberSaveable { mutableStateOf(AppDestination.QUOTAS) }
 
     // Single lifecycle-aware foreground auto-sync entry point.
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -88,9 +85,9 @@ fun MainContent(
         }
     }
 
-    // Predictive back: return to Dashboard if on another tab
-    BackHandler(enabled = currentDestination != AppDestination.DASHBOARD) {
-        currentDestination = AppDestination.DASHBOARD
+    // Predictive back: return to Quotas if on another tab
+    BackHandler(enabled = currentDestination != AppDestination.QUOTAS) {
+        currentDestination = AppDestination.QUOTAS
     }
 
     Scaffold(
@@ -138,8 +135,7 @@ fun MainContent(
             label = "screen_crossfade"
         ) { destination ->
             when (destination) {
-                AppDestination.DASHBOARD -> DashboardScreen(viewModel = viewModel)
-                AppDestination.BURN_VELOCITY -> BurnVelocityScreen(viewModel = viewModel)
+                AppDestination.QUOTAS -> DashboardScreen(viewModel = viewModel)
                 AppDestination.WIDGETS_SYNC -> WidgetsAndSyncScreen(viewModel = viewModel)
             }
         }

@@ -35,7 +35,7 @@ class QuotaSnapshotJsonTest {
             },
             {
               "role": "BUILDER",
-              "label": "Flash 3.8 / OpenCode",
+              "label": "Gemini Pool / OpenCode",
               "primaryBucketId": "gemini-5h",
               "remainingPercent": 99.0,
               "status": "healthy"
@@ -52,7 +52,7 @@ class QuotaSnapshotJsonTest {
             {
               "id": "agy",
               "displayName": "Antigravity (CLI)",
-              "subtitle": "Gemini 4 Argon & 3.8 Flash",
+              "subtitle": "Gemini 4 Argon, Gemini Pool & 3P",
               "status": "ok",
               "buckets": [
                 {

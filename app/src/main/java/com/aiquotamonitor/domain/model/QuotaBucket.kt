@@ -101,7 +101,7 @@ data class QuotaBucket(
      */
     fun shortHeaderLabel(): String = when (id) {
         "gemini-argon-wtu-weekly" -> "AGY ARGON"
-        "gemini-5h" -> "AGY FLASH"
+        "gemini-5h" -> "AGY GEMINI"
         "gemini-weekly" -> "AGY GEMINI"
         "3p-5h", "3p-weekly" -> "AGY 3P"
         "opencode-rolling", "opencode-weekly", "opencode-monthly" -> "OPENCODE"
